@@ -1,0 +1,52 @@
+Listado de rutas de carpetas
+El número de serie del volumen es 46BF-F2E8
+C:\USERS\JACQU\DESKTOP\PROYECTOS\LACASADEZOLVE-APP\SRC
+¦   App.vue
+¦   main.js
+¦   
++---assets
+¦       base.css
+¦       logo.svg
+¦       main.css
+¦       
++---components
+¦   ¦   HelloWorld.vue
+¦   ¦   TheWelcome.vue
+¦   ¦   WelcomeItem.vue
+¦   ¦   
+¦   +---icons
+¦           IconCommunity.vue
+¦           IconDocumentation.vue
+¦           IconEcosystem.vue
+¦           IconSupport.vue
+¦           IconTooling.vue
+¦           
++---layouts
+¦       AdminLayout.vue
+¦       
++---lib
+¦       supabaseClient.js
+¦       
++---router
+¦       index.js
+¦       
++---stores
+¦       authStore.js
+¦       
++---views
+    ¦   ARExperienceView.vue
+    ¦   AuthView.vue
+    ¦   HomeView.vue
+    ¦   HowToView.vue
+    ¦   ProfileView.vue
+    ¦   StoreView.vue
+    ¦   UpdatePasswordView.vue
+    ¦   
+    +---Admin
+            AdminContentFormView.vue
+            AdminContentsListView.vue
+            AdminDashboardView.vue
+            AdminMarkerFormView.vue
+            AdminMarkersListView.vue
+            AdminUserListView.vue
+            
