@@ -214,7 +214,7 @@ const handleSendMessage = async () => {
     }))
 
   try {
-    const backendUrl = 'http://localhost:3001/api/chat' // Apunta a tu serverZolve.js
+    const backendUrl = '/.netlify/functions/chat'
 
     const response = await fetch(backendUrl, {
       method: 'POST',

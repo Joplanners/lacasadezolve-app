@@ -112,10 +112,6 @@ async function handleContactSubmit() {
 </template>
 
 <style scoped>
-.home-view-wrapper {
-  /* Contenedor opcional para el layout general de la vista Home */
-  /* Puedes añadir estilos aquí si necesitas controlar el flujo de WeatherZolve y home-container */
-}
 .home-container {
   max-width: 800px;
   margin: 0 auto 40px auto; /* Ajustado el margen superior a 0 si WeatherZolve está encima */

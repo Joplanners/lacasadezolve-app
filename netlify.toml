@@ -1,0 +1,16 @@
+# netlify.toml (en la raíz de lacasadezolve-app/)
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions" # Correcto, le dice a Netlify dónde están tus funciones
+
+[functions]
+  node_bundler = "esbuild" # Asegura que se use esbuild, que maneja bien ESM
+  # Opcional: si necesitas una versión específica de Node.js para tus funciones
+  # node_version = "18" # o "20", etc.
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -5,30 +5,21 @@ import interact from 'interactjs'
 import { useToast } from 'vue-toastification'
 
 const props = defineProps({
-  overlayId: {
-    type: String,
-    required: true,
-  },
+  overlayId: { type: String, required: true },
 })
-
 const toast = useToast()
-
 const overlayDetails = ref(null)
 const loading = ref(true)
 const error = ref('')
-
 const videoPlayer = ref(null)
 const cameraStream = ref(null)
 const cameraError = ref('')
-
 const overlayImageElement = ref(null)
 const overlayPosition = ref({ x: 0, y: 0 })
-
-const R2_PUBLIC_BASE_URL = 'https://pub-48e6b80b718c43a99a9b98163de9920c.r2.dev' // CONFIRMA ESTA URL
+const R2_PUBLIC_BASE_URL = 'https://pub-48e6b80b718c43a99a9b98163de9920c.r2.dev'
 let interactionInstance = null
 const capturedImage = ref(null)
 const isCapturing = ref(false)
-
 const imageUrlToLoad = ref('')
 
 function getOverlayFullUrl(r2Key) {
@@ -42,30 +33,17 @@ function getOverlayFullUrl(r2Key) {
 watch(
   () => overlayDetails.value,
   (newDetails) => {
-    console.log(
-      '[OverlayPhotoCaptureView Watch] newDetails:',
-      newDetails ? JSON.parse(JSON.stringify(newDetails)) : null,
-    )
     if (newDetails && newDetails.r2_key) {
       const key = newDetails.r2_key
       let baseUrl = getOverlayFullUrl(key)
       const cacheBuster = `v=${Date.now()}`
       baseUrl += (baseUrl.includes('?') ? '&' : '?') + cacheBuster
       imageUrlToLoad.value = baseUrl
-      console.log('[OverlayPhotoCaptureView Watch] imageUrlToLoad asignado:', imageUrlToLoad.value)
     } else {
       imageUrlToLoad.value = ''
       if (newDetails && !newDetails.r2_key) {
-        console.error(
-          '[OverlayPhotoCaptureView Watch] newDetails existe PERO r2_key es NULO o falta:',
-          JSON.parse(JSON.stringify(newDetails)),
-        )
         error.value =
           'Error: No se encontró la clave de la imagen (r2_key) en los detalles del overlay.'
-      } else {
-        console.log(
-          '[OverlayPhotoCaptureView Watch] imageUrlToLoad limpiado (newDetails o r2_key no válidos).',
-        )
       }
     }
   },
@@ -77,11 +55,9 @@ async function fetchOverlayDetails() {
   error.value = ''
   overlayDetails.value = null
   imageUrlToLoad.value = ''
-  console.log(`[fetchOverlayDetails] Iniciando para overlayId: ${props.overlayId}`)
   if (!props.overlayId) {
     error.value = 'No se proporcionó ID de overlay.'
     loading.value = false
-    console.error('[fetchOverlayDetails] Error:', error.value)
     return
   }
   try {
@@ -94,58 +70,27 @@ async function fetchOverlayDetails() {
       .select('id, image_name, r2_key, description, is_public')
       .eq('id', props.overlayId)
       .single()
-    console.log(
-      `[fetchOverlayDetails] Supabase query para ID ${props.overlayId} - Status: ${status}, Error:`,
-      dbError,
-      'Data:',
-      data ? JSON.parse(JSON.stringify(data)) : null,
-    )
     if (dbError) {
       if (status === 406 || dbError.code === 'PGRST116') {
-        console.warn(
-          `[fetchOverlayDetails] No se encontró la Foto Mágica con ID: ${props.overlayId} (desde Supabase)`,
-        )
+        /* No encontrado, se maneja abajo */
       } else {
         throw dbError
       }
     }
     if (data) {
       overlayDetails.value = data
-      console.log(
-        '>>> CHECK - overlayDetails JUST SET:',
-        JSON.parse(JSON.stringify(overlayDetails.value)),
-      ) // Log cambiado para diferenciar
       if (!data.r2_key) {
-        const missingKeyError = `La configuración de la imagen (ID: ${props.overlayId}) está incompleta (falta r2_key).`
-        console.error(
-          `[fetchOverlayDetails] ¡ALERTA! ${missingKeyError} Datos recibidos:`,
-          JSON.parse(JSON.stringify(data)),
-        )
-        error.value = missingKeyError
-      }
-      if (typeof data.is_public === 'undefined') {
-        console.warn(
-          `[fetchOverlayDetails] ¡ALERTA! is_public no está definido en los datos recibidos de Supabase para el overlay ID ${props.overlayId}. Asegúrate que la columna existe y RLS la permite.`,
-        )
+        error.value = `La configuración de la imagen (ID: ${props.overlayId}) está incompleta (falta r2_key).`
       }
     } else {
       if (!error.value) {
-        // Solo establecer este error si no hay uno más específico (como missingKeyError)
         error.value = `No se encontró la Foto Mágica con ID: ${props.overlayId}`
       }
-      console.error('[fetchOverlayDetails] Error (data es nula o ya había error):', error.value)
     }
   } catch (err) {
-    console.error(
-      `[fetchOverlayDetails] Catch general. Error al cargar detalles para ID ${props.overlayId}:`,
-      err,
-    )
     error.value = `Error al cargar detalles: ${err.message || 'Error desconocido.'}`
   } finally {
     loading.value = false
-    console.log(
-      `[fetchOverlayDetails] Finalizado para overlayId: ${props.overlayId}. Loading: ${loading.value}, Error: "${error.value}"`,
-    )
   }
 }
 
@@ -172,7 +117,6 @@ async function startCamera() {
       } else {
         cameraError.value = `Error al iniciar cámara: ${err.name}`
       }
-      console.error('Error al acceder a la cámara: ', err)
     }
   } else {
     cameraError.value = 'API MediaDevices no soportada.'
@@ -313,11 +257,9 @@ async function takePhoto() {
     document.body.removeChild(link)
     toast.success('¡Foto guardada!')
   } catch (e) {
-    console.error('Error al procesar o descargar la imagen:', e)
     if (e.name === 'SecurityError') {
-      toast.error('Error de seguridad: No se puede exportar la imagen. Revisa CORS en R2.')
-      error.value =
-        "Error de seguridad al procesar la imagen. Asegúrate de que CORS esté bien configurado en R2 y que la imagen tenga 'crossorigin=anonymous'."
+      toast.error('Error de seguridad. Revisa CORS en R2.')
+      error.value = 'Error de seguridad. Asegúrate de que CORS esté bien configurado en R2.'
     } else {
       toast.error('Error al guardar la foto.')
       error.value = 'Error al procesar la foto.'
@@ -328,30 +270,11 @@ async function takePhoto() {
 }
 
 onMounted(async () => {
-  console.log(`[OverlayPhotoCaptureView onMounted] Overlay ID: ${props.overlayId}`)
   await fetchOverlayDetails()
   if (overlayDetails.value && !error.value && overlayDetails.value.r2_key) {
-    // Añadido chequeo de r2_key
     startCamera()
-  } else {
-    if (error.value) {
-      console.error(
-        `[OverlayPhotoCaptureView onMounted] No se pudo iniciar la cámara porque hubo un error al cargar detalles: ${error.value}`,
-      )
-    }
-    if (!overlayDetails.value) {
-      console.error(
-        `[OverlayPhotoCaptureView onMounted] No se pudo iniciar la cámara porque overlayDetails es nulo.`,
-      )
-    }
-    if (overlayDetails.value && !overlayDetails.value.r2_key) {
-      console.error(
-        `[OverlayPhotoCaptureView onMounted] No se pudo iniciar la cámara porque overlayDetails.r2_key es nulo o no está definido.`,
-      )
-    }
   }
 })
-
 onUnmounted(() => {
   if (cameraStream.value) {
     cameraStream.value.getTracks().forEach((track) => track.stop())
@@ -396,12 +319,6 @@ onUnmounted(() => {
           @error="
             (e) => {
               e.target.style.display = 'none'
-              console.error(
-                'Error al cargar imagen de superposición:',
-                e,
-                'URL intentada:',
-                imageUrlToLoad,
-              )
               toast.error('Fallo al cargar la imagen de superposición.')
             }
           "
@@ -457,8 +374,8 @@ onUnmounted(() => {
 .view-title-overlay {
   text-align: center;
   margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 1.1em;
+  margin-bottom: 5px;
+  font-size: 1em;
   flex-shrink: 0;
   font-weight: 500;
   color: #eee;
@@ -503,6 +420,9 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   width: 100%;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
   background-color: transparent;
   border-radius: 0;
   padding: 0;
@@ -510,7 +430,7 @@ onUnmounted(() => {
   overflow: hidden;
 }
 .overlay-info-header {
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   flex-shrink: 0;
   text-align: center;
 }
@@ -557,9 +477,9 @@ onUnmounted(() => {
   cursor: grabbing;
 }
 .btn-take-photo {
-  margin: 10px auto;
-  padding: 10px 20px;
-  font-size: 1em;
+  margin: 8px auto;
+  padding: 8px 18px;
+  font-size: 0.9em;
   background-color: #4caf50;
   color: #fff;
   border: none;
@@ -568,7 +488,7 @@ onUnmounted(() => {
   transition: background-color 0.2s;
   flex-shrink: 0;
   display: block;
-  min-width: 180px;
+  min-width: 160px;
   font-weight: 500;
 }
 .btn-take-photo:hover:not(:disabled) {
@@ -580,44 +500,45 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 .captured-image-preview {
-  margin: 10px auto 0;
+  margin: 8px auto 0;
   border: 1px dashed #616161;
-  padding: 8px;
+  padding: 5px;
   flex-shrink: 0;
   text-align: center;
   max-width: calc(100% - 20px);
   background-color: rgba(0, 0, 0, 0.2);
   box-sizing: border-box;
+  max-height: 60px;
 }
 .captured-image-preview h4 {
   margin-top: 0;
-  margin-bottom: 5px;
-  font-size: 0.9em;
+  margin-bottom: 3px;
+  font-size: 0.8em;
   color: #eee;
 }
 .captured-image-preview img {
   max-width: 100%;
-  max-height: 80px;
+  max-height: 45px;
   height: auto;
   border: 1px solid #424242;
   display: block;
-  margin: 0 auto 5px;
+  margin: 0 auto 3px;
   background-color: #fff;
 }
 .captured-image-preview p {
-  font-size: 0.75em;
+  font-size: 0.7em;
   color: #bdbdbd;
   margin: 0;
 }
 @media (max-width: 600px) {
   .view-title-overlay {
-    font-size: 1em;
-    margin-bottom: 8px;
+    font-size: 0.9em;
+    margin-bottom: 5px;
   }
   .btn-take-photo {
-    font-size: 0.9em;
-    padding: 8px 18px;
-    min-width: 160px;
+    font-size: 0.85em;
+    padding: 7px 15px;
+    min-width: 140px;
   }
   .description-text {
     font-size: 0.75em;
@@ -626,7 +547,7 @@ onUnmounted(() => {
     min-height: 200px;
   }
   .captured-image-preview img {
-    max-height: 70px;
+    max-height: 40px;
   }
 }
 </style>

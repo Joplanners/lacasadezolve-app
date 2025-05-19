@@ -5,7 +5,7 @@ const weatherData = ref(null)
 const isLoading = ref(true)
 const errorMsg = ref('')
 
-const API_ENDPOINT = '/api/weather-by-ip' // O '/.netlify/functions/getWeatherByIp' si es Netlify Function
+const API_ENDPOINT = '/.netlify/functions/weather'
 
 const fetchWeather = async () => {
   isLoading.value = true
