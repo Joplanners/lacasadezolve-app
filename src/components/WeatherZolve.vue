@@ -4,23 +4,26 @@ import { ref, onMounted, computed } from 'vue'
 const weatherData = ref(null)
 const isLoading = ref(true)
 const errorMsg = ref('')
+const locationPermissionIssue = ref(false)
 
-const API_ENDPOINT = '/.netlify/functions/weather'
+const API_ENDPOINT_BASE = '/.netlify/functions/weather'
 
-const fetchWeather = async () => {
+const fetchWeather = async (latitude = null, longitude = null) => {
   isLoading.value = true
-  errorMsg.value = ''
   weatherData.value = null
+  let endpoint = API_ENDPOINT_BASE
+  if (latitude !== null && longitude !== null) {
+    endpoint += `?lat=${latitude}&lon=${longitude}`
+  }
   try {
-    // Cambiado: fetch simple para GET, no necesita method: 'POST'
-    const response = await fetch(API_ENDPOINT)
+    const response = await fetch(endpoint)
     if (!response.ok) {
       let errorDetail = `Error del servidor: ${response.status}`
       try {
         const errData = await response.json()
         errorDetail = errData.error || errorDetail
       } catch (e) {
-        /* no se pudo parsear json */
+        /*ignore*/
       }
       throw new Error(errorDetail)
     }
@@ -29,11 +32,56 @@ const fetchWeather = async () => {
       throw new Error(data.error)
     }
     weatherData.value = data
+    errorMsg.value = ''
+    if (data.usedDefault && !(latitude !== null && longitude !== null)) {
+      if (!locationPermissionIssue.value) locationPermissionIssue.value = true
+    } else if (latitude !== null && longitude !== null) {
+      locationPermissionIssue.value = false
+    }
   } catch (err) {
     console.error('Error fetching weather:', err)
-    errorMsg.value = err.message || 'No se pudo cargar el clima.'
+    if (!errorMsg.value) {
+      errorMsg.value = err.message || 'No se pudo cargar el clima.'
+    }
   } finally {
     isLoading.value = false
+  }
+}
+
+const requestWeather = () => {
+  isLoading.value = true
+  errorMsg.value = ''
+  locationPermissionIssue.value = false
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        fetchWeather(position.coords.latitude, position.coords.longitude)
+      },
+      (geoError) => {
+        console.warn('[WeatherZolve] Geo Error:', geoError.message, `(Code: ${geoError.code})`)
+        if (geoError.code === 1) {
+          errorMsg.value = 'Permiso de ubicación denegado. Se mostrará clima de referencia.'
+        } else if (geoError.code === 2) {
+          errorMsg.value =
+            'Tu ubicación no está disponible. Revisa los servicios de ubicación en tu dispositivo/navegador. Se mostrará clima de referencia.'
+        } else if (geoError.code === 3) {
+          errorMsg.value =
+            'Tiempo agotado para obtener tu ubicación. Se mostrará clima de referencia.'
+        } else {
+          errorMsg.value =
+            'No se pudo obtener tu ubicación precisa. Se mostrará clima de referencia.'
+        }
+        locationPermissionIssue.value = true
+        fetchWeather()
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 },
+    )
+  } else {
+    console.warn('[WeatherZolve] Geolocalización no soportada.')
+    errorMsg.value =
+      'Geolocalización no soportada en este navegador. Se mostrará clima de referencia.'
+    locationPermissionIssue.value = true
+    fetchWeather()
   }
 }
 
@@ -76,25 +124,37 @@ const weatherEmoji = computed(() => {
 })
 
 onMounted(() => {
-  fetchWeather()
+  requestWeather()
 })
 </script>
 
 <template>
   <div class="weather-zolve-widget">
     <div v-if="isLoading" class="weather-loading">
-      <p>Cargando clima...</p>
+      <p>Obteniendo tu clima...</p>
     </div>
-    <div v-else-if="errorMsg" class="weather-error">
-      <img src="/zolveClima.png" alt="Zolve Meteorólogo" class="zolve-icon-error" />
-      <p>Zorry 🦊, no pude obtener el clima: {{ errorMsg }}</p>
+    <div v-else-if="errorMsg && !weatherData" class="weather-error">
+      <img src="/zolveClima.png" alt="Zolve Clima" class="zolve-icon-error" />
+      <p>{{ errorMsg }}</p>
+      <button @click="requestWeather" class="retry-button" v-if="locationPermissionIssue">
+        Intentar usar mi ubicación
+      </button>
     </div>
     <div v-else-if="weatherData" class="weather-content">
-      <img src="/zolveClima.png" alt="Zolve Meteorólogo" class="zolve-icon" />
+      <img src="/zolveClima.png" alt="Zolve Clima" class="zolve-icon" />
       <div class="weather-info">
         <p class="weather-location">
-          Clima para hoy en <strong>{{ weatherData.city || 'tu ubicación' }}</strong
+          Clima para hoy en <strong>{{ weatherData.city }}</strong
           >:
+          <span
+            v-if="
+              weatherData.usedDefault ||
+              (locationPermissionIssue && weatherData.city === 'Santiago, Chile')
+            "
+            class="default-location-notice"
+          >
+            (ubicación de referencia)
+          </span>
         </p>
         <div class="weather-details">
           <span class="weather-icon-emoji">{{ weatherEmoji }}</span>
@@ -107,7 +167,18 @@ onMounted(() => {
         >
           Min: {{ weatherData.tempMin }}°C / Max: {{ weatherData.tempMax }}°C
         </p>
+        <button
+          @click="requestWeather"
+          class="retry-button-small"
+          v-if="locationPermissionIssue || weatherData.usedDefault"
+        >
+          Usar mi ubicación actual
+        </button>
       </div>
+    </div>
+    <div v-else class="weather-error">
+      <img src="/zolveClima.png" alt="Zolve Clima" class="zolve-icon-error" />
+      <p>Zorry 🦊, no se pudo cargar la información del clima.</p>
     </div>
   </div>
 </template>
@@ -124,6 +195,7 @@ onMounted(() => {
   min-height: 70px;
   box-sizing: border-box;
   color: var(--color-text);
+  position: relative;
 }
 .weather-loading p,
 .weather-error p {
@@ -133,14 +205,50 @@ onMounted(() => {
 }
 .weather-error {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  color: var(--color-danger, red);
+  gap: 5px;
+  color: var(--color-text-muted);
+  padding: 10px 0;
+}
+.weather-error p {
+  color: var(--color-text-muted);
 }
 .zolve-icon-error {
   width: 30px;
   height: 30px;
   opacity: 0.7;
+  margin-bottom: 5px;
+}
+.retry-button {
+  background-color: var(--brand-turquoise);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  font-size: 0.85em;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 8px;
+  font-weight: 500;
+}
+.retry-button:hover {
+  background-color: var(--color-link-hover);
+}
+.retry-button-small {
+  background-color: transparent;
+  color: var(--brand-turquoise);
+  border: 1px solid var(--brand-turquoise);
+  padding: 3px 8px;
+  font-size: 0.75em;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 5px;
+  font-weight: 500;
+  align-self: flex-start;
+}
+.retry-button-small:hover {
+  background-color: rgba(var(--rgb-brand-turquoise, 77, 182, 172), 0.1);
+  text-decoration: underline;
 }
 .weather-content {
   display: flex;
@@ -169,6 +277,13 @@ onMounted(() => {
 .weather-location strong {
   font-weight: var(--font-weight-semibold, 600);
   color: var(--color-heading, #111);
+}
+.default-location-notice {
+  font-size: 0.8em;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-left: 5px;
+  display: inline-block;
 }
 .weather-details {
   display: flex;
@@ -222,6 +337,9 @@ onMounted(() => {
   .temp-range {
     font-size: 0.75em;
   }
+  .retry-button-small {
+    align-self: center;
+  }
 }
 @media (max-width: 480px) {
   .weather-content {
@@ -238,6 +356,15 @@ onMounted(() => {
   }
   .weather-details {
     justify-content: center;
+  }
+  .default-location-notice {
+    display: block;
+    text-align: center;
+    margin-left: 0;
+    margin-top: 3px;
+  }
+  .retry-button-small {
+    align-self: center;
   }
 }
 </style>
