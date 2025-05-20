@@ -4,12 +4,18 @@ import { ref, onMounted, computed } from 'vue'
 const weatherData = ref(null)
 const isLoading = ref(true)
 const errorMsg = ref('')
-const locationPermissionIssue = ref(false)
+const locationPermissionAttempted = ref(false) // Nueva ref para rastrear si ya intentamos geolocalización
+const explicitDenial = ref(false) // Para saber si el usuario denegó explícitamente
 
 const API_ENDPOINT_BASE = '/.netlify/functions/weather'
 
 const fetchWeather = async (latitude = null, longitude = null) => {
   isLoading.value = true
+  // No limpiar errorMsg si locationPermissionAttempted es true y no tenemos coords,
+  // para mantener el mensaje de "permiso denegado" o "ubicación no disponible".
+  if (latitude !== null && longitude !== null) {
+    errorMsg.value = '' // Limpiar error solo si vamos a obtener clima por coords
+  }
   weatherData.value = null
   let endpoint = API_ENDPOINT_BASE
   if (latitude !== null && longitude !== null) {
@@ -32,11 +38,15 @@ const fetchWeather = async (latitude = null, longitude = null) => {
       throw new Error(data.error)
     }
     weatherData.value = data
-    errorMsg.value = ''
-    if (data.usedDefault && !(latitude !== null && longitude !== null)) {
+    // Si obtuvimos datos y no fue porque el backend usó el default porque nosotros no dimos coords,
+    // entonces no hay problema de permiso para esta carga.
+    if (latitude !== null && longitude !== null) {
+      locationPermissionIssue.value = false // Ya no es un "issue" si tenemos datos por coords
+      explicitDenial.value = false // Resetear si tuvimos éxito con coords
+    } else if (data.usedDefault) {
+      // Si el backend usó default Y no fue porque el frontend falló en obtener coords,
+      // es solo una carga por defecto. Si el frontend SÍ falló, locationPermissionIssue ya está true.
       if (!locationPermissionIssue.value) locationPermissionIssue.value = true
-    } else if (latitude !== null && longitude !== null) {
-      locationPermissionIssue.value = false
     }
   } catch (err) {
     console.error('Error fetching weather:', err)
@@ -51,38 +61,44 @@ const fetchWeather = async (latitude = null, longitude = null) => {
 const requestWeather = () => {
   isLoading.value = true
   errorMsg.value = ''
-  locationPermissionIssue.value = false
+  // No resetear locationPermissionIssue o explicitDenial aquí del todo,
+  // la lógica de getCurrentPosition lo manejará.
+  // Solo marcar que se está intentando.
+  locationPermissionIssue.value = true // Asumimos un issue hasta que tengamos éxito con coords
+
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        locationPermissionIssue.value = false // Éxito
+        explicitDenial.value = false
         fetchWeather(position.coords.latitude, position.coords.longitude)
       },
       (geoError) => {
         console.warn('[WeatherZolve] Geo Error:', geoError.message, `(Code: ${geoError.code})`)
         if (geoError.code === 1) {
-          errorMsg.value = 'Permiso de ubicación denegado. Se mostrará clima de referencia.'
+          errorMsg.value = 'Permiso de ubicación denegado. Mostrando clima de referencia.'
+          explicitDenial.value = true // El usuario denegó explícitamente
         } else if (geoError.code === 2) {
           errorMsg.value =
-            'Tu ubicación no está disponible. Revisa los servicios de ubicación en tu dispositivo/navegador. Se mostrará clima de referencia.'
+            'Tu ubicación no está disponible. Revisa los servicios de ubicación. Mostrando clima de referencia.'
         } else if (geoError.code === 3) {
           errorMsg.value =
-            'Tiempo agotado para obtener tu ubicación. Se mostrará clima de referencia.'
+            'Tiempo agotado para obtener tu ubicación. Mostrando clima de referencia.'
         } else {
-          errorMsg.value =
-            'No se pudo obtener tu ubicación precisa. Se mostrará clima de referencia.'
+          errorMsg.value = 'No se pudo obtener tu ubicación precisa. Mostrando clima de referencia.'
         }
-        locationPermissionIssue.value = true
+        // locationPermissionIssue ya está true
         fetchWeather()
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 },
     )
   } else {
     console.warn('[WeatherZolve] Geolocalización no soportada.')
-    errorMsg.value =
-      'Geolocalización no soportada en este navegador. Se mostrará clima de referencia.'
+    errorMsg.value = 'Geolocalización no soportada. Mostrando clima de referencia.'
     locationPermissionIssue.value = true
     fetchWeather()
   }
+  locationPermissionAttempted.value = true // Marcamos que ya se intentó obtener la ubicación
 }
 
 const weatherEmoji = computed(() => {
@@ -136,7 +152,11 @@ onMounted(() => {
     <div v-else-if="errorMsg && !weatherData" class="weather-error">
       <img src="/zolveClima.png" alt="Zolve Clima" class="zolve-icon-error" />
       <p>{{ errorMsg }}</p>
-      <button @click="requestWeather" class="retry-button" v-if="locationPermissionIssue">
+      <button
+        @click="requestWeather"
+        class="retry-button"
+        v-if="locationPermissionIssue && !explicitDenial"
+      >
         Intentar usar mi ubicación
       </button>
     </div>
@@ -147,10 +167,7 @@ onMounted(() => {
           Clima para hoy en <strong>{{ weatherData.city }}</strong
           >:
           <span
-            v-if="
-              weatherData.usedDefault ||
-              (locationPermissionIssue && weatherData.city === 'Santiago, Chile')
-            "
+            v-if="weatherData.usedDefault || locationPermissionIssue"
             class="default-location-notice"
           >
             (ubicación de referencia)
@@ -170,7 +187,7 @@ onMounted(() => {
         <button
           @click="requestWeather"
           class="retry-button-small"
-          v-if="locationPermissionIssue || weatherData.usedDefault"
+          v-if="(locationPermissionIssue || weatherData.usedDefault) && !explicitDenial"
         >
           Usar mi ubicación actual
         </button>
