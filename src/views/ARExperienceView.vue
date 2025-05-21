@@ -59,7 +59,6 @@ function updateOrientationState() {
 
 const hideVRButton = () => {
   if (sceneRef.value?.el) {
-    // Usar sceneRef.value.el para el elemento de la escena
     const vrButton = sceneRef.value.el.querySelector('.a-enter-vr-button')
     if (vrButton) {
       vrButton.style.display = 'none'
@@ -587,8 +586,10 @@ async function cleanupARInternal(calledFromWatcher = false) {
   isCleaningUp.value = false
 }
 const handleOrientationAndResize = () => {
-  updateOrientationState()
-  handleWindowResize()
+  requestAnimationFrame(() => {
+    updateOrientationState()
+    handleWindowResize()
+  })
 }
 const handleWindowResize = (isInitialOrPostPromptAdjust = false) => {
   let needsContentDisplayAfterScale = false
@@ -623,44 +624,39 @@ const handleWindowResize = (isInitialOrPostPromptAdjust = false) => {
         const viewportWidth = sceneElement.canvas.clientWidth
         const viewportHeight = sceneElement.canvas.clientHeight
         let newScale = 1.0
-        const isFullscreenNow = !!(
-          document.fullscreenElement ||
-          document.mozFullScreenElement ||
-          document.webkitFullscreenElement ||
-          document.msFullscreenElement
-        )
-        const isEffectivelyFullscreen =
-          viewportWidth >= window.screen.width * 0.95 &&
-          viewportHeight >= window.screen.height * 0.95
-        if (isMarkerVisible.value && currentContent.value) {
-          const type = currentContentType.value
-          const planeEl =
-            (type === 'image' ? imagePlaneRef.value?.el : videoPlaneRef.value?.el) ||
-            sceneElement.querySelector(type === 'image' ? '#imagePlane' : '#videoPlane')
-          const asset = document.querySelector(type === 'image' ? '#imageAsset' : '#videoAsset')
-          if (
-            planeEl &&
-            planeEl.getAttribute('visible') === 'true' &&
-            asset &&
-            ((type === 'image' && asset.naturalWidth > 0) ||
-              (type === 'video' && asset.videoWidth > 0))
-          ) {
-            adjustMediaPlaneAspect(type, planeEl, asset)
+        if (isMobileForPrompt.value) {
+          newScale = 1.2
+        } // ESCALA AUMENTADA PARA MÓVIL
+        else {
+          const isFullscreenNow = !!(
+            document.fullscreenElement ||
+            document.mozFullScreenElement ||
+            document.webkitFullscreenElement ||
+            document.msFullscreenElement
+          )
+          const isEffectivelyFullscreen =
+            viewportWidth >= window.screen.width * 0.95 &&
+            viewportHeight >= window.screen.height * 0.95
+          if (isFullscreenNow || isEffectivelyFullscreen) {
+            const minFullscreenDim = Math.min(viewportWidth, viewportHeight)
+            if (minFullscreenDim < 500) newScale = 1.3
+            else if (minFullscreenDim < 800) newScale = 1.15
+            else newScale = 1.0
+          } else {
+            const minNormalDim = Math.min(viewportWidth, viewportHeight)
+            if (minNormalDim < 350) newScale = 1.0
+            else if (minNormalDim < 550) newScale = 0.9
+            else newScale = 0.8
           }
-        }
-        if (isFullscreenNow || isEffectivelyFullscreen) {
-          const minFullscreenDim = Math.min(viewportWidth, viewportHeight)
-          if (minFullscreenDim < 500) newScale = 1.3
-          else if (minFullscreenDim < 800) newScale = 1.15
-          else newScale = 1.0
-        } else {
-          const minNormalDim = Math.min(viewportWidth, viewportHeight)
-          if (minNormalDim < 350) newScale = 1.0
-          else if (minNormalDim < 550) newScale = 0.9
-          else newScale = 0.8
         }
         newScale = Math.max(0.5, Math.min(newScale, 2.0))
         currentScalerEl.setAttribute('scale', `${newScale} ${newScale} ${newScale}`)
+        if (sceneElement?.camera?.el?.components?.camera) {
+          sceneElement.camera.el.components.camera.updateAspect()
+        }
+        if (sceneElement && typeof sceneElement.resize === 'function') {
+          sceneElement.resize()
+        }
         if (
           needsContentDisplayAfterScale &&
           !showRotatePrompt.value &&
@@ -677,7 +673,7 @@ const handleWindowResize = (isInitialOrPostPromptAdjust = false) => {
         }
       }
     }
-  }, 150)
+  }, 100)
 }
 watch(
   () => props.markerId,
@@ -719,7 +715,7 @@ onMounted(() => {
   document.addEventListener('mozfullscreenchange', handleOrientationAndResize)
   document.addEventListener('MSFullscreenChange', handleOrientationAndResize)
   handleOrientationAndResize()
-  hideVRButton() // Llamada inicial por si el botón ya existe
+  hideVRButton()
 })
 onUnmounted(async () => {
   clearTimeout(resizeTimeout)
@@ -931,12 +927,10 @@ watch(isARReady, (ready) => {
 </template>
 
 <style scoped>
-/* Opción B: CSS Scoped con :deep() para ocultar el botón VR */
 :deep(.a-enter-vr-button) {
   display: none !important;
   visibility: hidden !important;
 }
-
 .ar-view-container {
   margin: 0;
   overflow: hidden;
