@@ -20,6 +20,9 @@ const isContentLoading = ref(false)
 const errorLoadingContent = ref('')
 const isMarkerVisible = ref(false)
 const isARReady = ref(false)
+const showCameraPermissionPrompt = ref(false) // For camera permission UI
+const cameraPermissionError = ref('') // Stores camera permission error messages
+const isCheckingPermission = ref(false) // True while checking camera permission
 let arSystem = null
 let arReadyTimeout = null
 let sceneElement = null
@@ -48,6 +51,45 @@ const currentContent = computed(() => {
 })
 const currentContentUrl = computed(() => currentContent.value?.content_url || '')
 const currentContentType = computed(() => currentContent.value?.type?.toLowerCase() || '')
+
+async function checkAndRequestCameraPermission() {
+  isCheckingPermission.value = true
+  cameraPermissionError.value = ''
+  showCameraPermissionPrompt.value = false
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+    stream.getTracks().forEach(track => track.stop())
+    console.log('Camera permission granted.')
+    // No need to set showCameraPermissionPrompt or cameraPermissionError if successful
+    isCheckingPermission.value = false
+    return true
+  } catch (error) {
+    console.error('Camera permission error:', error)
+    let errorMessage = ''
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      errorMessage = 'Camera access was denied. Please enable it in your browser settings and reload the page.'
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      errorMessage = 'No camera found. Please ensure you have a camera connected and enabled.'
+    } else {
+      errorMessage = `Could not access the camera. Error: ${error.message}`
+    }
+    cameraPermissionError.value = errorMessage
+    showCameraPermissionPrompt.value = true
+    toast.error(errorMessage, { timeout: 10000 })
+    isLoading.value = false // Stop loading as AR can't proceed
+    isCheckingPermission.value = false
+    return false
+  }
+}
+
+async function retryCameraCheck() {
+  // Reset states related to permission error
+  showCameraPermissionPrompt.value = false;
+  cameraPermissionError.value = '';
+  // isLoading.value will be managed by initializeARExperience
+  // Re-run the initialization flow. Pass current markerId. oldMarkerId can be null.
+  await initializeARExperience(props.markerId, null);
+}
 
 function updateOrientationState() {
   if (screen.orientation) {
@@ -165,18 +207,25 @@ function prevContent() {
   displayCurrentContent()
 }
 async function loadMarkerAndContents() {
+  // isLoading.value = true; // This is now handled by initializeARExperience
+  // isARReady.value = false; // Also handled by initializeARExperience
+  // isMarkerVisible.value = false; // Also handled by initializeARExperience
+  // errorLoadingContent.value = ''; // Also handled by initializeARExperience
+
+  // Camera permission is now expected to be granted before this function is called.
   if (isCleaningUp.value) {
+    console.log("loadMarkerAndContents: Cleanup in progress, returning.");
     return
   }
-  if (!props.markerId) {
+  if (!props.markerId) { // This check is still important.
     errorLoadingContent.value = 'ID de marcador no válido.'
-    isLoading.value = false
+    isLoading.value = false // Ensure loading stops if called with no marker ID.
     return
   }
-  isLoading.value = true
-  isARReady.value = false
-  isMarkerVisible.value = false
-  errorLoadingContent.value = ''
+  // Ensure AR states are reset if we are genuinely starting to load for a new/valid marker
+  isARReady.value = false;
+  isMarkerVisible.value = false;
+  // errorLoadingContent is managed by initializeARExperience or permission check mostly
   associatedContents.value = []
   mindFileUrl.value = ''
   currentContentIndex.value = 0
@@ -211,6 +260,7 @@ async function loadMarkerAndContents() {
     if (!mindFileUrl.value) {
       throw new Error('Error crítico: mindFileUrl es nulo o vacío después de procesar.')
     }
+    console.log('AR.js imageTargetSrc (mind file) will be set to:', mindFileUrl.value);
     const { data: contentsData, error: contentsError } = await supabase
       .from('marker_contents')
       .select(`display_order, contents (id,content_url,type,name,is_public,user_id)`)
@@ -238,29 +288,64 @@ async function loadMarkerAndContents() {
   }
 }
 async function displayCurrentContent() {
-  if ((showRotatePrompt.value || showFullscreenPrompt.value) && !userDismissedPrompt.value) {
-    const vp = sceneElement?.querySelector('#videoPlane')
-    const ip = sceneElement?.querySelector('#imagePlane')
-    if (vp) vp.setAttribute('visible', 'false')
-    if (ip) ip.setAttribute('visible', 'false')
-    pauseVideo()
-    isContentLoading.value = false
-    return
+  // Robust checks at the beginning
+  if (isCleaningUp.value) {
+    console.log('displayCurrentContent aborted: cleanup in progress.');
+    return;
   }
-  const content = currentContent.value
+  if (!isARReady.value || !isMarkerVisible.value) {
+    console.log('displayCurrentContent aborted: AR not ready or marker not visible.');
+    const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el;
+    const ip = sceneElement?.querySelector('#imagePlane') || imagePlaneRef.value?.el;
+    if (vp) vp.setAttribute('visible', 'false');
+    if (ip) ip.setAttribute('visible', 'false');
+    pauseVideo(); // Ensure video is paused
+    isContentLoading.value = false;
+    return;
+  }
+  if (((showRotatePrompt.value || showFullscreenPrompt.value) && !userDismissedPrompt.value) && !showCameraPermissionPrompt.value) {
+    console.log('displayCurrentContent aborted: prompts are active.');
+    const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el;
+    const ip = sceneElement?.querySelector('#imagePlane') || imagePlaneRef.value?.el;
+    if (vp) vp.setAttribute('visible', 'false');
+    if (ip) ip.setAttribute('visible', 'false');
+    pauseVideo();
+    isContentLoading.value = false;
+    return;
+  }
+  if (showCameraPermissionPrompt.value || isCheckingPermission.value) {
+      console.log('displayCurrentContent aborted: camera permission prompt active or being checked.');
+      const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el;
+      const ip = sceneElement?.querySelector('#imagePlane') || imagePlaneRef.value?.el;
+      if (vp) vp.setAttribute('visible', 'false');
+      if (ip) ip.setAttribute('visible', 'false');
+      pauseVideo();
+      isContentLoading.value = false;
+      return;
+  }
+
+  const content = currentContent.value;
   if (!content || !content.content_url) {
-    const vp = sceneElement?.querySelector('#videoPlane')
-    const ip = sceneElement?.querySelector('#imagePlane')
-    if (vp) vp.setAttribute('visible', 'false')
-    if (ip) ip.setAttribute('visible', 'false')
-    isContentLoading.value = false
-    return
+    console.log('displayCurrentContent aborted: no content or content_url.');
+    const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el;
+    const ip = sceneElement?.querySelector('#imagePlane') || imagePlaneRef.value?.el;
+    if (vp) vp.setAttribute('visible', 'false');
+    if (ip) ip.setAttribute('visible', 'false');
+    isContentLoading.value = false;
+    return;
   }
-  if (!sceneElement || !isMarkerVisible.value || !isARReady.value) {
-    const vp = sceneElement?.querySelector('#videoPlane')
-    const ip = sceneElement?.querySelector('#imagePlane')
-    if (vp) vp.setAttribute('visible', 'false')
-    if (ip) ip.setAttribute('visible', 'false')
+  // This check was already similar, just adding console log from requirement.
+  // if (!sceneElement || !isMarkerVisible.value || !isARReady.value) { // This is largely covered by earlier checks
+  // Redundant check: isARReady and isMarkerVisible are checked above. sceneElement should exist if AR is ready.
+  if (!sceneElement) {
+    console.error('displayCurrentContent aborted: sceneElement is null, though AR is supposedly ready.');
+    const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el; // sceneElement is null here, so this is problematic
+    const ip = sceneElement?.querySelector('#imagePlane') || imagePlaneRef.value?.el; // same here
+    // Fallback to refs if sceneElement is unexpectedly null
+    const vpRef = videoPlaneRef.value?.el;
+    const ipRef = imagePlaneRef.value?.el;
+    if (vpRef) vpRef.setAttribute('visible', 'false');
+    if (ipRef) ipRef.setAttribute('visible', 'false');
     isContentLoading.value = false
     return
   }
@@ -268,11 +353,14 @@ async function displayCurrentContent() {
   await nextTick()
   const videoPlaneCurrent = videoPlaneRef.value?.el || sceneElement?.querySelector('#videoPlane')
   const imagePlaneCurrent = imagePlaneRef.value?.el || sceneElement?.querySelector('#imagePlane')
-  const imageAsset = document.querySelector('#imageAsset')
-  const videoAsset = document.querySelector('#videoAsset')
+  const imageAsset = document.querySelector('#imageAsset');
+  const videoAsset = document.querySelector('#videoAsset');
+
   if (!videoPlaneCurrent || !imagePlaneCurrent || !imageAsset || !videoAsset) {
-    isContentLoading.value = false
-    return
+    console.error('Critical error: Media planes or assets not found in displayCurrentContent.');
+    isContentLoading.value = false;
+    // errorLoadingContent.value = "Error: AR media elements missing. Try reloading."; // Optional
+    return;
   }
   videoPlaneCurrent.setAttribute('visible', 'false')
   imagePlaneCurrent.setAttribute('visible', 'false')
@@ -304,12 +392,14 @@ async function displayCurrentContent() {
     if (
       isMarkerVisible.value &&
       isARReady.value &&
-      !((showRotatePrompt.value || showFullscreenPrompt.value) && !userDismissedPrompt.value)
+      !isCleaningUp.value && // Add this check
+      !((showRotatePrompt.value || showFullscreenPrompt.value) && !userDismissedPrompt.value) &&
+      !showCameraPermissionPrompt.value // Add this check
     ) {
-      if (targetPlaneElement) targetPlaneElement.setAttribute('visible', 'true')
-      if (type === 'video') playVideo()
+      if (targetPlaneElement) targetPlaneElement.setAttribute('visible', 'true');
+      if (type === 'video') playVideo(); // playVideo already has similar checks
     } else {
-      if (targetPlaneElement) targetPlaneElement.setAttribute('visible', 'false')
+      if (targetPlaneElement) targetPlaneElement.setAttribute('visible', 'false');
       if (type === 'video') pauseVideo()
     }
   } catch (error) {
@@ -322,13 +412,14 @@ async function displayCurrentContent() {
   }
 }
 function loadMedia(url, mediaElement, type) {
-  let urlWithCacheBust = url
+  let urlWithCacheBust = url;
   if (url && url.includes(YOUR_R2_DOMAIN_IDENTIFIER)) {
-    const cacheBuster = `v=${Date.now()}`
-    urlWithCacheBust = `${url}${url.includes('?') ? '&' : '?'}${cacheBuster}`
+    const cacheBuster = `v=${Date.now()}`;
+    urlWithCacheBust = `${url}${url.includes('?') ? '&' : '?'}${cacheBuster}`;
   }
+  console.log(`Attempting to load ${type} from: ${urlWithCacheBust}`); // Added logging
   return new Promise((resolve, reject) => {
-    const eventToWaitFor = type === 'image' ? 'load' : 'canplaythrough'
+    const eventToWaitFor = type === 'image' ? 'load' : 'canplaythrough';
     const timeoutDuration = 20000
     mediaElement.removeEventListener('load', loadHandlerInternal)
     mediaElement.removeEventListener('canplaythrough', loadHandlerInternal)
@@ -340,18 +431,34 @@ function loadMedia(url, mediaElement, type) {
       resolve()
     }
     function errorHandlerInternal(errEvent) {
-      clearTimeout(loadTimeout)
-      const errorType = errEvent?.type || 'desconocido'
-      let detailError = errEvent?.target?.error || errEvent
-      if (detailError instanceof Event) {
-        detailError = { message: `Error de carga de media (${errorType}) para ${urlWithCacheBust}` }
+      clearTimeout(loadTimeout);
+      const errorType = errEvent?.type || 'desconocido';
+      let detailMessage = `Error (${errorType}) al cargar ${type} desde ${urlWithCacheBust}.`;
+      let specificError = errEvent?.target?.error || errEvent;
+
+      if (specificError instanceof Event && !(specificError instanceof Error)) {
+         // Generic event, not a detailed error object
+         console.error(`Media load event error for ${type} at ${urlWithCacheBust}. Event type: ${errorType}`, errEvent);
+      } else if (specificError instanceof Error) {
+         // Standard Error object
+         detailMessage += ` Mensaje: ${specificError.message}`;
+         console.error(`Media load error for ${type} at ${urlWithCacheBust}: ${specificError.message}`, specificError);
+      } else if (specificError && typeof specificError.code !== 'undefined') { // Likely MediaError
+         detailMessage += ` Código: ${specificError.code}.`;
+         switch (specificError.code) {
+            case 1: detailMessage += ' (Carga abortada)'; break;
+            case 2: detailMessage += ' (Error de red)'; break;
+            case 3: detailMessage += ' (Error de decodificación)'; break;
+            case 4: detailMessage += ' (Fuente no soportada)'; break;
+            default: detailMessage += ' (Código de error desconocido)';
+         }
+         console.error(`MediaError for ${type} at ${urlWithCacheBust}. Code: ${specificError.code}, Message: ${specificError.message || 'N/A'}`, specificError);
+      } else {
+         console.error(`Unknown media load error for ${type} at ${urlWithCacheBust}. Details:`, specificError, errEvent);
       }
-      cleanupInternal()
-      reject(
-        new Error(
-          detailError.message || `Error (${errorType}) al cargar ${type} desde ${urlWithCacheBust}`,
-        ),
-      )
+      
+      cleanupInternal();
+      reject(new Error(detailMessage));
     }
     function cleanupInternal() {
       mediaElement.removeEventListener(eventToWaitFor, loadHandlerInternal)
@@ -376,14 +483,16 @@ function loadMedia(url, mediaElement, type) {
   })
 }
 const playVideo = async () => {
-  const videoEl = document.querySelector('#videoAsset')
+  const videoEl = document.querySelector('#videoAsset');
   if (
     videoEl &&
     isMarkerVisible.value &&
     isARReady.value &&
+    !isCleaningUp.value && // Added check
+    !showCameraPermissionPrompt.value && // Added check
     !((showRotatePrompt.value || showFullscreenPrompt.value) && !userDismissedPrompt.value)
   ) {
-    await nextTick()
+    await nextTick();
     if (videoEl.readyState >= 3) {
       try {
         await videoEl.play()
@@ -447,13 +556,40 @@ const handleArReady = async () => {
   }
 }
 const handleArError = (event) => {
-  const errorDetail = event.detail?.error || event.detail?.message || event.detail
-  if (arReadyTimeout) clearTimeout(arReadyTimeout)
-  errorLoadingContent.value = `Error AR: ${errorDetail || 'Desconocido'}.`
-  isLoading.value = false
-  isARReady.value = false
-  toast.error(errorLoadingContent.value, { timeout: 10000 })
-}
+  const errorDetailSource = event.detail?.error || event.detail?.message || event.detail;
+  let errorDetail = typeof errorDetailSource === 'object' ? JSON.stringify(errorDetailSource) : String(errorDetailSource);
+
+  if (arReadyTimeout) clearTimeout(arReadyTimeout);
+  arReadyTimeout = null;
+
+  // If a camera permission error is already active, prioritize showing that.
+  if (cameraPermissionError.value) {
+    isLoading.value = false;
+    isARReady.value = false;
+    // The toast for cameraPermissionError should have already been shown.
+    return; // Don't overwrite a specific camera error with a general AR error.
+  }
+
+  // Check if this AR error is related to camera access.
+  if (
+    errorDetail.includes('Camera not found') ||
+    errorDetail.includes('Requested device not found') ||
+    errorDetail.includes('Permission denied') || // General permission denied by user
+    errorDetail.includes('getUserMedia') // Specific to camera access API
+  ) {
+    cameraPermissionError.value = "AR Error: Could not access camera. Please check permissions and ensure a camera is available.";
+    showCameraPermissionPrompt.value = true; // Show the prompt with retry
+    errorLoadingContent.value = ''; // Clear any other AR error message
+    toast.error(cameraPermissionError.value, { timeout: 10000 });
+  } else {
+    // Handle other non-camera AR errors
+    errorLoadingContent.value = `Error AR: ${errorDetail || 'Desconocido'}.`;
+    toast.error(errorLoadingContent.value, { timeout: 10000 });
+  }
+
+  isLoading.value = false;
+  isARReady.value = false;
+};
 const addEntityListeners = (sceneEl) => {
   const targetMindAREntity = sceneEl.querySelector('#targetEntity')
   if (targetMindAREntity) {
@@ -504,15 +640,19 @@ const handleContentClick = (event) => {
   }
 }
 async function cleanupARInternal(calledFromWatcher = false) {
-  if (isCleaningUp.value && !calledFromWatcher) return
-  isCleaningUp.value = true
-  clearTimeout(arReadyTimeout)
-  arReadyTimeout = null
-  clearTimeout(targetLostTimeout)
-  targetLostTimeout = null
-  clearTimeout(resizeTimeout)
-  resizeTimeout = null
-  pauseVideo()
+  console.log('cleanupARInternal started. Called from watcher:', calledFromWatcher);
+  if (isCleaningUp.value && !calledFromWatcher) {
+    console.log('cleanupARInternal skipped: already in progress and not a watcher call.');
+    return;
+  }
+  isCleaningUp.value = true;
+  // Clear any pending AR ready timeout
+  clearTimeout(targetLostTimeout);
+  targetLostTimeout = null;
+  clearTimeout(resizeTimeout);
+  resizeTimeout = null;
+
+  pauseVideo(); // Pause any playing video
   const va = document.querySelector('#videoAsset')
   if (va) {
     va.pause()
@@ -577,13 +717,17 @@ async function cleanupARInternal(calledFromWatcher = false) {
   showRotatePrompt.value = false
   showFullscreenPrompt.value = false
   userDismissedPrompt.value = false
-  isMobileForPrompt.value = false
+  isMobileForPrompt.value = false;
+
   if (!calledFromWatcher) {
-    isLoading.value = true
-    errorLoadingContent.value = ''
+    isLoading.value = true; // Reset loading state for next marker
+    errorLoadingContent.value = ''; // Clear errors for next marker
   }
-  await new Promise((resolve) => setTimeout(resolve, 150))
-  isCleaningUp.value = false
+
+  // Short delay to allow A-Frame and other async operations to settle before fully marking cleanup as done.
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  isCleaningUp.value = false;
+  console.log('cleanupARInternal finished.');
 }
 const handleOrientationAndResize = () => {
   requestAnimationFrame(() => {
@@ -675,30 +819,59 @@ const handleWindowResize = (isInitialOrPostPromptAdjust = false) => {
     }
   }, 100)
 }
+async function initializeARExperience(newMarkerId, oldMarkerId) {
+  // This condition is from the original watch logic.
+  // It means if cleanup is happening due to markerId becoming null, don't proceed.
+  if (isCleaningUp.value && oldMarkerId && !newMarkerId) {
+    console.log("initializeARExperience: Cleanup in progress or newMarkerId is null, returning.");
+    isLoading.value = false; // Ensure loading state is false if we bail early.
+    return;
+  }
+
+  isLoading.value = true;
+  isARReady.value = false;
+  errorLoadingContent.value = ''; // Clear previous generic errors
+  cameraPermissionError.value = ''; // Clear previous camera errors
+  showCameraPermissionPrompt.value = false; // Hide prompt initially
+
+  if (sceneElement || arSystem) { // From existing watch
+    await cleanupARInternal(true); // Pass true as it's from a watcher-like context
+    await nextTick();
+  }
+
+  if (newMarkerId) {
+    const permissionGranted = await checkAndRequestCameraPermission();
+    if (permissionGranted) {
+      // Only proceed to load marker contents if permission was granted
+      await loadMarkerAndContents(); // This function now assumes permission is granted
+    } else {
+      // If permission is not granted, checkAndRequestCameraPermission has already set error messages
+      // and set isLoading.value = false.
+      mindFileUrl.value = ''; // Ensure A-Scene doesn't try to load with an old/invalid target
+      // Error message is already set by checkAndRequestCameraPermission, and isLoading is false.
+    }
+  } else {
+    // This part is from the original watch's "else" block (no newMarkerId)
+    errorLoadingContent.value = 'No se especificó un marcador.';
+    mindFileUrl.value = '';
+    associatedContents.value = [];
+    isLoading.value = false;
+    isARReady.value = false;
+  }
+}
+
 watch(
   () => props.markerId,
-  async (newMarkerId, oldMarkerId) => {
-    if (isCleaningUp.value && oldMarkerId && !newMarkerId) return
-    isLoading.value = true
-    isARReady.value = false
-    if (sceneElement || arSystem) {
-      await cleanupARInternal(true)
-      await nextTick()
-    }
-    if (newMarkerId) {
-      loadMarkerAndContents()
-    } else {
-      errorLoadingContent.value = 'No se especificó un marcador.'
-      mindFileUrl.value = ''
-      associatedContents.value = []
-      isLoading.value = false
-      isARReady.value = false
-    }
+  (newMarkerId, oldMarkerId) => {
+    // Call the new wrapper function
+    initializeARExperience(newMarkerId, oldMarkerId);
   },
-  { immediate: true },
+  { immediate: true }, // immediate:true ensures it runs on component mount if markerId is present
 )
 let orientationMediaQuery = null
 onMounted(() => {
+  // initializeARExperience is called by the immediate watch.
+  // No need to call loadMarkerAndContents or initializeARExperience directly here.
   window.addEventListener('resize', handleOrientationAndResize)
   if (screen.orientation) {
     screen.orientation.addEventListener('change', handleOrientationAndResize)
@@ -745,12 +918,28 @@ watch(isARReady, (ready) => {
 
 <template>
   <div class="ar-view-container">
-    <div v-if="isLoading && !errorLoadingContent" class="loading-overlay initial-loading">
+    <!-- Camera Permission Prompt -->
+    <div v-if="showCameraPermissionPrompt" class="loading-overlay camera-permission-prompt">
+      <p>⚠️ {{ cameraPermissionError }}</p>
+      <p v-if="cameraPermissionError.includes('denied') || cameraPermissionError.includes('PermissionDeniedError')">
+        You may need to go to your browser's site settings for this page to grant camera permission.
+      </p>
+      <button @click="retryCameraCheck" class="retry-button">Retry Permission Check</button>
+    </div>
+
+    <!-- Initial Loading / Checking Permission (only if not showing camera prompt) -->
+    <div v-if="isCheckingPermission && !showCameraPermissionPrompt" class="loading-overlay initial-loading">
+      <div class="spinner"></div>
+      <p>Checking camera permission...</p>
+    </div>
+    <div v-else-if="isLoading && !errorLoadingContent && !showCameraPermissionPrompt && !cameraPermissionError" class="loading-overlay initial-loading">
       <div class="spinner"></div>
       <p>Cargando datos AR...</p>
     </div>
+
+    <!-- AR Starting Message (only if not loading, no errors, and mindFileUrl is set) -->
     <div
-      v-else-if="!isLoading && !isARReady && !errorLoadingContent && mindFileUrl"
+      v-else-if="!isLoading && !isARReady && !errorLoadingContent && mindFileUrl && !showCameraPermissionPrompt && !cameraPermissionError"
       class="loading-overlay initial-loading"
     >
       <div class="spinner"></div>
@@ -762,21 +951,26 @@ watch(isARReady, (ready) => {
     >
       <p>Preparando archivo de marcador...</p>
     </div>
-    <div v-else-if="isContentLoading && isARReady" class="loading-overlay content-loading">
+
+    <!-- Content Loading (show only if AR is ready and no higher-priority prompts are active) -->
+    <div v-else-if="isContentLoading && isARReady && !showCameraPermissionPrompt && !cameraPermissionError" class="loading-overlay content-loading">
       <div class="spinner"></div>
       <p>Cargando contenido...</p>
     </div>
-    <div v-else-if="errorLoadingContent" class="loading-overlay error-display">
+
+    <!-- Error Display (generic errors, not camera related if camera prompt is shown) -->
+    <div v-else-if="errorLoadingContent && !showCameraPermissionPrompt && !cameraPermissionError" class="loading-overlay error-display">
       <p>⚠️ {{ errorLoadingContent }}</p>
       <button
         v-if="
           !errorLoadingContent.includes('tardó demasiado') &&
           !errorLoadingContent.includes('AR target no encontrado') &&
           !errorLoadingContent.includes('ID de marcador no válido') &&
-          !errorLoadingContent.includes('Error de MindAR') &&
-          !errorLoadingContent.includes('Timeout AR.')
+          !errorLoadingContent.includes('Error de MindAR') && // General MindAR errors
+          !errorLoadingContent.includes('Timeout AR.') &&
+          !errorLoadingContent.includes('Could not access camera') // Camera errors handled by camera prompt
         "
-        @click="loadMarkerAndContents"
+        @click="initializeARExperience(props.markerId, null)"
         class="retry-button"
       >
         Reintentar
@@ -809,10 +1003,12 @@ watch(isARReady, (ready) => {
         Ir a Pantalla Completa</button
       ><button @click="dismissPromptAndShowContent" class="prompt-button">Continuar así</button>
     </div>
-    <div v-if="!isLoading && mindFileUrl && !errorLoadingContent" class="ar-container">
+
+    <!-- AR Container and Scene - Conditionally rendered based on permissions and errors -->
+    <div v-if="!isLoading && mindFileUrl && !errorLoadingContent && !showCameraPermissionPrompt && !isCheckingPermission && !cameraPermissionError" class="ar-container">
       <div ref="sceneContainerRef" style="width: 100%; height: 100%">
         <a-scene
-          v-if="mindFileUrl"
+          v-if="mindFileUrl && !showCameraPermissionPrompt && !isCheckingPermission && !cameraPermissionError"
           ref="sceneRef"
           :key="mindFileUrl"
           embedded
@@ -894,7 +1090,7 @@ watch(isARReady, (ready) => {
             </a-entity>
           </a-entity>
         </a-scene>
-        <div v-else class="loading-overlay"><p>Preparando datos del marcador (.mind)...</p></div>
+        <div v-else-if="!cameraPermissionError && !showCameraPermissionPrompt && !isCheckingPermission && !isLoading" class="loading-overlay"><p>Preparando datos del marcador (.mind)...</p></div>
       </div>
       <div
         v-if="
@@ -941,7 +1137,8 @@ watch(isARReady, (ready) => {
 }
 .loading-overlay,
 .error-display,
-.scanning-indicator {
+.scanning-indicator,
+.camera-permission-prompt { /* Added camera-permission-prompt to shared styles */
   position: absolute;
   inset: 0;
   display: flex;
@@ -954,10 +1151,24 @@ watch(isARReady, (ready) => {
   z-index: 200;
   text-align: center;
   padding: 20px;
-  pointer-events: none;
+  pointer-events: none; /* Default for overlays */
 }
-.error-display {
+
+.error-display,
+.camera-permission-prompt { /* Allow clicks on error and permission prompts */
   pointer-events: auto;
+}
+
+.camera-permission-prompt {
+  background-color: rgba(0, 0, 0, 0.85); /* Same as loading overlay */
+  z-index: 250; /* Ensure it's above other general overlays, but potentially below toasts */
+}
+.camera-permission-prompt p {
+  color: #fff; /* Ensure text is visible on dark background */
+  margin-bottom: 15px; /* Space between messages and button */
+}
+
+.error-display {
   background-color: rgba(100, 0, 0, 0.85);
 }
 .scanning-indicator {
@@ -969,7 +1180,8 @@ watch(isARReady, (ready) => {
   color: #ccc;
 }
 .loading-overlay p,
-.error-display p {
+.error-display p,
+.camera-permission-prompt p { /* Shared paragraph styling */
   margin-top: 15px;
   font-size: 1.1em;
 }
