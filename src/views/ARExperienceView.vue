@@ -32,12 +32,14 @@ const isCleaningUp = ref(false)
 const imagePlaneRef = ref(null)
 const videoPlaneRef = ref(null)
 let resizeTimeout = null
-// const showRotatePrompt = ref(false); // Ya no se usará para forzar rotación
-const showFullscreenPrompt = ref(false) // Mantener opcionalmente
-const userDismissedFullscreenPrompt = ref(false) // Específico para el prompt de fullscreen
-const isMobile = ref(window.innerWidth < 768) // Para la escala
-const isDeviceLandscape = ref(window.matchMedia('(orientation: landscape)').matches) // Aún útil para layout de botones si se reintroducen
+const showFullscreenPrompt = ref(false)
+const userDismissedFullscreenPrompt = ref(false)
+const isMobile = ref(false) // Se actualizará en onMounted y resize
+const isDeviceLandscape = ref(false) // Se actualizará
+
 const YOUR_R2_DOMAIN_IDENTIFIER = 'pub-48e6b80b718c43a99a9b98163de9920c.r2.dev'
+
+// Eliminadas: markerWasVisibleBeforeResize y resizeEventToken ya que simplificamos la lógica de prompts de rotación.
 
 console.log(`[ARXP GLOBAL] Componente ARXP Creado. Props markerId: ${props.markerId}`)
 
@@ -94,11 +96,18 @@ async function retryCameraCheck() {
 
 function updateOrientationAndMobileState() {
   if (typeof window !== 'undefined') {
+    const oldMobile = isMobile.value
+    const oldLandscape = isDeviceLandscape.value
     isMobile.value = window.innerWidth < 768
     if (screen.orientation && screen.orientation.type) {
       isDeviceLandscape.value = screen.orientation.type.startsWith('landscape')
     } else {
       isDeviceLandscape.value = window.matchMedia('(orientation: landscape)').matches
+    }
+    if (oldMobile !== isMobile.value || oldLandscape !== isDeviceLandscape.value) {
+      console.log(
+        `[ARXP Env] Estado actualizado. Mobile: ${isMobile.value}, Landscape: ${isDeviceLandscape.value}`,
+      )
     }
   }
 }
@@ -113,7 +122,6 @@ const hideVRButton = () => {
   }
 }
 
-// Simplificado: Ya no forzamos rotación. Solo opcionalmente el fullscreen.
 function checkAndShowFullscreenPrompt() {
   console.log(
     `[ARXP Prompts] checkAndShowFullscreenPrompt. ARReady: ${isARReady.value}, MarkerVisible: ${isMarkerVisible.value}, UserDismissed: ${userDismissedFullscreenPrompt.value}`,
@@ -122,7 +130,7 @@ function checkAndShowFullscreenPrompt() {
     showFullscreenPrompt.value = false
     return
   }
-  isMobile.value = window.innerWidth < 768
+  updateOrientationAndMobileState() // Asegurar que isMobile esté actualizado
   const currentIsFullscreen = !!(
     document.fullscreenElement ||
     document.webkitFullscreenElement ||
@@ -130,51 +138,43 @@ function checkAndShowFullscreenPrompt() {
     document.msFullscreenElement
   )
 
-  // Mostrar prompt de fullscreen solo si no estamos ya en fullscreen
-  // y el usuario no lo ha descartado previamente en esta sesión de visualización del marcador.
   if (isMobile.value && !currentIsFullscreen) {
+    // Solo mostrar en móvil si no está ya en fullscreen
     showFullscreenPrompt.value = true
   } else {
     showFullscreenPrompt.value = false
   }
 
   if (showFullscreenPrompt.value) {
-    console.log(`[ARXP Prompts] Prompt Fullscreen ACTIVO. Ocultando contenido temporalmente.`)
     const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el
     const ip = sceneElement?.querySelector('#imagePlane') || imagePlaneRef.value?.el
     if (vp) vp.setAttribute('visible', 'false')
     if (ip) ip.setAttribute('visible', 'false')
     pauseVideo()
   } else if (isMarkerVisible.value) {
-    // Si no hay prompt, y marcador visible, mostrar contenido
     displayCurrentContent()
   }
 }
 
 function dismissFullscreenPromptAndShowContent() {
-  console.log('[ARXP Prompts] dismissFullscreenPromptAndShowContent.')
   userDismissedFullscreenPrompt.value = true
   showFullscreenPrompt.value = false
   if (isMarkerVisible.value && isARReady.value) {
-    displayCurrentContent() // Mostrar contenido inmediatamente
+    displayCurrentContent()
     nextTick(() => {
       handleWindowResize(true)
-    }) // Ajustar escala si es necesario
+    })
   }
 }
 
 function requestFullscreen() {
   const elem = sceneContainerRef.value
-  console.log('[ARXP Fullscreen] Intentando para:', elem)
   if (!elem) {
-    console.error('[ARXP Fullscreen] sceneContainerRef no encontrado.')
     toast.error('Error Fullscreen.')
     return
   }
-
-  userDismissedFullscreenPrompt.value = true // Asumir que el usuario quiere fullscreen o ya no verá el prompt
+  userDismissedFullscreenPrompt.value = true
   showFullscreenPrompt.value = false
-
   if (typeof document !== 'undefined' && !document.fullscreenElement) {
     const promise =
       elem.requestFullscreen?.() ||
@@ -182,18 +182,15 @@ function requestFullscreen() {
       elem.mozRequestFullScreen?.() ||
       elem.msRequestFullscreen?.()
     if (promise && typeof promise.catch === 'function') {
-      promise.catch((err) => {
-        console.error('[ARXP Fullscreen] Error al solicitar:', err.name, err.message)
+      promise.catch(() => {
         toast.info('No se pudo entrar en pantalla completa.', { timeout: 5000 })
-        userDismissedFullscreenPrompt.value = false // Permitir reintentar si falla
+        userDismissedFullscreenPrompt.value = false
       })
     } else if (!promise) {
-      console.warn('[ARXP Fullscreen] API no disponible.')
       toast.info('Pantalla completa no compatible.', { timeout: 5000 })
-      userDismissedFullscreenPrompt.value = false // Permitir reintentar si no es compatible
+      userDismissedFullscreenPrompt.value = false
     }
   } else if (document.fullscreenElement) {
-    // Ya en fullscreen, asegurarse de que el contenido se muestre
     if (isMarkerVisible.value && isARReady.value) {
       displayCurrentContent()
       nextTick(() => {
@@ -204,6 +201,7 @@ function requestFullscreen() {
 }
 
 async function loadMarkerAndContents() {
+  // ... (Misma lógica robusta de loadMarkerAndContents, asegurando que isLoading se pone a false)
   console.log(`[ARXP Load] loadMarkerAndContents INICIO. MarkerId: ${props.markerId}`)
   if (isCleaningUp.value) {
     console.log('[ARXP Load] Cleanup en progreso.')
@@ -214,7 +212,6 @@ async function loadMarkerAndContents() {
     isLoading.value = false
     return
   }
-
   isARReady.value = false
   isMarkerVisible.value = false
   associatedContents.value = []
@@ -222,12 +219,10 @@ async function loadMarkerAndContents() {
   currentContentIndex.value = 0
   userDismissedFullscreenPrompt.value = false
   showFullscreenPrompt.value = false
-
   if (arReadyTimeout) clearTimeout(arReadyTimeout)
   arReadyTimeout = null
   if (targetLostTimeout) clearTimeout(targetLostTimeout)
   targetLostTimeout = null
-
   try {
     const { data: markerData, error: markerError } = await supabase
       .from('markers')
@@ -240,7 +235,6 @@ async function loadMarkerAndContents() {
     if (!markerData?.mind_file_name) {
       throw new Error('Marcador sin .mind.')
     }
-
     let rawMindFileUrl = markerData.mind_file_name
     if (rawMindFileUrl && rawMindFileUrl.includes(YOUR_R2_DOMAIN_IDENTIFIER)) {
       const mindCacheBuster = `v=${Date.now()}`
@@ -248,7 +242,6 @@ async function loadMarkerAndContents() {
     } else {
       mindFileUrl.value = rawMindFileUrl
     }
-
     const { data: contentsData, error: contentsError } = await supabase
       .from('marker_contents')
       .select(`display_order, contents (id,content_url,type,name)`)
@@ -259,12 +252,10 @@ async function loadMarkerAndContents() {
       .filter((i) => i.contents?.content_url && i.contents?.type)
       .map((i) => ({ ...i.contents, display_order: i.display_order }))
       .sort((a, b) => a.display_order - b.display_order)
-
     if (mindFileUrl.value && !errorLoadingContent.value) {
       isLoading.value = false
       console.log('[ARXP Load] isLoading = false. Listo para montar escena AR.')
     }
-
     arReadyTimeout = setTimeout(() => {
       if (
         !isARReady.value &&
@@ -289,19 +280,18 @@ async function loadMarkerAndContents() {
 
 async function displayCurrentContent() {
   console.log(
-    `[ARXP Display] INICIO. Marker: ${isMarkerVisible.value}, ARReady: ${isARReady.value}, ShowFullscreenPrompt: ${showFullscreenPrompt.value}, UserDismissedFullscreen: ${userDismissedFullscreenPrompt.value}`,
+    `[ARXP Display] INICIO. Marker: ${isMarkerVisible.value}, ARReady: ${isARReady.value}, ShowFullscreenPrompt: ${showFullscreenPrompt.value}, UserDismissed: ${userDismissedFullscreenPrompt.value}`,
   )
   if (isCleaningUp.value || !isARReady.value || !isMarkerVisible.value) {
     return
   }
   if (showFullscreenPrompt.value && !userDismissedFullscreenPrompt.value) {
     return
-  } // Esperar si el prompt de fullscreen está activo y no descartado
+  }
 
   const content = currentContent.value
   if (!content || !content.content_url) {
     isContentLoading.value = false
-    // Ocultar planos si no hay contenido
     const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el
     const ip = sceneElement?.querySelector('#imagePlane') || imagePlaneRef.value?.el
     if (vp) vp.setAttribute('visible', 'false')
@@ -330,9 +320,9 @@ async function displayCurrentContent() {
   imagePlane.setAttribute('visible', 'false')
   if (videoAsset.pause) videoAsset.pause()
 
-  // Limpiar listeners de click ANTES de asignar nuevos. Se reasignan después de cargar el contenido.
-  imagePlane.removeEventListener('click', handleContentClick)
-  videoPlane.removeEventListener('click', handleContentClick)
+  // QUITAR listeners aquí, porque se reasignan en el template con :[attribute].v-if
+  // imagePlane.removeEventListener('click', handleContentClick);
+  // videoPlane.removeEventListener('click', handleContentClick);
 
   const type = content.type.toLowerCase()
   const url = content.content_url
@@ -355,7 +345,7 @@ async function displayCurrentContent() {
 
     await loadMedia(url, mediaAsset, type)
     adjustMediaPlaneAspect(type, targetPlaneElement, mediaAsset)
-    targetPlaneElement.addEventListener('click', handleContentClick) // Re-asignar listener al plano activo
+    // El listener de click ahora está en el template directamente en los planos
 
     if (
       isMarkerVisible.value &&
@@ -382,7 +372,7 @@ async function displayCurrentContent() {
 }
 
 function loadMedia(url, mediaElement, type) {
-  // ... (Lógica de loadMedia de la versión anterior) ...
+  // ... (Lógica de loadMedia sin cambios) ...
   let urlWithCacheBust = url
   if (url && url.includes(YOUR_R2_DOMAIN_IDENTIFIER)) {
     const cacheBuster = `v=${Date.now()}`
@@ -440,6 +430,7 @@ function loadMedia(url, mediaElement, type) {
 }
 
 const playVideo = async () => {
+  // ... (Lógica de playVideo sin cambios) ...
   const videoEl = document.querySelector('#videoAsset')
   if (
     videoEl &&
@@ -471,6 +462,7 @@ const playVideo = async () => {
   }
 }
 const pauseVideo = () => {
+  // ... (Lógica de pauseVideo sin cambios) ...
   const videoEl = document.querySelector('#videoAsset')
   if (videoEl && typeof videoEl.pause === 'function' && !videoEl.paused) {
     videoEl.pause()
@@ -508,6 +500,7 @@ const adjustMediaPlaneAspect = (contentType, targetPlaneElement, mediaAssetEleme
 }
 
 const handleSceneLoaded = (event) => {
+  // ... (Lógica de handleSceneLoaded sin cambios) ...
   sceneElement = event.target
   if (!sceneElement) {
     return
@@ -516,6 +509,7 @@ const handleSceneLoaded = (event) => {
   nextTick(hideVRButton)
 }
 const handleArReady = async () => {
+  // ... (Lógica de handleArReady sin cambios) ...
   if (arReadyTimeout) clearTimeout(arReadyTimeout)
   arReadyTimeout = null
   if (isCleaningUp.value) {
@@ -539,7 +533,7 @@ const handleArReady = async () => {
   hideVRButton()
   if (isMarkerVisible.value) {
     checkAndShowFullscreenPrompt()
-  } // Cambiado a prompt de fullscreen
+  }
 }
 const handleArError = (event) => {
   // ... (Lógica de handleArError sin cambios) ...
@@ -574,6 +568,7 @@ const handleArError = (event) => {
 }
 
 const addEntityListeners = (sceneEl) => {
+  // ... (Lógica de addEntityListeners sin cambios) ...
   const targetMindAREntity = sceneEl.querySelector('#targetEntity')
   if (targetMindAREntity) {
     targetEntityRef.value = targetMindAREntity
@@ -595,12 +590,12 @@ const handleTargetFound = () => {
   isMarkerVisible.value = true
   errorLoadingContent.value = ''
   if (isARReady.value && associatedContents.value.length > 0) {
-    checkAndShowFullscreenPrompt() // Cambiado a prompt de fullscreen
-    // No necesitamos llamar a displayCurrentContent aquí directamente,
-    // checkAndShowFullscreenPrompt o el dismiss del prompt lo harán.
+    checkAndShowFullscreenPrompt()
+    // No llamamos displayCurrentContent aquí directamente; el prompt o su descarte lo harán.
   }
 }
 const handleTargetLost = () => {
+  // ... (Lógica de handleTargetLost sin cambios significativos) ...
   if (isCleaningUp.value) {
     return
   }
@@ -612,7 +607,7 @@ const handleTargetLost = () => {
     isMarkerVisible.value = false
     isContentLoading.value = false
     pauseVideo()
-    showFullscreenPrompt.value = false // Ocultar prompt de fullscreen si el marcador se pierde
+    showFullscreenPrompt.value = false
     const currentSceneEl = sceneElement || sceneRef.value?.el
     if (currentSceneEl) {
       const vp = currentSceneEl.querySelector('#videoPlane')
@@ -630,17 +625,25 @@ const handleTargetLost = () => {
 }
 
 const handleContentClick = (event) => {
-  console.log('[ARXP ClickEvent] Click en contenido AR.')
+  console.log('[ARXP ClickEvent] Click en contenido AR detectado.')
   if (showFullscreenPrompt.value && !userDismissedFullscreenPrompt.value) {
-    console.log('[ARXP ClickEvent] Prompt Fullscreen activo, click ignorado.')
-    return // No hacer nada si el prompt de fullscreen está activo y no descartado
+    console.log('[ARXP ClickEvent] Prompt Fullscreen activo, click ignorado temporalmente.')
+    return
+  }
+
+  if (!isMarkerVisible.value || !isARReady.value) {
+    console.log('[ARXP ClickEvent] Marcador no visible o AR no lista, click ignorado.')
+    return
   }
 
   if (associatedContents.value.length > 1) {
-    pauseVideo() // Pausar video actual antes de cambiar
+    console.log('[ARXP ClickEvent] Múltiples contenidos. Avanzando al siguiente.')
+    pauseVideo()
     currentContentIndex.value = (currentContentIndex.value + 1) % associatedContents.value.length
+    console.log('[ARXP ClickEvent] Nuevo currentContentIndex:', currentContentIndex.value)
     displayCurrentContent()
-  } else if (currentContentType.value === 'video') {
+  } else if (currentContentType.value === 'video' && associatedContents.value.length === 1) {
+    console.log('[ARXP ClickEvent] Video único. Pausar/Reproducir.')
     const videoEl = document.querySelector('#videoAsset')
     if (videoEl) {
       if (videoEl.paused) {
@@ -650,9 +653,8 @@ const handleContentClick = (event) => {
       }
     }
   } else {
-    // Si es una sola imagen, o tipo desconocido, podríamos no hacer nada o un toast.
     console.log(
-      '[ARXP ClickEvent] Contenido único (no video) o tipo desconocido, no hay acción de navegación.',
+      '[ARXP ClickEvent] Contenido único (no video) o sin contenidos. No hay acción de navegación por click.',
     )
     if (currentContent.value) toast.info(`Viendo: ${currentContent.value.name}`, { timeout: 1500 })
   }
@@ -686,15 +688,8 @@ async function cleanupARInternal(calledFromWatcher = false) {
     currentTargetEntity.removeEventListener('targetLost', handleTargetLost)
   }
   targetEntityRef.value = null
-  const imgPlane = imagePlaneRef.value?.el
-  if (imgPlane && typeof imgPlane.removeEventListener === 'function') {
-    imgPlane.removeEventListener('click', handleContentClick)
-  }
+  // No necesitamos quitar listeners de click de los planos aquí, ya que están en el template y se destruyen/recrean con el v-if o :key
   imagePlaneRef.value = null
-  const vidPlane = videoPlaneRef.value?.el
-  if (vidPlane && typeof vidPlane.removeEventListener === 'function') {
-    vidPlane.removeEventListener('click', handleContentClick)
-  }
   videoPlaneRef.value = null
   contentScalerRef.value = null
   const currentArSystem = arSystem
@@ -735,24 +730,19 @@ async function cleanupARInternal(calledFromWatcher = false) {
   isMarkerVisible.value = false
   isARReady.value = false
   isContentLoading.value = false
-  showFullscreenPrompt.value = false // Resetear prompt de fullscreen también
+  showFullscreenPrompt.value = false
   await new Promise((resolve) => setTimeout(resolve, 100))
   isCleaningUp.value = false
 }
 
 const handleGlobalOrientationAndResize = () => {
-  // Renombrado para claridad
-  const newResizeToken = Date.now()
-  markerWasVisibleBeforeResize = isMarkerVisible.value
-  resizeEventToken = newResizeToken
   requestAnimationFrame(() => {
     updateOrientationAndMobileState()
-    handleWindowResize(false, resizeEventToken)
+    handleWindowResize(false) // No necesita token ya que markerWasVisible... fue removido
   })
 }
 
 const handleFullscreenChange = () => {
-  const currentToken = resizeEventToken
   const isCurrentlyFullscreen = !!(
     document.fullscreenElement ||
     document.webkitFullscreenElement ||
@@ -760,32 +750,26 @@ const handleFullscreenChange = () => {
     document.msFullscreenElement
   )
   if (isCurrentlyFullscreen) {
-    userDismissedFullscreenPrompt.value = true // Si entra a fullscreen, consideramos el prompt "atendido"
+    userDismissedFullscreenPrompt.value = true
     showFullscreenPrompt.value = false
   } else {
-    userDismissedFullscreenPrompt.value = false // Si sale, podría querer ver el prompt de nuevo
-  }
+    userDismissedFullscreenPrompt.value = false
+  } // Permitir que el prompt reaparezca si sale de fullscreen
   nextTick(() => {
-    handleWindowResize(true, currentToken)
-  })
+    handleWindowResize(true)
+  }) // true para forzar re-evaluación y posible re-display de contenido
 }
 
-const handleWindowResize = (isInitialOrPostPromptAdjust = false, currentResizeToken = 0) => {
+const handleWindowResize = (isInitialOrPostPromptAdjust = false) => {
   console.log(
-    `[ARXP Resize] handleWindowResize (#${currentResizeToken}). Initial: ${isInitialOrPostPromptAdjust}, Marker: ${isMarkerVisible.value}, ARReady: ${isARReady.value}`,
+    `[ARXP Resize] handleWindowResize. Initial: ${isInitialOrPostPromptAdjust}, Marker: ${isMarkerVisible.value}, ARReady: ${isARReady.value}`,
   )
 
-  // Llamar a checkAndShowFullscreenPrompt solo si AR está lista y el marcador visible (o se consideraba visible)
   if (isARReady.value && !isCleaningUp.value) {
-    const considerMarkerVisible =
-      markerWasVisibleBeforeResize &&
-      currentResizeToken !== 0 &&
-      currentResizeToken === resizeEventToken
-        ? true
-        : isMarkerVisible.value
-    if (considerMarkerVisible) {
-      checkAndShowFullscreenPrompt() // Ya no pasamos token aquí, su lógica es más simple
-    } else if (!isMarkerVisible.value) {
+    if (isMarkerVisible.value) {
+      // Solo llamar si el marcador está realmente visible
+      checkAndShowFullscreenPrompt()
+    } else {
       // Si marcador NO visible
       showFullscreenPrompt.value = false
       const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el
@@ -818,32 +802,23 @@ const handleWindowResize = (isInitialOrPostPromptAdjust = false, currentResizeTo
       !sceneElForTimeout.camera ||
       !currentScalerEl
     ) {
-      console.warn(
-        `[ARXP Resize] (#${currentResizeToken}) Timeout: Elementos no encontrados. Scaler:`,
-        currentScalerEl,
-      )
+      console.warn(`[ARXP Resize] Timeout: Elementos no encontrados. Scaler:`, currentScalerEl)
       return
     }
 
-    // Aplicar escala siempre que no haya un prompt de fullscreen activo que el usuario no haya descartado
     if (
       !(showFullscreenPrompt.value && !userDismissedFullscreenPrompt.value) ||
       isInitialOrPostPromptAdjust
     ) {
-      updateOrientationAndMobileState() // Asegurar que isMobile esté actualizado
-      let newScale = isMobile.value ? 1.4 : 1.2 // Escalas fijas propuestas
-
+      updateOrientationAndMobileState()
+      let newScale = isMobile.value ? 1.4 : 1.2
       currentScalerEl.setAttribute('scale', `${newScale} ${newScale} ${newScale}`)
-      console.log(
-        `[ARXP Resize] (#${currentResizeToken}) Escala aplicada: ${newScale}. Mobile: ${isMobile.value}`,
-      )
-
+      console.log(`[ARXP Resize] Escala aplicada: ${newScale}. Mobile: ${isMobile.value}`)
       if (sceneElForTimeout.camera?.el?.components?.camera?.updateAspect) {
         sceneElForTimeout.camera.el.components.camera.updateAspect()
       }
-      // Sigue comentado: sceneElForTimeout.resize();
+      // sceneElForTimeout.resize(); // Sigue comentado
 
-      // Mostrar contenido si las condiciones son correctas después del reescalado.
       if (
         isMarkerVisible.value &&
         isARReady.value &&
@@ -856,10 +831,7 @@ const handleWindowResize = (isInitialOrPostPromptAdjust = false, currentResizeTo
 }
 
 async function initializeARExperience(newMarkerId, oldMarkerId) {
-  // ... (Lógica de initializeARExperience sin cambios significativos, ya maneja isLoading bien) ...
-  console.log(
-    `[ARXP Init] initializeARExperience INICIO. NewMarker: ${newMarkerId}, OldMarker: ${oldMarkerId}, isCleaningUp: ${isCleaningUp.value}`,
-  )
+  console.log(`[ARXP Init] initializeARExperience INICIO. NewMarker: ${newMarkerId}`)
   if (isCleaningUp.value && oldMarkerId && !newMarkerId) {
     isLoading.value = false
     return
@@ -889,9 +861,6 @@ async function initializeARExperience(newMarkerId, oldMarkerId) {
     isLoading.value = false
     isARReady.value = false
   }
-  console.log(
-    `[ARXP Init] initializeARExperience FIN. isLoading: ${isLoading.value}, isARReady: ${isARReady.value}, mindFileUrl: ${mindFileUrl.value ? 'SET' : 'EMPTY'}`,
-  )
 }
 
 watch(
@@ -903,6 +872,7 @@ watch(
 )
 
 onMounted(() => {
+  updateOrientationAndMobileState() // Llamada inicial
   window.addEventListener('resize', handleGlobalOrientationAndResize)
   if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
     screen.orientation.addEventListener('change', handleGlobalOrientationAndResize)
@@ -918,11 +888,9 @@ onMounted(() => {
   document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
   document.addEventListener('mozfullscreenchange', handleFullscreenChange)
   document.addEventListener('MSFullscreenChange', handleFullscreenChange)
-  handleGlobalOrientationAndResize() // Llamada inicial
 })
 
 onUnmounted(async () => {
-  // ... (Lógica de onUnmounted sin cambios) ...
   clearTimeout(resizeTimeout)
   window.removeEventListener('resize', handleGlobalOrientationAndResize)
   if (screen.orientation && typeof screen.orientation.removeEventListener === 'function') {
@@ -946,7 +914,8 @@ watch(isARReady, (ready) => {
   if (ready) {
     nextTick(() => {
       hideVRButton()
-      handleWindowResize(true) // Llama para ajuste inicial de escala
+      updateOrientationAndMobileState() // Asegurar estados antes del primer resize
+      handleWindowResize(true)
     })
   }
 })
@@ -954,15 +923,11 @@ watch(isARReady, (ready) => {
 
 <template>
   <div class="ar-view-container">
-    <!-- Camera Permission Prompt -->
     <div v-if="showCameraPermissionPrompt" class="loading-overlay camera-permission-prompt">
       <p>⚠️ {{ cameraPermissionError }}</p>
-      <p v-if="cameraPermissionError.includes('denied')">
-        Debes habilitar el permiso en los ajustes.
-      </p>
+      <p v-if="cameraPermissionError.includes('denied')">Debes habilitar el permiso.</p>
       <button @click="retryCameraCheck" class="retry-button">Reintentar</button>
     </div>
-    <!-- Loadings -->
     <div
       v-if="isCheckingPermission && !showCameraPermissionPrompt"
       class="loading-overlay initial-loading"
@@ -1014,7 +979,6 @@ watch(isARReady, (ready) => {
       <div class="spinner"></div>
       <p>Cargando contenido...</p>
     </div>
-    <!-- Error Display -->
     <div
       v-else-if="errorLoadingContent && !showCameraPermissionPrompt && !cameraPermissionError"
       class="loading-overlay error-display"
@@ -1032,7 +996,6 @@ watch(isARReady, (ready) => {
       </button>
     </div>
 
-    <!-- Fullscreen Prompt (Opcional) -->
     <div
       v-if="isARReady && isMarkerVisible && showFullscreenPrompt && !userDismissedFullscreenPrompt"
       class="ar-prompt-overlay"
@@ -1046,7 +1009,6 @@ watch(isARReady, (ready) => {
       </button>
     </div>
 
-    <!-- AR Container -->
     <div
       v-if="
         !isLoading &&
@@ -1099,27 +1061,38 @@ watch(isARReady, (ready) => {
         ></a-camera>
         <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
           <a-entity ref="contentScalerRef" id="contentScaler" scale="1 1 1" position="0 0 0">
-            <!-- Los planos ahora se manejan solo con refs, el @click se añade/quita en displayCurrentContent -->
             <a-image
               ref="imagePlaneRef"
               id="imagePlane"
               class="clickable"
+              @click="handleContentClick"
               position="0 0 0"
               rotation="0 0 0"
               width="1"
               height="1"
-              visible="false"
+              :visible="
+                isARReady &&
+                isMarkerVisible &&
+                currentContentType === 'image' &&
+                !(showFullscreenPrompt && !userDismissedFullscreenPrompt)
+              "
               src="#imageAsset"
             ></a-image>
             <a-video
               ref="videoPlaneRef"
               id="videoPlane"
               class="clickable"
+              @click="handleContentClick"
               position="0 0 0"
               rotation="0 0 0"
               width="1"
               height="1"
-              visible="false"
+              :visible="
+                isARReady &&
+                isMarkerVisible &&
+                currentContentType === 'video' &&
+                !(showFullscreenPrompt && !userDismissedFullscreenPrompt)
+              "
               src="#videoAsset"
             ></a-video>
             <a-entity
@@ -1143,8 +1116,6 @@ watch(isARReady, (ready) => {
         </a-entity>
       </a-scene>
     </div>
-
-    <!-- Scanning Indicator (Ya no hay botones de navegación lateral) -->
     <div
       v-if="
         isARReady &&
@@ -1161,7 +1132,7 @@ watch(isARReady, (ready) => {
 </template>
 
 <style scoped>
-/* Estilos sin cambios significativos, se mantiene la estructura anterior */
+/* Estilos sin cambios */
 :deep(.a-enter-vr-button) {
   display: none !important;
   visibility: hidden !important;
@@ -1273,7 +1244,6 @@ a-scene {
   z-index: 1;
   background-color: transparent !important;
 }
-/* .nav-buttons ya no se usan */
 .ar-prompt-overlay {
   position: absolute;
   bottom: 20px;
