@@ -40,7 +40,7 @@ const FULLSCREEN_CHANGE_DEBOUNCE_DELAY = 400
 
 const showFullscreenPrompt = ref(false)
 const userDismissedFullscreenPrompt = ref(false)
-const isMobile = ref(false)
+const isMobile = ref(false) // Ahora incluirá tablets hasta 1023px para ciertas lógicas
 const isDeviceLandscape = ref(false)
 const isInBrowserFullscreen = ref(false)
 let orientationMediaQuery = null
@@ -103,7 +103,7 @@ async function retryCameraCheck() {
 
 function updateOrientationAndMobileState() {
   if (typeof window !== 'undefined') {
-    isMobile.value = window.innerWidth < 768
+    isMobile.value = window.innerWidth < 1024 // Ajustado para tablets
     if (screen.orientation && screen.orientation.type) {
       isDeviceLandscape.value = screen.orientation.type.startsWith('landscape')
     } else {
@@ -139,6 +139,7 @@ function checkAndShowFullscreenPrompt() {
   if (isInBrowserFullscreen.value || userDismissedFullscreenPrompt.value) {
     showFullscreenPrompt.value = false
   } else if (isMobile.value) {
+    // isMobile ahora incluye tablets < 1024px
     showFullscreenPrompt.value = true
   } else {
     showFullscreenPrompt.value = false
@@ -783,7 +784,7 @@ const handleFullscreenChange = () => {
 }
 
 function procesarRedimensionado(isInitialOrPostPromptAdjust = false) {
-  updateOrientationAndMobileState() // Siempre actualizar estados primero
+  updateOrientationAndMobileState()
 
   if (isARReady.value && !isCleaningUp.value) {
     if (isMarkerVisible.value) {
@@ -815,10 +816,8 @@ function procesarRedimensionado(isInitialOrPostPromptAdjust = false) {
   ) {
     let newScale = 1.0
     if (isMobile.value) {
-      // Móvil: Landscape o Fullscreen -> 1.2, Portrait no Fullscreen -> 1.0
       newScale = isDeviceLandscape.value || isInBrowserFullscreen.value ? 1.2 : 1.0
     } else {
-      // Desktop/Tablet: Fullscreen -> 1.2, No Fullscreen -> 1.0
       newScale = isInBrowserFullscreen.value ? 1.2 : 1.0
     }
 
@@ -1072,10 +1071,7 @@ watch(isARReady, (ready) => {
       </button>
     </div>
 
-    <div
-      v-if="showARControls"
-      :class="['ar-controls-overlay', isDeviceLandscape ? 'landscape' : 'portrait']"
-    >
+    <div v-if="showARControls" class="ar-controls-overlay">
       <button @click="processContentNavigation('prev')" class="ar-control-button prev-button">
         <
       </button>
@@ -1155,6 +1151,7 @@ watch(isARReady, (ready) => {
               height="1"
               visible="false"
               src="#imageAsset"
+              material="shader: flat; transparent: true;"
             ></a-image>
             <a-video
               ref="videoPlaneRef"
@@ -1166,6 +1163,7 @@ watch(isARReady, (ready) => {
               height="1"
               visible="false"
               src="#videoAsset"
+              material="shader: flat; transparent: true;"
             ></a-video>
             <a-entity
               v-if="
@@ -1242,35 +1240,28 @@ watch(isARReady, (ready) => {
   width: 100%;
   height: 100%;
   display: flex;
-  flex-direction: row; /* Por defecto horizontal para landscape y desktop */
-  justify-content: space-between; /* Botones a los lados */
-  align-items: center; /* Centrados verticalmente */
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
   pointer-events: none;
   z-index: 150;
 }
-/* No se necesita .ar-controls-overlay.landscape si el default es row y space-between */
-/* Para portrait, si quieres que estén arriba/abajo, necesitarías cambiar flex-direction */
-/* .ar-controls-overlay.portrait { */
-/* flex-direction: column; */
-/* justify-content: space-between; */ /* Para poner uno arriba y otro abajo */
-/* } */
-/* .ar-controls-overlay.portrait .ar-control-button { margin: 10px; } */
 
 .ar-control-button {
   background-color: rgba(0, 0, 0, 0.5);
   color: white;
   border: none;
   border-radius: 50%;
-  font-size: 28px; /* Aumentado */
+  font-size: 28px;
   line-height: 1;
   cursor: pointer;
   pointer-events: auto;
-  width: 55px; /* Aumentado */
-  height: 55px; /* Aumentado */
+  width: 55px;
+  height: 55px;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 20px; /* Aumentado margen */
+  margin: 20px;
   user-select: none;
   font-family: 'Roboto', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
@@ -1280,11 +1271,11 @@ watch(isARReady, (ready) => {
 
 .exit-fullscreen-button {
   position: absolute;
-  top: 20px; /* Aumentado */
-  right: 20px; /* Aumentado */
-  width: 45px; /* Aumentado */
-  height: 45px; /* Aumentado */
-  font-size: 24px; /* Aumentado */
+  top: 20px;
+  right: 20px;
+  width: 45px;
+  height: 45px;
+  font-size: 24px;
   z-index: 160;
 }
 
@@ -1338,7 +1329,7 @@ watch(isARReady, (ready) => {
   padding: 8px 15px;
   border-radius: 20px;
   font-size: 1em;
-} /* Aumentado */
+}
 .loading-overlay p,
 .error-display p,
 .camera-permission-prompt p,
@@ -1346,7 +1337,7 @@ watch(isARReady, (ready) => {
   margin-top: 15px;
   font-size: 1.2em;
   font-family: 'Roboto', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-} /* Aumentado */
+}
 .error-display p {
   color: #ffdddd;
 }
@@ -1376,7 +1367,7 @@ watch(isARReady, (ready) => {
   transition: background-color 0.3s ease;
   pointer-events: auto;
   font-family: 'Roboto', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-} /* Aumentado */
+}
 .retry-button:hover {
   background-color: var(--vt-c-divider-light-1, #bbb);
 }
