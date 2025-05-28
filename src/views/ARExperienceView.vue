@@ -11,7 +11,10 @@ const toast = useToast()
 const sceneRef = ref(null)
 const targetEntityRef = ref(null)
 const contentScalerRef = ref(null)
-const sceneContainerRef = ref(null)
+const imagePlaneRef = ref(null)
+const videoPlaneRef = ref(null)
+const arViewContainerRef = ref(null)
+
 const mindFileUrl = ref('')
 const associatedContents = ref([])
 const currentContentIndex = ref(0)
@@ -29,19 +32,20 @@ let sceneElement = null
 let cameraElement = null
 let targetLostTimeout = null
 const isCleaningUp = ref(false)
-const imagePlaneRef = ref(null)
-const videoPlaneRef = ref(null)
-let resizeTimeout = null
+
+let resizeDebounceTimer = null
+const RESIZE_DEBOUNCE_DELAY = 400
+let fullscreenChangeDebounceTimer = null
+const FULLSCREEN_CHANGE_DEBOUNCE_DELAY = 400
+
 const showFullscreenPrompt = ref(false)
 const userDismissedFullscreenPrompt = ref(false)
-const isMobile = ref(false) // Se actualizará en onMounted y resize
-const isDeviceLandscape = ref(false) // Se actualizará
+const isMobile = ref(false)
+const isDeviceLandscape = ref(false)
+const isInBrowserFullscreen = ref(false)
+let orientationMediaQuery = null
 
 const YOUR_R2_DOMAIN_IDENTIFIER = 'pub-48e6b80b718c43a99a9b98163de9920c.r2.dev'
-
-// Eliminadas: markerWasVisibleBeforeResize y resizeEventToken ya que simplificamos la lógica de prompts de rotación.
-
-console.log(`[ARXP GLOBAL] Componente ARXP Creado. Props markerId: ${props.markerId}`)
 
 const currentContent = computed(() => {
   if (
@@ -53,11 +57,16 @@ const currentContent = computed(() => {
   }
   return null
 })
-const currentContentUrl = computed(() => currentContent.value?.content_url || '')
 const currentContentType = computed(() => currentContent.value?.type?.toLowerCase() || '')
 
+const showARControls = computed(() => {
+  return isARReady.value && isMarkerVisible.value && associatedContents.value.length > 1
+})
+const showExitFullscreenButton = computed(() => {
+  return isARReady.value && isMarkerVisible.value && isInBrowserFullscreen.value
+})
+
 async function checkAndRequestCameraPermission() {
-  console.log('[ARXP Perm] checkAndRequestCameraPermission INICIO')
   isCheckingPermission.value = true
   cameraPermissionError.value = ''
   showCameraPermissionPrompt.value = false
@@ -66,11 +75,9 @@ async function checkAndRequestCameraPermission() {
       video: { facingMode: 'environment' },
     })
     stream.getTracks().forEach((track) => track.stop())
-    console.log('[ARXP Perm] Permiso de cámara OTORGADO.')
     isCheckingPermission.value = false
     return true
   } catch (error) {
-    console.error('[ARXP Perm] Error en getUserMedia:', error.name, error.message)
     let errorMessage = ''
     if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
       errorMessage = 'Permiso de cámara denegado.'
@@ -96,19 +103,18 @@ async function retryCameraCheck() {
 
 function updateOrientationAndMobileState() {
   if (typeof window !== 'undefined') {
-    const oldMobile = isMobile.value
-    const oldLandscape = isDeviceLandscape.value
     isMobile.value = window.innerWidth < 768
     if (screen.orientation && screen.orientation.type) {
       isDeviceLandscape.value = screen.orientation.type.startsWith('landscape')
     } else {
       isDeviceLandscape.value = window.matchMedia('(orientation: landscape)').matches
     }
-    if (oldMobile !== isMobile.value || oldLandscape !== isDeviceLandscape.value) {
-      console.log(
-        `[ARXP Env] Estado actualizado. Mobile: ${isMobile.value}, Landscape: ${isDeviceLandscape.value}`,
-      )
-    }
+    isInBrowserFullscreen.value = !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    )
   }
 }
 
@@ -123,35 +129,28 @@ const hideVRButton = () => {
 }
 
 function checkAndShowFullscreenPrompt() {
-  console.log(
-    `[ARXP Prompts] checkAndShowFullscreenPrompt. ARReady: ${isARReady.value}, MarkerVisible: ${isMarkerVisible.value}, UserDismissed: ${userDismissedFullscreenPrompt.value}`,
-  )
-  if (!isARReady.value || !isMarkerVisible.value || userDismissedFullscreenPrompt.value) {
+  updateOrientationAndMobileState()
+
+  if (!isARReady.value || !isMarkerVisible.value) {
     showFullscreenPrompt.value = false
     return
   }
-  updateOrientationAndMobileState() // Asegurar que isMobile esté actualizado
-  const currentIsFullscreen = !!(
-    document.fullscreenElement ||
-    document.webkitFullscreenElement ||
-    document.mozFullScreenElement ||
-    document.msFullscreenElement
-  )
 
-  if (isMobile.value && !currentIsFullscreen) {
-    // Solo mostrar en móvil si no está ya en fullscreen
+  if (isInBrowserFullscreen.value || userDismissedFullscreenPrompt.value) {
+    showFullscreenPrompt.value = false
+  } else if (isMobile.value) {
     showFullscreenPrompt.value = true
   } else {
     showFullscreenPrompt.value = false
   }
 
   if (showFullscreenPrompt.value) {
-    const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el
-    const ip = sceneElement?.querySelector('#imagePlane') || imagePlaneRef.value?.el
+    const vp = videoPlaneRef.value?.el || sceneElement?.querySelector('#videoPlane')
+    const ip = imagePlaneRef.value?.el || sceneElement?.querySelector('#imagePlane')
     if (vp) vp.setAttribute('visible', 'false')
     if (ip) ip.setAttribute('visible', 'false')
     pauseVideo()
-  } else if (isMarkerVisible.value) {
+  } else if (isMarkerVisible.value && !isContentLoading.value) {
     displayCurrentContent()
   }
 }
@@ -162,19 +161,16 @@ function dismissFullscreenPromptAndShowContent() {
   if (isMarkerVisible.value && isARReady.value) {
     displayCurrentContent()
     nextTick(() => {
-      handleWindowResize(true)
+      procesarRedimensionado(true)
     })
   }
 }
 
 function requestFullscreen() {
-  const elem = sceneContainerRef.value
+  const elem = arViewContainerRef.value
   if (!elem) {
-    toast.error('Error Fullscreen.')
     return
   }
-  userDismissedFullscreenPrompt.value = true
-  showFullscreenPrompt.value = false
   if (typeof document !== 'undefined' && !document.fullscreenElement) {
     const promise =
       elem.requestFullscreen?.() ||
@@ -184,29 +180,27 @@ function requestFullscreen() {
     if (promise && typeof promise.catch === 'function') {
       promise.catch(() => {
         toast.info('No se pudo entrar en pantalla completa.', { timeout: 5000 })
-        userDismissedFullscreenPrompt.value = false
       })
     } else if (!promise) {
-      toast.info('Pantalla completa no compatible.', { timeout: 5000 })
-      userDismissedFullscreenPrompt.value = false
-    }
-  } else if (document.fullscreenElement) {
-    if (isMarkerVisible.value && isARReady.value) {
-      displayCurrentContent()
-      nextTick(() => {
-        handleWindowResize(true)
-      })
+      toast.info('La pantalla completa no es compatible con este navegador.', { timeout: 5000 })
     }
   }
 }
 
-async function loadMarkerAndContents() {
-  // ... (Misma lógica robusta de loadMarkerAndContents, asegurando que isLoading se pone a false)
-  console.log(`[ARXP Load] loadMarkerAndContents INICIO. MarkerId: ${props.markerId}`)
-  if (isCleaningUp.value) {
-    console.log('[ARXP Load] Cleanup en progreso.')
-    return
+function exitFullscreenCustom() {
+  if (typeof document !== 'undefined' && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {})
+  } else if (typeof document !== 'undefined' && document.webkitExitFullscreen) {
+    document.webkitExitFullscreen()
+  } else if (typeof document !== 'undefined' && document.mozCancelFullScreen) {
+    document.mozCancelFullScreen()
+  } else if (typeof document !== 'undefined' && document.msExitFullscreen) {
+    document.msExitFullscreen()
   }
+}
+
+async function loadMarkerAndContents() {
+  if (isCleaningUp.value) return
   if (!props.markerId) {
     errorLoadingContent.value = 'ID de marcador no válido.'
     isLoading.value = false
@@ -229,12 +223,9 @@ async function loadMarkerAndContents() {
       .select('mind_file_name')
       .eq('id', props.markerId)
       .single()
-    if (markerError) {
-      throw new Error(markerError.message)
-    }
-    if (!markerData?.mind_file_name) {
-      throw new Error('Marcador sin .mind.')
-    }
+    if (markerError) throw new Error(markerError.message)
+    if (!markerData?.mind_file_name) throw new Error('Marcador sin .mind.')
+
     let rawMindFileUrl = markerData.mind_file_name
     if (rawMindFileUrl && rawMindFileUrl.includes(YOUR_R2_DOMAIN_IDENTIFIER)) {
       const mindCacheBuster = `v=${Date.now()}`
@@ -242,19 +233,30 @@ async function loadMarkerAndContents() {
     } else {
       mindFileUrl.value = rawMindFileUrl
     }
+
     const { data: contentsData, error: contentsError } = await supabase
       .from('marker_contents')
       .select(`display_order, contents (id,content_url,type,name)`)
       .eq('marker_id', props.markerId)
       .order('display_order')
     if (contentsError) throw new Error(`Error al buscar contenidos: ${contentsError.message}`)
+
     associatedContents.value = (contentsData || [])
       .filter((i) => i.contents?.content_url && i.contents?.type)
       .map((i) => ({ ...i.contents, display_order: i.display_order }))
       .sort((a, b) => a.display_order - b.display_order)
+
+    console.log(
+      `[ARXP Load] Contenidos cargados: ${associatedContents.value.length}`,
+      JSON.parse(JSON.stringify(associatedContents.value)),
+    )
+
+    if (associatedContents.value.length === 0) {
+      toast.info('Este marcador no tiene contenidos para mostrar.', { timeout: 5000 })
+    }
+
     if (mindFileUrl.value && !errorLoadingContent.value) {
       isLoading.value = false
-      console.log('[ARXP Load] isLoading = false. Listo para montar escena AR.')
     }
     arReadyTimeout = setTimeout(() => {
       if (
@@ -279,62 +281,58 @@ async function loadMarkerAndContents() {
 }
 
 async function displayCurrentContent() {
-  console.log(
-    `[ARXP Display] INICIO. Marker: ${isMarkerVisible.value}, ARReady: ${isARReady.value}, ShowFullscreenPrompt: ${showFullscreenPrompt.value}, UserDismissed: ${userDismissedFullscreenPrompt.value}`,
-  )
+  if (isContentLoading.value && !errorLoadingContent.value) return
   if (isCleaningUp.value || !isARReady.value || !isMarkerVisible.value) {
+    isContentLoading.value = false
     return
   }
   if (showFullscreenPrompt.value && !userDismissedFullscreenPrompt.value) {
+    isContentLoading.value = false
     return
   }
 
-  const content = currentContent.value
-  if (!content || !content.content_url) {
+  const contentToDisplay = currentContent.value
+  if (!contentToDisplay || !contentToDisplay.content_url) {
     isContentLoading.value = false
-    const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el
-    const ip = sceneElement?.querySelector('#imagePlane') || imagePlaneRef.value?.el
-    if (vp) vp.setAttribute('visible', 'false')
-    if (ip) ip.setAttribute('visible', 'false')
-    return
-  }
-  if (!sceneElement) {
-    isContentLoading.value = false
+    const vpCheck = videoPlaneRef.value?.el || sceneElement?.querySelector('#videoPlane')
+    const ipCheck = imagePlaneRef.value?.el || sceneElement?.querySelector('#imagePlane')
+    if (vpCheck) vpCheck.setAttribute('visible', 'false')
+    if (ipCheck) ipCheck.setAttribute('visible', 'false')
     return
   }
 
   isContentLoading.value = true
+  errorLoadingContent.value = ''
   await nextTick()
-  const videoPlane = videoPlaneRef.value?.el || sceneElement?.querySelector('#videoPlane')
-  const imagePlane = imagePlaneRef.value?.el || sceneElement?.querySelector('#imagePlane')
+
+  let videoPlaneEl = videoPlaneRef.value?.el
+  let imagePlaneEl = imagePlaneRef.value?.el
+  if (!videoPlaneEl && sceneElement) videoPlaneEl = sceneElement.querySelector('#videoPlane')
+  if (!imagePlaneEl && sceneElement) imagePlaneEl = sceneElement.querySelector('#imagePlane')
   const imageAsset = document.querySelector('#imageAsset')
   const videoAsset = document.querySelector('#videoAsset')
 
-  if (!videoPlane || !imagePlane || !imageAsset || !videoAsset) {
+  if (!videoPlaneEl || !imagePlaneEl || !imageAsset || !videoAsset) {
     isContentLoading.value = false
-    errorLoadingContent.value = 'Error: Elementos AR no encontrados.'
+    errorLoadingContent.value = 'Error: Elementos AR no encontrados en display.'
     toast.error(errorLoadingContent.value)
     return
   }
-  videoPlane.setAttribute('visible', 'false')
-  imagePlane.setAttribute('visible', 'false')
-  if (videoAsset.pause) videoAsset.pause()
 
-  // QUITAR listeners aquí, porque se reasignan en el template con :[attribute].v-if
-  // imagePlane.removeEventListener('click', handleContentClick);
-  // videoPlane.removeEventListener('click', handleContentClick);
-
-  const type = content.type.toLowerCase()
-  const url = content.content_url
+  const type = contentToDisplay.type.toLowerCase()
+  const url = contentToDisplay.content_url
   let targetPlaneElement = null,
     mediaAsset = null
-
   try {
+    videoPlaneEl.setAttribute('visible', 'false')
+    imagePlaneEl.setAttribute('visible', 'false')
+    if (videoAsset.pause) videoAsset.pause()
+
     if (type === 'image') {
-      targetPlaneElement = imagePlane
+      targetPlaneElement = imagePlaneEl
       mediaAsset = imageAsset
     } else if (type === 'video') {
-      targetPlaneElement = videoPlane
+      targetPlaneElement = videoPlaneEl
       mediaAsset = videoAsset
       if (mediaAsset.pause) mediaAsset.pause()
       mediaAsset.removeAttribute('src')
@@ -345,7 +343,6 @@ async function displayCurrentContent() {
 
     await loadMedia(url, mediaAsset, type)
     adjustMediaPlaneAspect(type, targetPlaneElement, mediaAsset)
-    // El listener de click ahora está en el template directamente en los planos
 
     if (
       isMarkerVisible.value &&
@@ -364,15 +361,14 @@ async function displayCurrentContent() {
   } catch (error) {
     errorLoadingContent.value = `Error mostrando ${type}: ${error.message}`
     toast.error(errorLoadingContent.value)
-    videoPlane.setAttribute('visible', 'false')
-    imagePlane.setAttribute('visible', 'false')
+    if (videoPlaneEl) videoPlaneEl.setAttribute('visible', 'false')
+    if (imagePlaneEl) imagePlaneEl.setAttribute('visible', 'false')
   } finally {
     isContentLoading.value = false
   }
 }
 
 function loadMedia(url, mediaElement, type) {
-  // ... (Lógica de loadMedia sin cambios) ...
   let urlWithCacheBust = url
   if (url && url.includes(YOUR_R2_DOMAIN_IDENTIFIER)) {
     const cacheBuster = `v=${Date.now()}`
@@ -380,12 +376,14 @@ function loadMedia(url, mediaElement, type) {
   }
   return new Promise((resolve, reject) => {
     const eventToWaitFor = type === 'image' ? 'load' : 'canplaythrough'
-    const timeoutDuration = 20000
+    const timeoutDuration = 30000
+
     mediaElement.removeEventListener('load', loadHandlerInternal)
     mediaElement.removeEventListener('canplaythrough', loadHandlerInternal)
     mediaElement.removeEventListener('loadeddata', loadHandlerInternal)
     mediaElement.removeEventListener('error', errorHandlerInternal)
     let loadTimeout = null
+
     function loadHandlerInternal(event) {
       if (type === 'video' && event.type === 'loadeddata' && mediaElement.readyState < 3) {
         return
@@ -397,9 +395,8 @@ function loadMedia(url, mediaElement, type) {
     function errorHandlerInternal(errEvent) {
       clearTimeout(loadTimeout)
       const errorType = errEvent?.type || 'desconocido'
-      let detailMessage = `Error (${errorType}) loading ${type} from ${urlWithCacheBust}.`
+      let detailMessage = `Error (${errorType}) al cargar ${type} desde ${urlWithCacheBust}.`
       cleanupInternal()
-      console.error(`[ARXP LoadMedia] ${detailMessage}`, errEvent?.target?.error || errEvent)
       reject(new Error(detailMessage))
     }
     function cleanupInternal() {
@@ -408,29 +405,30 @@ function loadMedia(url, mediaElement, type) {
       mediaElement.removeEventListener('loadeddata', loadHandlerInternal)
       mediaElement.removeEventListener('error', errorHandlerInternal)
     }
+
     if (type === 'video' && mediaElement.pause) {
       mediaElement.pause()
       mediaElement.currentTime = 0
     }
+
     mediaElement.addEventListener(eventToWaitFor, loadHandlerInternal, { once: true })
     if (type === 'video')
       mediaElement.addEventListener('loadeddata', loadHandlerInternal, { once: true })
     mediaElement.addEventListener('error', errorHandlerInternal, { once: true })
     mediaElement.crossOrigin = 'anonymous'
     mediaElement.src = urlWithCacheBust
+
     loadTimeout = setTimeout(() => {
       errorHandlerInternal({ type: 'timeout' })
     }, timeoutDuration)
+
     if (type === 'video') {
       mediaElement.load()
-    } else if (type === 'image' && mediaElement.complete) {
-      loadHandlerInternal({ type: 'load' })
     }
   })
 }
 
 const playVideo = async () => {
-  // ... (Lógica de playVideo sin cambios) ...
   const videoEl = document.querySelector('#videoAsset')
   if (
     videoEl &&
@@ -462,7 +460,6 @@ const playVideo = async () => {
   }
 }
 const pauseVideo = () => {
-  // ... (Lógica de pauseVideo sin cambios) ...
   const videoEl = document.querySelector('#videoAsset')
   if (videoEl && typeof videoEl.pause === 'function' && !videoEl.paused) {
     videoEl.pause()
@@ -470,7 +467,6 @@ const pauseVideo = () => {
 }
 
 const adjustMediaPlaneAspect = (contentType, targetPlaneElement, mediaAssetElement) => {
-  // ... (Lógica de adjustMediaPlaneAspect sin cambios) ...
   let nW = 0,
     nH = 0
   if (contentType === 'video') {
@@ -480,9 +476,8 @@ const adjustMediaPlaneAspect = (contentType, targetPlaneElement, mediaAssetEleme
     nW = mediaAssetElement.naturalWidth
     nH = mediaAssetElement.naturalHeight
   }
-  if (!targetPlaneElement || !mediaAssetElement) {
-    return
-  }
+  if (!targetPlaneElement || !mediaAssetElement) return
+
   if (nW > 0 && nH > 0) {
     const aspectRatio = nW / nH
     const planeWidth = 1.0
@@ -491,35 +486,51 @@ const adjustMediaPlaneAspect = (contentType, targetPlaneElement, mediaAssetEleme
     targetPlaneElement.setAttribute('height', planeHeight.toString())
     targetPlaneElement.setAttribute('position', `0 0 0`)
   } else {
-    const fallbackWidth = 1.0
-    const fallbackHeight = 1.0
-    targetPlaneElement.setAttribute('width', fallbackWidth.toString())
-    targetPlaneElement.setAttribute('height', fallbackHeight.toString())
+    targetPlaneElement.setAttribute('width', '1')
+    targetPlaneElement.setAttribute('height', '1')
     targetPlaneElement.setAttribute('position', `0 0 0`)
   }
 }
 
 const handleSceneLoaded = (event) => {
-  // ... (Lógica de handleSceneLoaded sin cambios) ...
   sceneElement = event.target
-  if (!sceneElement) {
-    return
-  }
-  addEntityListeners(sceneElement)
+  if (!sceneElement) return
+
+  addMindARListeners(sceneElement)
+  addContentPlaneListeners(sceneElement)
   nextTick(hideVRButton)
 }
+
+const addContentPlaneListeners = (sceneEl) => {
+  const imgPlane = imagePlaneRef.value?.el || sceneEl.querySelector('#imagePlane')
+  const vidPlane = videoPlaneRef.value?.el || sceneEl.querySelector('#videoPlane')
+
+  if (imgPlane) {
+    imgPlane.removeEventListener('mousedown', handleContentClickAFRAME)
+    imgPlane.addEventListener('mousedown', handleContentClickAFRAME)
+  }
+
+  if (vidPlane) {
+    vidPlane.removeEventListener('mousedown', handleContentClickAFRAME)
+    vidPlane.addEventListener('mousedown', handleContentClickAFRAME)
+  }
+}
+
+const handleContentClickAFRAME = (event) => {
+  console.log(`[ARXP AFrameInput] Evento '${event.type}' de A-Frame detectado en:`, event.target.id)
+  processContentNavigation('next')
+}
+
 const handleArReady = async () => {
-  // ... (Lógica de handleArReady sin cambios) ...
   if (arReadyTimeout) clearTimeout(arReadyTimeout)
   arReadyTimeout = null
-  if (isCleaningUp.value) {
-    return
-  }
+  if (isCleaningUp.value) return
+
   isARReady.value = true
   isLoading.value = false
   if (!sceneElement && sceneRef.value?.el) sceneElement = sceneRef.value.el
   if (!sceneElement) {
-    errorLoadingContent.value = 'Error: Escena AR no inicializada.'
+    errorLoadingContent.value = 'Error: Escena AR no inicializada post arReady.'
     toast.error(errorLoadingContent.value)
     isARReady.value = false
     return
@@ -531,17 +542,19 @@ const handleArReady = async () => {
   }
   await nextTick()
   hideVRButton()
-  if (isMarkerVisible.value) {
-    checkAndShowFullscreenPrompt()
-  }
+  setTimeout(() => {
+    if (isMarkerVisible.value && isARReady.value && !isCleaningUp.value) {
+      checkAndShowFullscreenPrompt()
+    }
+  }, 250)
 }
 const handleArError = (event) => {
-  // ... (Lógica de handleArError sin cambios) ...
   const errorDetailSource = event.detail?.error || event.detail?.message || event.detail
   let errorDetail =
     typeof errorDetailSource === 'object'
       ? JSON.stringify(errorDetailSource)
       : String(errorDetailSource)
+
   if (arReadyTimeout) clearTimeout(arReadyTimeout)
   arReadyTimeout = null
   if (cameraPermissionError.value && showCameraPermissionPrompt.value) {
@@ -567,8 +580,7 @@ const handleArError = (event) => {
   isARReady.value = false
 }
 
-const addEntityListeners = (sceneEl) => {
-  // ... (Lógica de addEntityListeners sin cambios) ...
+const addMindARListeners = (sceneEl) => {
   const targetMindAREntity = sceneEl.querySelector('#targetEntity')
   if (targetMindAREntity) {
     targetEntityRef.value = targetMindAREntity
@@ -576,102 +588,100 @@ const addEntityListeners = (sceneEl) => {
     targetMindAREntity.removeEventListener('targetLost', handleTargetLost)
     targetMindAREntity.addEventListener('targetFound', handleTargetFound)
     targetMindAREntity.addEventListener('targetLost', handleTargetLost)
-  } else {
-    errorLoadingContent.value = 'Error: AR target no encontrado.'
   }
 }
 
 const handleTargetFound = () => {
-  if (isCleaningUp.value) {
-    return
-  }
+  if (isCleaningUp.value) return
   clearTimeout(targetLostTimeout)
   targetLostTimeout = null
   isMarkerVisible.value = true
   errorLoadingContent.value = ''
+  userDismissedFullscreenPrompt.value = false
+
   if (isARReady.value && associatedContents.value.length > 0) {
     checkAndShowFullscreenPrompt()
-    // No llamamos displayCurrentContent aquí directamente; el prompt o su descarte lo harán.
   }
 }
 const handleTargetLost = () => {
-  // ... (Lógica de handleTargetLost sin cambios significativos) ...
-  if (isCleaningUp.value) {
-    return
-  }
+  if (isCleaningUp.value) return
   clearTimeout(targetLostTimeout)
   targetLostTimeout = setTimeout(() => {
-    if (isCleaningUp.value) {
-      return
-    }
+    if (isCleaningUp.value) return
     isMarkerVisible.value = false
     isContentLoading.value = false
     pauseVideo()
     showFullscreenPrompt.value = false
     const currentSceneEl = sceneElement || sceneRef.value?.el
-    if (currentSceneEl) {
-      const vp = currentSceneEl.querySelector('#videoPlane')
-      const ip = currentSceneEl.querySelector('#imagePlane')
-      if (vp) vp.setAttribute('visible', 'false')
-      if (ip) ip.setAttribute('visible', 'false')
-    } else {
-      const vpRef = videoPlaneRef.value?.el
-      const ipRef = imagePlaneRef.value?.el
-      if (vpRef) vpRef.setAttribute('visible', 'false')
-      if (ipRef) ipRef.setAttribute('visible', 'false')
-    }
+    const vp =
+      videoPlaneRef.value?.el ||
+      (currentSceneEl ? currentSceneEl.querySelector('#videoPlane') : null)
+    const ip =
+      imagePlaneRef.value?.el ||
+      (currentSceneEl ? currentSceneEl.querySelector('#imagePlane') : null)
+    if (vp) vp.setAttribute('visible', 'false')
+    if (ip) ip.setAttribute('visible', 'false')
     targetLostTimeout = null
   }, 750)
 }
 
-const handleContentClick = (event) => {
-  console.log('[ARXP ClickEvent] Click en contenido AR detectado.')
-  if (showFullscreenPrompt.value && !userDismissedFullscreenPrompt.value) {
-    console.log('[ARXP ClickEvent] Prompt Fullscreen activo, click ignorado temporalmente.')
+const processContentNavigation = (direction = 'next') => {
+  console.log(
+    `[ARXP NavLogic] Navegación: ${direction}. Index actual: ${currentContentIndex.value}`,
+  )
+  if (
+    showFullscreenPrompt.value &&
+    !userDismissedFullscreenPrompt.value &&
+    !isInBrowserFullscreen.value
+  ) {
+    console.log(
+      '[ARXP NavLogic] Prompt de Fullscreen activo y no descartado (y no en fullscreen), navegación ignorada.',
+    )
     return
   }
-
   if (!isMarkerVisible.value || !isARReady.value) {
-    console.log('[ARXP ClickEvent] Marcador no visible o AR no lista, click ignorado.')
+    console.log('[ARXP NavLogic] Marcador no visible o AR no lista, navegación ignorada.')
+    return
+  }
+  if (isContentLoading.value) {
+    console.log('[ARXP NavLogic] Contenido ya está cargando, navegación ignorada.')
     return
   }
 
   if (associatedContents.value.length > 1) {
-    console.log('[ARXP ClickEvent] Múltiples contenidos. Avanzando al siguiente.')
     pauseVideo()
-    currentContentIndex.value = (currentContentIndex.value + 1) % associatedContents.value.length
-    console.log('[ARXP ClickEvent] Nuevo currentContentIndex:', currentContentIndex.value)
-    displayCurrentContent()
+    let newIndex = currentContentIndex.value
+    if (direction === 'next') {
+      newIndex = (currentContentIndex.value + 1) % associatedContents.value.length
+    } else if (direction === 'prev') {
+      newIndex =
+        (currentContentIndex.value - 1 + associatedContents.value.length) %
+        associatedContents.value.length
+    }
+    console.log(`[ARXP NavLogic] Cambiando de índice ${currentContentIndex.value} a ${newIndex}`)
+    currentContentIndex.value = newIndex
   } else if (currentContentType.value === 'video' && associatedContents.value.length === 1) {
-    console.log('[ARXP ClickEvent] Video único. Pausar/Reproducir.')
     const videoEl = document.querySelector('#videoAsset')
     if (videoEl) {
-      if (videoEl.paused) {
-        playVideo()
-      } else {
-        pauseVideo()
-      }
+      if (videoEl.paused) playVideo()
+      else pauseVideo()
     }
   } else {
-    console.log(
-      '[ARXP ClickEvent] Contenido único (no video) o sin contenidos. No hay acción de navegación por click.',
-    )
     if (currentContent.value) toast.info(`Viendo: ${currentContent.value.name}`, { timeout: 1500 })
   }
 }
 
 async function cleanupARInternal(calledFromWatcher = false) {
-  // ... (Lógica de cleanupARInternal sin cambios) ...
-  if (isCleaningUp.value && !calledFromWatcher) {
-    return
-  }
+  if (isCleaningUp.value && !calledFromWatcher) return
   isCleaningUp.value = true
   clearTimeout(arReadyTimeout)
   arReadyTimeout = null
   clearTimeout(targetLostTimeout)
   targetLostTimeout = null
-  clearTimeout(resizeTimeout)
-  resizeTimeout = null
+  clearTimeout(resizeDebounceTimer)
+  resizeDebounceTimer = null
+  clearTimeout(fullscreenChangeDebounceTimer)
+  fullscreenChangeDebounceTimer = null
   pauseVideo()
   const videoEl = document.querySelector('#videoAsset')
   if (videoEl) {
@@ -682,16 +692,26 @@ async function cleanupARInternal(calledFromWatcher = false) {
   if (imageEl) {
     imageEl.removeAttribute('src')
   }
+
   const currentTargetEntity = targetEntityRef.value?.el || targetEntityRef.value
   if (currentTargetEntity && typeof currentTargetEntity.removeEventListener === 'function') {
     currentTargetEntity.removeEventListener('targetFound', handleTargetFound)
     currentTargetEntity.removeEventListener('targetLost', handleTargetLost)
   }
   targetEntityRef.value = null
-  // No necesitamos quitar listeners de click de los planos aquí, ya que están en el template y se destruyen/recrean con el v-if o :key
+
+  const imgPlaneEl = imagePlaneRef.value?.el || sceneElement?.querySelector('#imagePlane')
+  if (imgPlaneEl) {
+    imgPlaneEl.removeEventListener('mousedown', handleContentClickAFRAME)
+  }
+  const vidPlaneEl = videoPlaneRef.value?.el || sceneElement?.querySelector('#videoPlane')
+  if (vidPlaneEl) {
+    vidPlaneEl.removeEventListener('mousedown', handleContentClickAFRAME)
+  }
   imagePlaneRef.value = null
   videoPlaneRef.value = null
   contentScalerRef.value = null
+
   const currentArSystem = arSystem
   if (currentArSystem && typeof currentArSystem.stop === 'function') {
     try {
@@ -702,6 +722,7 @@ async function cleanupARInternal(calledFromWatcher = false) {
   }
   arSystem = null
   cameraElement = null
+
   const currentSceneEl = sceneElement || sceneRef.value?.el
   if (currentSceneEl) {
     currentSceneEl.removeEventListener('loaded', handleSceneLoaded)
@@ -724,6 +745,7 @@ async function cleanupARInternal(calledFromWatcher = false) {
   }
   sceneElement = null
   if (sceneRef.value) sceneRef.value = null
+
   mindFileUrl.value = ''
   associatedContents.value = []
   currentContentIndex.value = 0
@@ -736,102 +758,91 @@ async function cleanupARInternal(calledFromWatcher = false) {
 }
 
 const handleGlobalOrientationAndResize = () => {
-  requestAnimationFrame(() => {
+  clearTimeout(resizeDebounceTimer)
+  resizeDebounceTimer = setTimeout(() => {
     updateOrientationAndMobileState()
-    handleWindowResize(false) // No necesita token ya que markerWasVisible... fue removido
-  })
+    procesarRedimensionado(false)
+  }, RESIZE_DEBOUNCE_DELAY)
 }
 
 const handleFullscreenChange = () => {
-  const isCurrentlyFullscreen = !!(
-    document.fullscreenElement ||
-    document.webkitFullscreenElement ||
-    document.mozFullScreenElement ||
-    document.msFullscreenElement
-  )
-  if (isCurrentlyFullscreen) {
-    userDismissedFullscreenPrompt.value = true
-    showFullscreenPrompt.value = false
-  } else {
-    userDismissedFullscreenPrompt.value = false
-  } // Permitir que el prompt reaparezca si sale de fullscreen
-  nextTick(() => {
-    handleWindowResize(true)
-  }) // true para forzar re-evaluación y posible re-display de contenido
+  clearTimeout(fullscreenChangeDebounceTimer)
+  fullscreenChangeDebounceTimer = setTimeout(() => {
+    updateOrientationAndMobileState()
+    if (isInBrowserFullscreen.value) {
+      userDismissedFullscreenPrompt.value = true
+      showFullscreenPrompt.value = false
+    } else {
+      userDismissedFullscreenPrompt.value = false
+      if (isMobile.value && !isDeviceLandscape.value) {
+        checkAndShowFullscreenPrompt()
+      }
+    }
+    procesarRedimensionado(true)
+  }, FULLSCREEN_CHANGE_DEBOUNCE_DELAY)
 }
 
-const handleWindowResize = (isInitialOrPostPromptAdjust = false) => {
-  console.log(
-    `[ARXP Resize] handleWindowResize. Initial: ${isInitialOrPostPromptAdjust}, Marker: ${isMarkerVisible.value}, ARReady: ${isARReady.value}`,
-  )
+function procesarRedimensionado(isInitialOrPostPromptAdjust = false) {
+  updateOrientationAndMobileState() // Siempre actualizar estados primero
 
   if (isARReady.value && !isCleaningUp.value) {
     if (isMarkerVisible.value) {
-      // Solo llamar si el marcador está realmente visible
       checkAndShowFullscreenPrompt()
     } else {
-      // Si marcador NO visible
       showFullscreenPrompt.value = false
-      const vp = sceneElement?.querySelector('#videoPlane') || videoPlaneRef.value?.el
-      const ip = sceneElement?.querySelector('#imagePlane') || imagePlaneRef.value?.el
+      const vp = videoPlaneRef.value?.el || sceneElement?.querySelector('#videoPlane')
+      const ip = imagePlaneRef.value?.el || sceneElement?.querySelector('#imagePlane')
       if (vp) vp.setAttribute('visible', 'false')
       if (ip) ip.setAttribute('visible', 'false')
       pauseVideo()
     }
   }
+  if (!isARReady.value || isCleaningUp.value) return
 
-  if (!isARReady.value || isCleaningUp.value) {
-    return
-  }
   const currentSceneEl = sceneElement || sceneRef.value?.el
-  if (!currentSceneEl?.canvas) {
-    return
+  if (!currentSceneEl?.canvas) return
+
+  let currentScalerEl = contentScalerRef.value?.el
+  if (!currentScalerEl && sceneElement) {
+    currentScalerEl = sceneElement.querySelector('#contentScaler')
   }
 
-  clearTimeout(resizeTimeout)
-  resizeTimeout = setTimeout(() => {
-    if (isCleaningUp.value) {
-      return
-    }
-    const currentScalerEl = contentScalerRef.value?.el
-    const sceneElForTimeout = sceneElement || sceneRef.value?.el
-
-    if (
-      !sceneElForTimeout ||
-      !sceneElForTimeout.renderer ||
-      !sceneElForTimeout.camera ||
-      !currentScalerEl
-    ) {
-      console.warn(`[ARXP Resize] Timeout: Elementos no encontrados. Scaler:`, currentScalerEl)
-      return
-    }
-
-    if (
+  if (
+    currentScalerEl &&
+    (isInitialOrPostPromptAdjust ||
       !(showFullscreenPrompt.value && !userDismissedFullscreenPrompt.value) ||
-      isInitialOrPostPromptAdjust
-    ) {
-      updateOrientationAndMobileState()
-      let newScale = isMobile.value ? 1.4 : 1.2
-      currentScalerEl.setAttribute('scale', `${newScale} ${newScale} ${newScale}`)
-      console.log(`[ARXP Resize] Escala aplicada: ${newScale}. Mobile: ${isMobile.value}`)
-      if (sceneElForTimeout.camera?.el?.components?.camera?.updateAspect) {
-        sceneElForTimeout.camera.el.components.camera.updateAspect()
-      }
-      // sceneElForTimeout.resize(); // Sigue comentado
-
-      if (
-        isMarkerVisible.value &&
-        isARReady.value &&
-        !(showFullscreenPrompt.value && !userDismissedFullscreenPrompt.value)
-      ) {
-        nextTick(() => displayCurrentContent())
-      }
+      isInBrowserFullscreen.value)
+  ) {
+    let newScale = 1.0
+    if (isMobile.value) {
+      // Móvil: Landscape o Fullscreen -> 1.2, Portrait no Fullscreen -> 1.0
+      newScale = isDeviceLandscape.value || isInBrowserFullscreen.value ? 1.2 : 1.0
+    } else {
+      // Desktop/Tablet: Fullscreen -> 1.2, No Fullscreen -> 1.0
+      newScale = isInBrowserFullscreen.value ? 1.2 : 1.0
     }
-  }, 350)
+
+    currentScalerEl.setAttribute('scale', `${newScale} ${newScale} ${newScale}`)
+    console.log(
+      `[ARXP Resize] Escala aplicada: ${newScale}. Mobile: ${isMobile.value}, Landscape: ${isDeviceLandscape.value}, Fullscreen: ${isInBrowserFullscreen.value}`,
+    )
+
+    if (currentSceneEl.camera?.el?.components?.camera?.updateAspect) {
+      currentSceneEl.camera.el.components.camera.updateAspect()
+    }
+  }
+
+  if (
+    isMarkerVisible.value &&
+    isARReady.value &&
+    !(showFullscreenPrompt.value && !userDismissedFullscreenPrompt.value) &&
+    !isContentLoading.value
+  ) {
+    nextTick(() => displayCurrentContent())
+  }
 }
 
 async function initializeARExperience(newMarkerId, oldMarkerId) {
-  console.log(`[ARXP Init] initializeARExperience INICIO. NewMarker: ${newMarkerId}`)
   if (isCleaningUp.value && oldMarkerId && !newMarkerId) {
     isLoading.value = false
     return
@@ -843,10 +854,12 @@ async function initializeARExperience(newMarkerId, oldMarkerId) {
   showCameraPermissionPrompt.value = false
   isMarkerVisible.value = false
   userDismissedFullscreenPrompt.value = false
+
   if (sceneElement || arSystem || sceneRef.value?.el) {
     await cleanupARInternal(true)
     await nextTick()
   }
+
   if (newMarkerId) {
     const permissionGranted = await checkAndRequestCameraPermission()
     if (permissionGranted) {
@@ -863,16 +876,8 @@ async function initializeARExperience(newMarkerId, oldMarkerId) {
   }
 }
 
-watch(
-  () => props.markerId,
-  (newMarkerId, oldMarkerId) => {
-    initializeARExperience(newMarkerId, oldMarkerId)
-  },
-  { immediate: true },
-)
-
 onMounted(() => {
-  updateOrientationAndMobileState() // Llamada inicial
+  updateOrientationAndMobileState()
   window.addEventListener('resize', handleGlobalOrientationAndResize)
   if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
     screen.orientation.addEventListener('change', handleGlobalOrientationAndResize)
@@ -891,7 +896,8 @@ onMounted(() => {
 })
 
 onUnmounted(async () => {
-  clearTimeout(resizeTimeout)
+  clearTimeout(resizeDebounceTimer)
+  clearTimeout(fullscreenChangeDebounceTimer)
   window.removeEventListener('resize', handleGlobalOrientationAndResize)
   if (screen.orientation && typeof screen.orientation.removeEventListener === 'function') {
     screen.orientation.removeEventListener('change', handleGlobalOrientationAndResize)
@@ -910,19 +916,73 @@ onUnmounted(async () => {
   await cleanupARInternal(false)
 })
 
+watch(
+  () => props.markerId,
+  (newMarkerId, oldMarkerId) => {
+    initializeARExperience(newMarkerId, oldMarkerId)
+  },
+  { immediate: true },
+)
+
+watch(
+  currentContent,
+  (newContent, oldContent) => {
+    console.log(
+      `[ARXP Watch currentContent] Cambió. Nuevo: ${newContent?.name}, Viejo: ${oldContent?.name}. ARReady: ${isARReady.value}, MarkerVisible: ${isMarkerVisible.value}, IsContentLoading: ${isContentLoading.value}, ShowFullscreenPrompt: ${showFullscreenPrompt.value}, UserDismissedFullscreen: ${userDismissedFullscreenPrompt.value}`,
+    )
+    if (
+      newContent &&
+      isARReady.value &&
+      isMarkerVisible.value &&
+      !isContentLoading.value &&
+      !(showFullscreenPrompt.value && !userDismissedFullscreenPrompt.value)
+    ) {
+      if ((oldContent?.id !== newContent.id || !oldContent) && !isContentLoading.value) {
+        console.log(
+          '[ARXP Watch currentContent] Condiciones cumplidas, llamando displayCurrentContent. Nuevo:',
+          newContent?.name,
+          'Viejo:',
+          oldContent?.name,
+        )
+        displayCurrentContent()
+      } else {
+        console.log(
+          '[ARXP Watch currentContent] No se llamó displayCurrentContent. oldContentId:',
+          oldContent?.id,
+          'newContentId:',
+          newContent?.id,
+          'isContentLoading:',
+          isContentLoading.value,
+        )
+      }
+    } else if (!newContent && isARReady.value && isMarkerVisible.value) {
+      const vp = videoPlaneRef.value?.el || sceneElement?.querySelector('#videoPlane')
+      const ip = imagePlaneRef.value?.el || sceneElement?.querySelector('#imagePlane')
+      if (vp) vp.setAttribute('visible', 'false')
+      if (ip) ip.setAttribute('visible', 'false')
+      pauseVideo()
+    } else {
+      console.log(
+        '[ARXP Watch currentContent] No se llamó displayCurrentContent debido a condiciones iniciales o prompt activo.',
+      )
+    }
+  },
+  { deep: true },
+)
+
 watch(isARReady, (ready) => {
   if (ready) {
     nextTick(() => {
       hideVRButton()
-      updateOrientationAndMobileState() // Asegurar estados antes del primer resize
-      handleWindowResize(true)
+      updateOrientationAndMobileState()
+      procesarRedimensionado(true)
     })
   }
 })
 </script>
 
 <template>
-  <div class="ar-view-container">
+  <div class="ar-view-container" ref="arViewContainerRef">
     <div v-if="showCameraPermissionPrompt" class="loading-overlay camera-permission-prompt">
       <p>⚠️ {{ cameraPermissionError }}</p>
       <p v-if="cameraPermissionError.includes('denied')">Debes habilitar el permiso.</p>
@@ -964,11 +1024,13 @@ watch(isARReady, (ready) => {
         !mindFileUrl &&
         !errorLoadingContent &&
         !cameraPermissionError &&
-        !showCameraPermissionPrompt
+        !showCameraPermissionPrompt &&
+        !isCheckingPermission
       "
       class="loading-overlay initial-loading"
     >
-      <p>Preparando marcador...</p>
+      <p v-if="props.markerId">Preparando marcador...</p>
+      <p v-else>Esperando ID de marcador...</p>
     </div>
     <div
       v-else-if="
@@ -987,7 +1049,8 @@ watch(isARReady, (ready) => {
       <button
         v-if="
           !errorLoadingContent.includes('Timeout AR') &&
-          !errorLoadingContent.includes('No se pudo acceder')
+          !errorLoadingContent.includes('No se pudo acceder') &&
+          !errorLoadingContent.includes('Elementos AR no encontrados')
         "
         @click="initializeARExperience(props.markerId, null)"
         class="retry-button"
@@ -1010,6 +1073,25 @@ watch(isARReady, (ready) => {
     </div>
 
     <div
+      v-if="showARControls"
+      :class="['ar-controls-overlay', isDeviceLandscape ? 'landscape' : 'portrait']"
+    >
+      <button @click="processContentNavigation('prev')" class="ar-control-button prev-button">
+        <
+      </button>
+      <button @click="processContentNavigation('next')" class="ar-control-button next-button">
+        >
+      </button>
+    </div>
+    <button
+      v-if="showExitFullscreenButton"
+      @click="exitFullscreenCustom"
+      class="ar-control-button exit-fullscreen-button"
+    >
+      ✕
+    </button>
+
+    <div
       v-if="
         !isLoading &&
         mindFileUrl &&
@@ -1018,8 +1100,7 @@ watch(isARReady, (ready) => {
         !isCheckingPermission &&
         !cameraPermissionError
       "
-      class="ar-container"
-      ref="sceneContainerRef"
+      class="ar-scene-wrapper"
     >
       <a-scene
         v-if="mindFileUrl"
@@ -1037,8 +1118,8 @@ watch(isARReady, (ready) => {
         @arError="handleArError"
         loading-screen="enabled: false;"
       >
-        <a-assets timeout="30000"
-          ><video
+        <a-assets timeout="30000">
+          <video
             id="videoAsset"
             preload="auto"
             loop
@@ -1046,53 +1127,44 @@ watch(isARReady, (ready) => {
             playsinline
             webkit-playsinline
             src="data:video/mp4;base64,AAAAHGZ0eXBNNFYgAAACAGlzb21pc28yYXZjMQAAAAhmcmVlAAAAG21kYXQAAAAGgAAAAABiAhARAAAAAAAAAAA="
-          ></video
-          ><img
+          ></video>
+          <img
             id="imageAsset"
             crossorigin="anonymous"
             src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-        /></a-assets>
+          />
+        </a-assets>
+
         <a-camera
           position="0 0 0"
           look-controls="enabled: false"
           camera="active: false"
           cursor="rayOrigin: mouse; fuse: false;"
-          raycaster="objects: .clickable"
+          raycaster="objects: a-entity, a-image, a-video; showLine: true;"
         ></a-camera>
+
         <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
           <a-entity ref="contentScalerRef" id="contentScaler" scale="1 1 1" position="0 0 0">
             <a-image
               ref="imagePlaneRef"
               id="imagePlane"
               class="clickable"
-              @click="handleContentClick"
               position="0 0 0"
               rotation="0 0 0"
               width="1"
               height="1"
-              :visible="
-                isARReady &&
-                isMarkerVisible &&
-                currentContentType === 'image' &&
-                !(showFullscreenPrompt && !userDismissedFullscreenPrompt)
-              "
+              visible="false"
               src="#imageAsset"
             ></a-image>
             <a-video
               ref="videoPlaneRef"
               id="videoPlane"
               class="clickable"
-              @click="handleContentClick"
               position="0 0 0"
               rotation="0 0 0"
               width="1"
               height="1"
-              :visible="
-                isARReady &&
-                isMarkerVisible &&
-                currentContentType === 'video' &&
-                !(showFullscreenPrompt && !userDismissedFullscreenPrompt)
-              "
+              visible="false"
               src="#videoAsset"
             ></a-video>
             <a-entity
@@ -1104,14 +1176,15 @@ watch(isARReady, (ready) => {
               "
               position="0 0 0.1"
               rotation="0 0 0"
-              ><a-ring
+            >
+              <a-ring
                 radius-inner="0.08"
                 radius-outer="0.12"
                 color="teal"
                 opacity="0.8"
                 animation="property: rotation; to: 0 0 360; loop: true; dur: 1000; easing: linear;"
-              ></a-ring
-            ></a-entity>
+              ></a-ring>
+            </a-entity>
           </a-entity>
         </a-entity>
       </a-scene>
@@ -1122,21 +1195,30 @@ watch(isARReady, (ready) => {
         !isMarkerVisible &&
         !errorLoadingContent &&
         !isLoading &&
-        !(showFullscreenPrompt && !userDismissedFullscreenPrompt)
+        !(showFullscreenPrompt && !userDismissedFullscreenPrompt) &&
+        associatedContents.length > 0
       "
       class="scanning-indicator"
     >
       <p>Buscando marcador...</p>
     </div>
+    <div
+      v-if="
+        isARReady &&
+        !isMarkerVisible &&
+        associatedContents.length === 0 &&
+        !errorLoadingContent &&
+        !isLoading &&
+        mindFileUrl
+      "
+      class="scanning-indicator"
+    >
+      <p>Marcador sin contenidos. Buscando otro marcador...</p>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Estilos sin cambios */
-:deep(.a-enter-vr-button) {
-  display: none !important;
-  visibility: hidden !important;
-}
 .ar-view-container {
   margin: 0;
   overflow: hidden;
@@ -1144,6 +1226,71 @@ watch(isARReady, (ready) => {
   width: 100%;
   height: 100%;
   background-color: transparent;
+}
+
+.ar-scene-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background-color: transparent;
+}
+
+.ar-controls-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row; /* Por defecto horizontal para landscape y desktop */
+  justify-content: space-between; /* Botones a los lados */
+  align-items: center; /* Centrados verticalmente */
+  pointer-events: none;
+  z-index: 150;
+}
+/* No se necesita .ar-controls-overlay.landscape si el default es row y space-between */
+/* Para portrait, si quieres que estén arriba/abajo, necesitarías cambiar flex-direction */
+/* .ar-controls-overlay.portrait { */
+/* flex-direction: column; */
+/* justify-content: space-between; */ /* Para poner uno arriba y otro abajo */
+/* } */
+/* .ar-controls-overlay.portrait .ar-control-button { margin: 10px; } */
+
+.ar-control-button {
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 28px; /* Aumentado */
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  width: 55px; /* Aumentado */
+  height: 55px; /* Aumentado */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px; /* Aumentado margen */
+  user-select: none;
+  font-family: 'Roboto', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+.ar-control-button:hover {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+.exit-fullscreen-button {
+  position: absolute;
+  top: 20px; /* Aumentado */
+  right: 20px; /* Aumentado */
+  width: 45px; /* Aumentado */
+  height: 45px; /* Aumentado */
+  font-size: 24px; /* Aumentado */
+  z-index: 160;
+}
+
+:deep(.a-enter-vr-button) {
+  display: none !important;
+  visibility: hidden !important;
 }
 .loading-overlay,
 .error-display,
@@ -1190,14 +1337,16 @@ watch(isARReady, (ready) => {
   background-color: rgba(0, 0, 0, 0.5);
   padding: 8px 15px;
   border-radius: 20px;
-  font-size: 0.9em;
-}
+  font-size: 1em;
+} /* Aumentado */
 .loading-overlay p,
 .error-display p,
-.camera-permission-prompt p {
+.camera-permission-prompt p,
+.ar-prompt-overlay p {
   margin-top: 15px;
-  font-size: 1.1em;
-}
+  font-size: 1.2em;
+  font-family: 'Roboto', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+} /* Aumentado */
 .error-display p {
   color: #ffdddd;
 }
@@ -1214,10 +1363,11 @@ watch(isARReady, (ready) => {
     transform: rotate(360deg);
   }
 }
-.retry-button {
+.retry-button,
+.ar-prompt-overlay .prompt-button {
   margin-top: 20px;
-  padding: 10px 20px;
-  font-size: 1em;
+  padding: 12px 22px;
+  font-size: 1.05em;
   cursor: pointer;
   background-color: var(--vt-c-white-mute, #ddd);
   color: var(--vt-c-black-soft, #333);
@@ -1225,16 +1375,12 @@ watch(isARReady, (ready) => {
   border-radius: 5px;
   transition: background-color 0.3s ease;
   pointer-events: auto;
-}
+  font-family: 'Roboto', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+} /* Aumentado */
 .retry-button:hover {
   background-color: var(--vt-c-divider-light-1, #bbb);
 }
-.ar-container {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  background-color: transparent;
-}
+
 a-scene {
   display: block;
   position: absolute;
@@ -1244,6 +1390,7 @@ a-scene {
   z-index: 1;
   background-color: transparent !important;
 }
+
 .ar-prompt-overlay {
   position: absolute;
   bottom: 20px;
@@ -1266,24 +1413,9 @@ a-scene {
   opacity: 1;
   transition: opacity 0.3s ease-in-out;
 }
-.ar-prompt-overlay p {
-  font-size: 1.15em;
-  margin: 0 0 15px;
-  line-height: 1.5;
-}
 .ar-prompt-overlay .prompt-button {
-  padding: 10px 22px;
-  font-size: 1em;
-  font-weight: var(--font-weight-medium, 500);
-  cursor: pointer;
   background-color: var(--brand-pink, #ff6b87);
   color: var(--vt-c-white, #fff);
-  border: none;
-  border-radius: 5px;
-  margin-top: 8px;
-  transition:
-    background-color 0.2s ease,
-    transform 0.1s ease;
 }
 .ar-prompt-overlay .prompt-button:hover {
   background-color: #e85d72;
