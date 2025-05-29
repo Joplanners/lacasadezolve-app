@@ -40,7 +40,12 @@ const FULLSCREEN_CHANGE_DEBOUNCE_DELAY = 400
 
 const showFullscreenPrompt = ref(false)
 const userDismissedFullscreenPrompt = ref(false)
-const isMobile = ref(false) // Ahora incluirá tablets hasta 1023px para ciertas lógicas
+
+const isSmallMobile = ref(false)
+const isMobileDevice = ref(false) // Para teléfonos >= 480 y < 768
+const isTablet = ref(false)
+const isConsideredMobileForPrompt = ref(false) // Para agrupar móvil + tablet para el prompt de FS
+
 const isDeviceLandscape = ref(false)
 const isInBrowserFullscreen = ref(false)
 let orientationMediaQuery = null
@@ -103,7 +108,12 @@ async function retryCameraCheck() {
 
 function updateOrientationAndMobileState() {
   if (typeof window !== 'undefined') {
-    isMobile.value = window.innerWidth < 1024 // Ajustado para tablets
+    const width = window.innerWidth
+    isSmallMobile.value = width < 480
+    isMobileDevice.value = width >= 480 && width < 768
+    isTablet.value = width >= 768 && width < 1200 // Límite superior para tablet ajustado
+    isConsideredMobileForPrompt.value = width < 1200 // Móviles y tablets reciben prompt
+
     if (screen.orientation && screen.orientation.type) {
       isDeviceLandscape.value = screen.orientation.type.startsWith('landscape')
     } else {
@@ -138,8 +148,7 @@ function checkAndShowFullscreenPrompt() {
 
   if (isInBrowserFullscreen.value || userDismissedFullscreenPrompt.value) {
     showFullscreenPrompt.value = false
-  } else if (isMobile.value) {
-    // isMobile ahora incluye tablets < 1024px
+  } else if (isConsideredMobileForPrompt.value) {
     showFullscreenPrompt.value = true
   } else {
     showFullscreenPrompt.value = false
@@ -775,7 +784,7 @@ const handleFullscreenChange = () => {
       showFullscreenPrompt.value = false
     } else {
       userDismissedFullscreenPrompt.value = false
-      if (isMobile.value && !isDeviceLandscape.value) {
+      if (isConsideredMobileForPrompt.value && !isDeviceLandscape.value) {
         checkAndShowFullscreenPrompt()
       }
     }
@@ -815,15 +824,20 @@ function procesarRedimensionado(isInitialOrPostPromptAdjust = false) {
       isInBrowserFullscreen.value)
   ) {
     let newScale = 1.0
-    if (isMobile.value) {
+    if (isSmallMobile.value) {
+      newScale = isDeviceLandscape.value || isInBrowserFullscreen.value ? 1.2 : 1.0
+    } else if (isMobileDevice.value) {
+      newScale = isDeviceLandscape.value || isInBrowserFullscreen.value ? 1.2 : 1.0
+    } else if (isTablet.value) {
       newScale = isDeviceLandscape.value || isInBrowserFullscreen.value ? 1.2 : 1.0
     } else {
+      // Desktop
       newScale = isInBrowserFullscreen.value ? 1.2 : 1.0
     }
 
     currentScalerEl.setAttribute('scale', `${newScale} ${newScale} ${newScale}`)
     console.log(
-      `[ARXP Resize] Escala aplicada: ${newScale}. Mobile: ${isMobile.value}, Landscape: ${isDeviceLandscape.value}, Fullscreen: ${isInBrowserFullscreen.value}`,
+      `[ARXP Resize] Escala aplicada: ${newScale}. SmallMobile: ${isSmallMobile.value}, MobileDevice: ${isMobileDevice.value}, Tablet: ${isTablet.value}, Landscape: ${isDeviceLandscape.value}, Fullscreen: ${isInBrowserFullscreen.value}`,
     )
 
     if (currentSceneEl.camera?.el?.components?.camera?.updateAspect) {
@@ -1105,7 +1119,7 @@ watch(isARReady, (ready) => {
         embedded
         :mindar-image="`imageTargetSrc: ${mindFileUrl}; autoStart: true; maxTrack: 1; uiLoading: no; uiError: no; uiScanning: no; filterMinCF:0.001; filterBeta: 10; warmupTolerance: 2; missTolerance: 2;`"
         color-space="sRGB"
-        renderer="colorManagement: true; physicallyCorrectLights: false; antialias: true; alpha: true; precision: medium;"
+        renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true; alpha: true; precision: medium;"
         vr-mode-ui="enabled: false"
         device-orientation-permission-ui="enabled: false"
         background="transparent: true;"
@@ -1181,6 +1195,7 @@ watch(isARReady, (ready) => {
                 color="teal"
                 opacity="0.8"
                 animation="property: rotation; to: 0 0 360; loop: true; dur: 1000; easing: linear;"
+                material="shader: flat; transparent: true;"
               ></a-ring>
             </a-entity>
           </a-entity>
