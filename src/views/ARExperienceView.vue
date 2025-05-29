@@ -41,13 +41,10 @@ const FULLSCREEN_CHANGE_DEBOUNCE_DELAY = 400
 const showFullscreenPrompt = ref(false)
 const userDismissedFullscreenPrompt = ref(false)
 
-const isSmallMobile = ref(false)
-const isMobileDevice = ref(false)
-const isTablet = ref(false)
-const isConsideredMobileForPrompt = ref(false)
+// Definiciones de tipo de dispositivo para escalas y prompts
+const isConsideredMobileForPrompt = ref(false) // Para agrupar móvil + tablet para el prompt de FS
 
-const isDeviceLandscape = ref(false)
-let previousLandscapeState = false // Para detectar cambio de orientación
+const isDeviceLandscape = ref(false) // Se sigue usando para el layout de botones si fuera necesario en el futuro
 const isInBrowserFullscreen = ref(false)
 let orientationMediaQuery = null
 
@@ -107,14 +104,10 @@ async function retryCameraCheck() {
   await initializeARExperience(props.markerId, null)
 }
 
-function updateOrientationAndMobileState(forResizeProcessing = false) {
+function updateOrientationAndMobileState() {
   if (typeof window !== 'undefined') {
     const width = window.innerWidth
-
-    isSmallMobile.value = width < 480
-    isMobileDevice.value = width >= 480 && width < 768
-    isTablet.value = width >= 768 && width < 1200
-    isConsideredMobileForPrompt.value = width < 1200
+    isConsideredMobileForPrompt.value = width < 1200 // Móviles y tablets reciben prompt
 
     if (screen.orientation && screen.orientation.type) {
       isDeviceLandscape.value = screen.orientation.type.startsWith('landscape')
@@ -127,14 +120,6 @@ function updateOrientationAndMobileState(forResizeProcessing = false) {
       document.mozFullScreenElement ||
       document.msFullscreenElement
     )
-
-    if (forResizeProcessing && previousLandscapeState !== isDeviceLandscape.value) {
-      console.log(
-        `[ARXP Env] Cambio de orientación procesado a Landscape: ${isDeviceLandscape.value}.`,
-      )
-      // La lógica de reinicio de arSystem se moverá a procesarRedimensionado
-    }
-    previousLandscapeState = isDeviceLandscape.value
   }
 }
 
@@ -561,7 +546,7 @@ const handleArReady = async () => {
   }
   await nextTick()
   hideVRButton()
-  procesarRedimensionado(true) // Llama aquí para asegurar ajustes iniciales
+  procesarRedimensionado(true)
 }
 const handleArError = (event) => {
   const errorDetailSource = event.detail?.error || event.detail?.message || event.detail
@@ -776,7 +761,7 @@ const handleGlobalOrientationAndResize = () => {
   clearTimeout(resizeDebounceTimer)
   resizeDebounceTimer = setTimeout(() => {
     const previousLandscape = isDeviceLandscape.value
-    updateOrientationAndMobileState(true)
+    updateOrientationAndMobileState() // Primero actualiza todos los estados de orientación y tamaño
 
     if (
       isARReady.value &&
@@ -784,25 +769,23 @@ const handleGlobalOrientationAndResize = () => {
       previousLandscape !== isDeviceLandscape.value
     ) {
       console.log(
-        `[ARXP Env] Cambio de orientación procesado (Landscape: ${isDeviceLandscape.value}). Intentando stop/start de arSystem.`,
+        `[ARXP Env] Cambio de orientación significativo detectado (Landscape: ${isDeviceLandscape.value}).`,
       )
       isMarkerVisible.value = false
       if (arSystem && typeof arSystem.stop === 'function' && typeof arSystem.start === 'function') {
+        console.log('[ARXP Env] Intentando stop/start de arSystem debido a giro.')
         try {
           arSystem.stop()
-          // Opcional: un pequeño delay si es necesario, pero a veces no lo es.
-          // await new Promise(r => setTimeout(r, 50));
           arSystem.start()
-          console.log('[ARXP Env] arSystem stop/start llamado.')
-          // Forzar un re-chequeo del prompt y contenido
+          // Después de reiniciar, forzar un reprocesamiento para ajustar UI y contenido.
           nextTick(() => procesarRedimensionado(true))
         } catch (e) {
-          console.warn('Error al intentar stop/start de arSystem:', e)
-          procesarRedimensionado(false) // Proceder con redimensionado normal si stop/start falla
+          console.warn('Error al intentar stop/start de arSystem durante giro:', e)
+          procesarRedimensionado(false)
         }
       } else {
         console.log(
-          '[ARXP Env] arSystem no disponible o sin stop/start, procediendo con redimensionado normal.',
+          '[ARXP Env] arSystem no disponible o sin stop/start para reinicio por giro, procediendo con redimensionado normal.',
         )
         procesarRedimensionado(false)
       }
@@ -861,23 +844,17 @@ function procesarRedimensionado(isInitialOrPostPromptAdjust = false) {
       isInBrowserFullscreen.value)
   ) {
     let newScale = 1.0
-    if (isSmallMobile.value) {
-      // Teléfonos < 480px
-      newScale = isDeviceLandscape.value || isInBrowserFullscreen.value ? 1.2 : 1.0
-    } else if (isMobileDevice.value) {
-      // Teléfonos >= 480px y < 768px
-      newScale = isDeviceLandscape.value || isInBrowserFullscreen.value ? 1.2 : 1.0
-    } else if (isTablet.value) {
-      // Tablets >= 768px y < 1200px
+    if (isSmallMobile.value || isMobileDevice.value || isTablet.value) {
+      // Agrupa móvil y tablet
       newScale = isDeviceLandscape.value || isInBrowserFullscreen.value ? 1.2 : 1.0
     } else {
-      // Desktop >= 1200px
+      // Desktop
       newScale = isInBrowserFullscreen.value ? 1.2 : 1.0
     }
 
     currentScalerEl.setAttribute('scale', `${newScale} ${newScale} ${newScale}`)
     console.log(
-      `[ARXP Resize] Escala aplicada: ${newScale}. SmallMobile: ${isSmallMobile.value}, MobileDevice: ${isMobileDevice.value}, Tablet: ${isTablet.value}, Landscape: ${isDeviceLandscape.value}, Fullscreen: ${isInBrowserFullscreen.value}`,
+      `[ARXP Resize] Escala aplicada: ${newScale}. ConsideredMobile: ${isConsideredMobileForPrompt.value}, Landscape: ${isDeviceLandscape.value}, Fullscreen: ${isInBrowserFullscreen.value}`,
     )
 
     if (currentSceneEl.camera?.el?.components?.camera?.updateAspect) {
@@ -931,7 +908,7 @@ async function initializeARExperience(newMarkerId, oldMarkerId) {
 
 onMounted(() => {
   updateOrientationAndMobileState()
-  previousLandscapeState = isDeviceLandscape.value // Inicializar estado previo
+  previousLandscapeState = isDeviceLandscape.value
   window.addEventListener('resize', handleGlobalOrientationAndResize)
   if (screen.orientation && typeof screen.orientation.addEventListener === 'function') {
     screen.orientation.addEventListener('change', handleGlobalOrientationAndResize)
@@ -1291,13 +1268,14 @@ watch(isARReady, (ready) => {
 
 .ar-controls-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  bottom: 20px; /* Posicionar en la parte inferior */
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto; /* Ajustar al contenido de los botones */
+  height: auto;
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
+  flex-direction: row; /* Botones uno al lado del otro */
+  justify-content: center;
   align-items: center;
   pointer-events: none;
   z-index: 150;
@@ -1317,7 +1295,7 @@ watch(isARReady, (ready) => {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 20px;
+  margin: 0 10px; /* Margen entre botones */
   user-select: none;
   font-family: 'Roboto', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
