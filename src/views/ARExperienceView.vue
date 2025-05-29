@@ -15,6 +15,8 @@ const imagePlaneRef = ref(null)
 const videoPlaneRef = ref(null)
 const arViewContainerRef = ref(null)
 
+const sceneRenderKey = ref(0) // Para forzar el remontaje de a-scene
+
 const mindFileUrl = ref('')
 const associatedContents = ref([])
 const currentContentIndex = ref(0)
@@ -42,9 +44,9 @@ const showFullscreenPrompt = ref(false)
 const userDismissedFullscreenPrompt = ref(false)
 
 const isSmallMobile = ref(false)
-const isMobileDevice = ref(false) // Para teléfonos >= 480 y < 768
+const isMobileDevice = ref(false)
 const isTablet = ref(false)
-const isConsideredMobileForPrompt = ref(false) // Para agrupar móvil + tablet para el prompt de FS
+const isConsideredMobileForPrompt = ref(false)
 
 const isDeviceLandscape = ref(false)
 const isInBrowserFullscreen = ref(false)
@@ -109,10 +111,12 @@ async function retryCameraCheck() {
 function updateOrientationAndMobileState() {
   if (typeof window !== 'undefined') {
     const width = window.innerWidth
+    const oldLandscape = isDeviceLandscape.value
+
     isSmallMobile.value = width < 480
     isMobileDevice.value = width >= 480 && width < 768
-    isTablet.value = width >= 768 && width < 1200 // Límite superior para tablet ajustado
-    isConsideredMobileForPrompt.value = width < 1200 // Móviles y tablets reciben prompt
+    isTablet.value = width >= 768 && width < 1200
+    isConsideredMobileForPrompt.value = width < 1200
 
     if (screen.orientation && screen.orientation.type) {
       isDeviceLandscape.value = screen.orientation.type.startsWith('landscape')
@@ -125,6 +129,24 @@ function updateOrientationAndMobileState() {
       document.mozFullScreenElement ||
       document.msFullscreenElement
     )
+
+    if (
+      isARReady.value &&
+      oldLandscape !== isDeviceLandscape.value &&
+      (isSmallMobile.value || isMobileDevice.value || isTablet.value)
+    ) {
+      console.log(
+        `[ARXP Env] Cambio de orientación detectado a Landscape: ${isDeviceLandscape.value}. Forzando reinicio de escena AR.`,
+      )
+      isMarkerVisible.value = false // Asumir que se pierde el marcador temporalmente
+      if (arSystem && typeof arSystem.stop === 'function') {
+        // Detener sistema AR si existe
+        try {
+          arSystem.stop()
+        } catch (e) {}
+      }
+      sceneRenderKey.value++ // Incrementar key para forzar remontaje
+    }
   }
 }
 
@@ -220,7 +242,7 @@ async function loadMarkerAndContents() {
   isMarkerVisible.value = false
   associatedContents.value = []
   mindFileUrl.value = ''
-  currentContentIndex.value = 0
+  // currentContentIndex.value = 0; // No resetear aquí para persistir entre reinicios de escena por giro
   userDismissedFullscreenPrompt.value = false
   showFullscreenPrompt.value = false
   if (arReadyTimeout) clearTimeout(arReadyTimeout)
@@ -770,8 +792,27 @@ async function cleanupARInternal(calledFromWatcher = false) {
 const handleGlobalOrientationAndResize = () => {
   clearTimeout(resizeDebounceTimer)
   resizeDebounceTimer = setTimeout(() => {
-    updateOrientationAndMobileState()
-    procesarRedimensionado(false)
+    const previousLandscape = isDeviceLandscape.value
+    updateOrientationAndMobileState() // Actualiza isDeviceLandscape entre otras
+
+    if (
+      isARReady.value &&
+      previousLandscape !== isDeviceLandscape.value &&
+      (isSmallMobile.value || isMobileDevice.value || isTablet.value)
+    ) {
+      console.log(
+        `[ARXP Env] Cambio de orientación A/DESDE landscape detectado. Reiniciando escena AR via key.`,
+      )
+      isMarkerVisible.value = false
+      if (arSystem && typeof arSystem.stop === 'function') {
+        try {
+          arSystem.stop()
+        } catch (e) {}
+      }
+      sceneRenderKey.value++
+    } else {
+      procesarRedimensionado(false)
+    }
   }, RESIZE_DEBOUNCE_DELAY)
 }
 
@@ -831,7 +872,6 @@ function procesarRedimensionado(isInitialOrPostPromptAdjust = false) {
     } else if (isTablet.value) {
       newScale = isDeviceLandscape.value || isInBrowserFullscreen.value ? 1.2 : 1.0
     } else {
-      // Desktop
       newScale = isInBrowserFullscreen.value ? 1.2 : 1.0
     }
 
@@ -1115,11 +1155,11 @@ watch(isARReady, (ready) => {
       <a-scene
         v-if="mindFileUrl"
         ref="sceneRef"
-        :key="`${mindFileUrl}-${props.markerId}`"
+        :key="sceneRenderKey"
         embedded
         :mindar-image="`imageTargetSrc: ${mindFileUrl}; autoStart: true; maxTrack: 1; uiLoading: no; uiError: no; uiScanning: no; filterMinCF:0.001; filterBeta: 10; warmupTolerance: 2; missTolerance: 2;`"
         color-space="sRGB"
-        renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true; alpha: true; precision: medium;"
+        renderer="colorManagement: false; physicallyCorrectLights: false; antialias: true; alpha: true; precision: medium;"
         vr-mode-ui="enabled: false"
         device-orientation-permission-ui="enabled: false"
         background="transparent: true;"
