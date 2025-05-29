@@ -15,7 +15,7 @@ const imagePlaneRef = ref(null)
 const videoPlaneRef = ref(null)
 const arViewContainerRef = ref(null)
 
-const sceneRenderKey = ref(0) // Para forzar el remontaje de a-scene
+const sceneRenderKey = ref(0)
 
 const mindFileUrl = ref('')
 const associatedContents = ref([])
@@ -133,19 +133,20 @@ function updateOrientationAndMobileState() {
     if (
       isARReady.value &&
       oldLandscape !== isDeviceLandscape.value &&
-      (isSmallMobile.value || isMobileDevice.value || isTablet.value)
+      isConsideredMobileForPrompt.value
     ) {
       console.log(
         `[ARXP Env] Cambio de orientación detectado a Landscape: ${isDeviceLandscape.value}. Forzando reinicio de escena AR.`,
       )
-      isMarkerVisible.value = false // Asumir que se pierde el marcador temporalmente
+      isMarkerVisible.value = false
       if (arSystem && typeof arSystem.stop === 'function') {
-        // Detener sistema AR si existe
         try {
           arSystem.stop()
-        } catch (e) {}
+        } catch (e) {
+          console.warn('Error al detener arSystem:', e)
+        }
       }
-      sceneRenderKey.value++ // Incrementar key para forzar remontaje
+      sceneRenderKey.value++
     }
   }
 }
@@ -242,7 +243,7 @@ async function loadMarkerAndContents() {
   isMarkerVisible.value = false
   associatedContents.value = []
   mindFileUrl.value = ''
-  // currentContentIndex.value = 0; // No resetear aquí para persistir entre reinicios de escena por giro
+  // No resetear currentContentIndex aquí si queremos persistencia entre reinicios de :key
   userDismissedFullscreenPrompt.value = false
   showFullscreenPrompt.value = false
   if (arReadyTimeout) clearTimeout(arReadyTimeout)
@@ -574,11 +575,8 @@ const handleArReady = async () => {
   }
   await nextTick()
   hideVRButton()
-  setTimeout(() => {
-    if (isMarkerVisible.value && isARReady.value && !isCleaningUp.value) {
-      checkAndShowFullscreenPrompt()
-    }
-  }, 250)
+  // Llamar a procesarRedimensionado aquí después de arReady y de que la escena se haya remontado por key
+  procesarRedimensionado(true)
 }
 const handleArError = (event) => {
   const errorDetailSource = event.detail?.error || event.detail?.message || event.detail
@@ -792,25 +790,19 @@ async function cleanupARInternal(calledFromWatcher = false) {
 const handleGlobalOrientationAndResize = () => {
   clearTimeout(resizeDebounceTimer)
   resizeDebounceTimer = setTimeout(() => {
-    const previousLandscape = isDeviceLandscape.value
-    updateOrientationAndMobileState() // Actualiza isDeviceLandscape entre otras
-
+    // La lógica de reinicio de escena por giro ya está en updateOrientationAndMobileState
+    updateOrientationAndMobileState()
+    // Si no hubo reinicio de escena por el key, procesarRedimensionado normal
     if (
-      isARReady.value &&
-      previousLandscape !== isDeviceLandscape.value &&
-      (isSmallMobile.value || isMobileDevice.value || isTablet.value)
+      sceneRenderKey.value ===
+      sceneRenderKey.value -
+        (isARReady.value &&
+        isDeviceLandscape.value !== !isDeviceLandscape.value &&
+        isConsideredMobileForPrompt.value
+          ? 1
+          : 0)
     ) {
-      console.log(
-        `[ARXP Env] Cambio de orientación A/DESDE landscape detectado. Reiniciando escena AR via key.`,
-      )
-      isMarkerVisible.value = false
-      if (arSystem && typeof arSystem.stop === 'function') {
-        try {
-          arSystem.stop()
-        } catch (e) {}
-      }
-      sceneRenderKey.value++
-    } else {
+      // Comprobar si el key no cambió
       procesarRedimensionado(false)
     }
   }, RESIZE_DEBOUNCE_DELAY)
@@ -972,6 +964,7 @@ onUnmounted(async () => {
 watch(
   () => props.markerId,
   (newMarkerId, oldMarkerId) => {
+    sceneRenderKey.value++ // Forzar reinicio de escena si el markerId cambia externamente
     initializeARExperience(newMarkerId, oldMarkerId)
   },
   { immediate: true },
@@ -1025,9 +1018,11 @@ watch(
 
 watch(isARReady, (ready) => {
   if (ready) {
+    // Cuando la escena AR está lista (potencialmente después de un reinicio por :key),
+    // asegurarse de procesar el redimensionado para ajustar escalas y cámara.
     nextTick(() => {
       hideVRButton()
-      updateOrientationAndMobileState()
+      updateOrientationAndMobileState() // Asegurar estados antes del primer resize
       procesarRedimensionado(true)
     })
   }
