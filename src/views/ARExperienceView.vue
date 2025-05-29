@@ -15,6 +15,8 @@ const imagePlaneRef = ref(null)
 const videoPlaneRef = ref(null)
 const arViewContainerRef = ref(null)
 
+const sceneRenderKey = ref(0)
+
 const mindFileUrl = ref('')
 const associatedContents = ref([])
 const currentContentIndex = ref(0)
@@ -41,10 +43,13 @@ const FULLSCREEN_CHANGE_DEBOUNCE_DELAY = 400
 const showFullscreenPrompt = ref(false)
 const userDismissedFullscreenPrompt = ref(false)
 
-// Definiciones de tipo de dispositivo para escalas y prompts
-const isConsideredMobileForPrompt = ref(false) // Para agrupar móvil + tablet para el prompt de FS
+const isSmallMobile = ref(false)
+const isMobileDevice = ref(false)
+const isTablet = ref(false)
+const isConsideredMobileForPrompt = ref(false)
 
-const isDeviceLandscape = ref(false) // Se sigue usando para el layout de botones si fuera necesario en el futuro
+const isDeviceLandscape = ref(false)
+let previousLandscapeState = false
 const isInBrowserFullscreen = ref(false)
 let orientationMediaQuery = null
 
@@ -104,10 +109,15 @@ async function retryCameraCheck() {
   await initializeARExperience(props.markerId, null)
 }
 
-function updateOrientationAndMobileState() {
+function updateOrientationAndMobileState(forResizeProcessing = false) {
   if (typeof window !== 'undefined') {
     const width = window.innerWidth
-    isConsideredMobileForPrompt.value = width < 1200 // Móviles y tablets reciben prompt
+    const oldLandscape = isDeviceLandscape.value
+
+    isSmallMobile.value = width < 480
+    isMobileDevice.value = width >= 480 && width < 768
+    isTablet.value = width >= 768 && width < 1200
+    isConsideredMobileForPrompt.value = width < 1200
 
     if (screen.orientation && screen.orientation.type) {
       isDeviceLandscape.value = screen.orientation.type.startsWith('landscape')
@@ -120,6 +130,29 @@ function updateOrientationAndMobileState() {
       document.mozFullScreenElement ||
       document.msFullscreenElement
     )
+
+    if (
+      isARReady.value &&
+      oldLandscape !== isDeviceLandscape.value &&
+      isConsideredMobileForPrompt.value
+    ) {
+      console.log(
+        `[ARXP Env] Cambio de orientación detectado a Landscape: ${isDeviceLandscape.value}. Forzando reinicio de escena AR.`,
+      )
+      isMarkerVisible.value = false
+      if (arSystem && typeof arSystem.stop === 'function') {
+        try {
+          arSystem.stop()
+        } catch (e) {
+          console.warn('Error al detener arSystem:', e)
+        }
+      }
+      sceneRenderKey.value++
+    }
+    if (forResizeProcessing) {
+      // Solo actualizar previousLandscapeState si es para procesar el redimensionado
+      previousLandscapeState = isDeviceLandscape.value
+    }
   }
 }
 
@@ -141,9 +174,10 @@ function checkAndShowFullscreenPrompt() {
     return
   }
 
-  if (isInBrowserFullscreen.value || userDismissedFullscreenPrompt.value) {
+  if (isInBrowserFullscreen.value) {
+    // Si ya está en fullscreen, nunca mostrar prompt
     showFullscreenPrompt.value = false
-  } else if (isConsideredMobileForPrompt.value) {
+  } else if (isConsideredMobileForPrompt.value && !userDismissedFullscreenPrompt.value) {
     showFullscreenPrompt.value = true
   } else {
     showFullscreenPrompt.value = false
@@ -761,7 +795,7 @@ const handleGlobalOrientationAndResize = () => {
   clearTimeout(resizeDebounceTimer)
   resizeDebounceTimer = setTimeout(() => {
     const previousLandscape = isDeviceLandscape.value
-    updateOrientationAndMobileState() // Primero actualiza todos los estados de orientación y tamaño
+    updateOrientationAndMobileState(true) // Pasa true para actualizar previousLandscapeState
 
     if (
       isARReady.value &&
@@ -777,7 +811,6 @@ const handleGlobalOrientationAndResize = () => {
         try {
           arSystem.stop()
           arSystem.start()
-          // Después de reiniciar, forzar un reprocesamiento para ajustar UI y contenido.
           nextTick(() => procesarRedimensionado(true))
         } catch (e) {
           console.warn('Error al intentar stop/start de arSystem durante giro:', e)
@@ -844,13 +877,8 @@ function procesarRedimensionado(isInitialOrPostPromptAdjust = false) {
       isInBrowserFullscreen.value)
   ) {
     let newScale = 1.0
-    if (isSmallMobile.value || isMobileDevice.value || isTablet.value) {
-      // Agrupa móvil y tablet
-      newScale = isDeviceLandscape.value || isInBrowserFullscreen.value ? 1.2 : 1.0
-    } else {
-      // Desktop
-      newScale = isInBrowserFullscreen.value ? 1.2 : 1.0
-    }
+    // Lógica de escala: 1.2 si está en Fullscreen, sino 1.0. (Aplica a todos los dispositivos)
+    newScale = isInBrowserFullscreen.value ? 1.2 : 1.0
 
     currentScalerEl.setAttribute('scale', `${newScale} ${newScale} ${newScale}`)
     console.log(
@@ -1268,13 +1296,13 @@ watch(isARReady, (ready) => {
 
 .ar-controls-overlay {
   position: absolute;
-  bottom: 20px; /* Posicionar en la parte inferior */
+  bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
-  width: auto; /* Ajustar al contenido de los botones */
+  width: auto;
   height: auto;
   display: flex;
-  flex-direction: row; /* Botones uno al lado del otro */
+  flex-direction: row;
   justify-content: center;
   align-items: center;
   pointer-events: none;
@@ -1295,7 +1323,7 @@ watch(isARReady, (ready) => {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 0 10px; /* Margen entre botones */
+  margin: 0 10px;
   user-select: none;
   font-family: 'Roboto', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
