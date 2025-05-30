@@ -22,11 +22,9 @@ const isCapturing = ref(false)
 const imageUrlToLoad = ref('')
 const viewActive = ref(false)
 
-// Breakpoints
 const isSmallMobile = ref(false)
-const isMobileDevice = ref(false) // Para teléfonos >= 480 y < 768
+const isMobileDevice = ref(false)
 const isTablet = ref(false)
-// const isDesktop = computed(() => !isSmallMobile.value && !isMobileDevice.value && !isTablet.value); // No usado directamente aún
 
 function updateDeviceFlags() {
   if (typeof window !== 'undefined') {
@@ -66,7 +64,7 @@ watch(
 
 async function initializeView() {
   console.log('[OverlayPhoto] InitializeView START')
-  updateDeviceFlags() // Actualizar flags de dispositivo al inicializar
+  updateDeviceFlags()
   loading.value = true
   error.value = ''
   cameraError.value = ''
@@ -75,9 +73,8 @@ async function initializeView() {
   cleanupCamera()
 
   await fetchOverlayDetails()
-  loading.value = false
+  loading.value = false // Esto debería hacer que el v-if del <video> se resuelva
   console.log('[OverlayPhoto] InitializeView END, loading:', loading.value, 'error:', error.value)
-
   // La cámara se iniciará mediante el watcher de videoPlayer
 }
 
@@ -134,10 +131,8 @@ async function startCamera() {
     return
   }
   if (!videoPlayer.value) {
-    // Esta guarda es crucial
     cameraError.value = 'Error interno: Elemento de video no listo para iniciar cámara.'
     console.error(cameraError.value)
-    // No retornar aquí necesariamente, el watcher podría volver a intentarlo cuando videoPlayer.value esté listo
     return
   }
   cameraError.value = ''
@@ -152,7 +147,6 @@ async function startCamera() {
       console.log('[OverlayPhoto] Media stream obtained.')
       cameraStream.value = stream
       if (videoPlayer.value) {
-        // Doble check
         videoPlayer.value.srcObject = stream
         await videoPlayer.value.play()
         console.log('[OverlayPhoto] Video player started.')
@@ -171,7 +165,7 @@ async function startCamera() {
         cameraError.value = `Error al acceder a la cámara: ${err.name}`
       }
       toast.error(cameraError.value)
-      cleanupCamera() // Limpiar si falla el inicio
+      cleanupCamera()
     }
   } else {
     cameraError.value = 'La API MediaDevices (cámara) no es soportada por este navegador.'
@@ -180,7 +174,6 @@ async function startCamera() {
   }
 }
 
-// Watcher para iniciar la cámara cuando todas las condiciones se cumplen, incluyendo videoPlayer.value
 watch(
   [
     videoPlayer,
@@ -211,7 +204,7 @@ watch(
     }
   },
   { immediate: true, deep: true },
-) // immediate true para el primer intento, deep por overlayDetails
+)
 
 function cleanupCamera() {
   console.log('[OverlayPhoto] Cleanup Camera Called')
@@ -221,7 +214,7 @@ function cleanupCamera() {
     console.log('[OverlayPhoto] Camera stream stopped and nulled')
   }
   if (videoPlayer.value && videoPlayer.value.srcObject) {
-    videoPlayer.value.srcObject = null // Importante para permitir reasignación
+    videoPlayer.value.srcObject = null
     console.log('[OverlayPhoto] Video player srcObject nulled')
   }
 }
