@@ -22,21 +22,13 @@ const isCapturing = ref(false)
 const imageUrlToLoad = ref('')
 const viewActive = ref(false)
 
+const currentViewMode = ref('capturing')
+const capturedImageDataUrl = ref('')
+
 const isSmallMobile = ref(false)
 const isMobileDevice = ref(false)
 const isTablet = ref(false)
-
-function updateDeviceFlags() {
-  if (typeof window !== 'undefined') {
-    const width = window.innerWidth
-    isSmallMobile.value = width < 480
-    isMobileDevice.value = width >= 480 && width < 768
-    isTablet.value = width >= 768 && width < 1200
-    console.log(
-      `[OverlayPhoto DeviceFlags] SmallMobile: ${isSmallMobile.value}, MobileDevice: ${isMobileDevice.value}, Tablet: ${isTablet.value}, Width: ${width}`,
-    )
-  }
-}
+const isDesktop = ref(false)
 
 function getOverlayFullUrl(r2Key) {
   if (!r2Key) return ''
@@ -62,20 +54,74 @@ watch(
   { immediate: true, deep: true },
 )
 
-async function initializeView() {
-  console.log('[OverlayPhoto] InitializeView START')
-  updateDeviceFlags()
+function updateDeviceSizeClassifiers() {
+  if (typeof window !== 'undefined') {
+    const width = window.innerWidth
+    isSmallMobile.value = width < 480
+    isMobileDevice.value = width >= 480 && width < 768
+    isTablet.value = width >= 768 && width < 1200
+    isDesktop.value = width >= 1200
+  }
+}
+
+async function initializeView(isReactivating = false) {
+  console.log('[OverlayPhoto] InitializeView START. Is Reactivating:', isReactivating)
   loading.value = true
   error.value = ''
   cameraError.value = ''
   isCapturing.value = false
+  currentViewMode.value = 'capturing'
+  capturedImageDataUrl.value = ''
 
   cleanupCamera()
+  updateDeviceSizeClassifiers()
 
-  await fetchOverlayDetails()
-  loading.value = false // Esto debería hacer que el v-if del <video> se resuelva
+  if (!overlayDetails.value || !isReactivating) {
+    await fetchOverlayDetails()
+  } else {
+    if (overlayDetails.value && overlayDetails.value.r2_key) {
+      const key = overlayDetails.value.r2_key
+      let baseUrl = getOverlayFullUrl(key)
+      const cacheBuster = `v=${Date.now()}`
+      baseUrl += (baseUrl.includes('?') ? '&' : '?') + cacheBuster
+      imageUrlToLoad.value = baseUrl
+    }
+  }
+
+  loading.value = false
   console.log('[OverlayPhoto] InitializeView END, loading:', loading.value, 'error:', error.value)
-  // La cámara se iniciará mediante el watcher de videoPlayer
+
+  if (
+    viewActive.value &&
+    currentViewMode.value === 'capturing' &&
+    !error.value &&
+    overlayDetails.value?.r2_key
+  ) {
+    await nextTick()
+    if (videoPlayer.value) {
+      console.log(
+        '[OverlayPhoto] InitializeView: videoPlayer ref está lista. Condiciones para startCamera met. Llamando a startCamera.',
+      )
+      await startCamera()
+    } else {
+      console.error(
+        '[OverlayPhoto] InitializeView: videoPlayer ref NO está lista DESPUÉS de nextTick. No se puede iniciar la cámara.',
+      )
+      cameraError.value = 'Error interno al inicializar el reproductor de video.'
+      toast.error(cameraError.value)
+    }
+  } else {
+    console.log(
+      '[OverlayPhoto] InitializeView: Condiciones para startCamera NO met. viewActive:',
+      viewActive.value,
+      'mode:',
+      currentViewMode.value,
+      'error:',
+      error.value,
+      'r2_key:',
+      overlayDetails.value?.r2_key,
+    )
+  }
 }
 
 async function fetchOverlayDetails() {
@@ -120,23 +166,17 @@ async function fetchOverlayDetails() {
 }
 
 async function startCamera() {
-  console.log(
-    '[OverlayPhoto] Attempting to start camera. Current stream:',
-    !!cameraStream.value,
-    'videoPlayer ref:',
-    !!videoPlayer.value,
-  )
+  console.log('[OverlayPhoto] Attempting to start camera. Current stream:', cameraStream.value)
   if (cameraStream.value) {
     console.log('[OverlayPhoto] Camera stream already active. Skipping startCamera.')
     return
   }
+  cameraError.value = ''
   if (!videoPlayer.value) {
-    cameraError.value = 'Error interno: Elemento de video no listo para iniciar cámara.'
+    cameraError.value = 'Error interno: Referencia al reproductor de video no encontrada.'
     console.error(cameraError.value)
     return
   }
-  cameraError.value = ''
-
   if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     try {
       console.log('[OverlayPhoto] Requesting user media (camera)...')
@@ -146,26 +186,26 @@ async function startCamera() {
       })
       console.log('[OverlayPhoto] Media stream obtained.')
       cameraStream.value = stream
-      if (videoPlayer.value) {
-        videoPlayer.value.srcObject = stream
+      videoPlayer.value.srcObject = stream
+      try {
         await videoPlayer.value.play()
         console.log('[OverlayPhoto] Video player started.')
-      } else {
-        throw new Error('videoPlayer se volvió nulo antes de asignar srcObject')
+      } catch (playError) {
+        cameraError.value = 'No se pudo iniciar video de cámara.'
+        console.error('[OverlayPhoto] Play error:', playError)
       }
     } catch (err) {
-      console.error('[OverlayPhoto] GetUserMedia o Play error:', err.name, err.message)
+      console.error('[OverlayPhoto] GetUserMedia error:', err.name, err.message)
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         cameraError.value = 'Permiso de cámara denegado por el usuario.'
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         cameraError.value = 'No se encontró una cámara compatible.'
-      } else if (err.name === 'NotReadableError' || err.name === 'AbortError') {
+      } else if (err.name === 'NotReadableError') {
         cameraError.value = 'La cámara está en uso o no es accesible.'
       } else {
         cameraError.value = `Error al acceder a la cámara: ${err.name}`
       }
       toast.error(cameraError.value)
-      cleanupCamera()
     }
   } else {
     cameraError.value = 'La API MediaDevices (cámara) no es soportada por este navegador.'
@@ -173,38 +213,6 @@ async function startCamera() {
     toast.error(cameraError.value)
   }
 }
-
-watch(
-  [
-    videoPlayer,
-    () => loading.value,
-    () => overlayDetails.value,
-    () => viewActive.value,
-    () => error.value,
-    () => cameraError.value,
-  ],
-  async ([videoElm, isLoadingVal, details, isActive, currentError, currentCamError]) => {
-    console.log(
-      `[OverlayPhoto Watch videoPlayer] videoElm: ${!!videoElm}, isLoading: ${isLoadingVal}, details: ${!!details?.r2_key}, isActive: ${isActive}, stream: ${!!cameraStream.value}, error: ${currentError}, camError: ${currentCamError}`,
-    )
-    if (
-      isActive &&
-      !isLoadingVal &&
-      details &&
-      details.r2_key &&
-      videoElm &&
-      !cameraStream.value &&
-      !currentError &&
-      !currentCamError
-    ) {
-      console.log(
-        '[OverlayPhoto Watch videoPlayer] Condiciones para startCamera met. Llamando a startCamera.',
-      )
-      await startCamera()
-    }
-  },
-  { immediate: true, deep: true },
-)
 
 function cleanupCamera() {
   console.log('[OverlayPhoto] Cleanup Camera Called')
@@ -231,30 +239,30 @@ onMounted(() => {
   console.log('[OverlayPhoto] Component Mounted.')
   viewActive.value = true
   initializeView()
-  window.addEventListener('resize', updateDeviceFlags)
+  window.addEventListener('resize', updateDeviceSizeClassifiers)
 })
 
 onUnmounted(() => {
-  console.log('[OverlayPhoto] Component Unmounted. Cleaning up resources...')
+  console.log('[OverlayPhoto] Component Unmounted.')
   viewActive.value = false
   cleanupCamera()
   cleanupInteract()
-  window.removeEventListener('resize', updateDeviceFlags)
+  window.removeEventListener('resize', updateDeviceSizeClassifiers)
 })
 
 onActivated(() => {
-  console.log('[OverlayPhoto] Component Activated. Re-initializing view...')
+  console.log('[OverlayPhoto] Component Activated.')
   viewActive.value = true
-  initializeView()
-  window.addEventListener('resize', updateDeviceFlags)
+  initializeView(true)
+  window.addEventListener('resize', updateDeviceSizeClassifiers)
 })
 
 onDeactivated(() => {
-  console.log('[OverlayPhoto] Component Deactivated. Cleaning up resources...')
+  console.log('[OverlayPhoto] Component Deactivated.')
   viewActive.value = false
   cleanupCamera()
   cleanupInteract()
-  window.removeEventListener('resize', updateDeviceFlags)
+  window.removeEventListener('resize', updateDeviceSizeClassifiers)
 })
 
 function initInteractOnImage() {
@@ -307,32 +315,33 @@ function initInteractOnImage() {
 function setInitialOverlaySizeAndCallInteract() {
   const videoElem = videoPlayer.value
   const overlayImgElem = overlayImageElement.value
-  if (videoElem && overlayImgElem && overlayImgElem.naturalWidth > 0) {
-    if (videoElem.readyState < videoElem.HAVE_METADATA && videoElem.videoWidth === 0) {
-      console.log(
-        '[OverlayPhoto] Video metadata not loaded yet for initial size. Waiting for event.',
-      )
-      const onMetadataLoaded = () => {
-        console.log('[OverlayPhoto] Video metadata loaded via event. Recalculating initial size.')
-        videoElem.removeEventListener('loadedmetadata', onMetadataLoaded)
+  if (
+    videoElem &&
+    overlayImgElem &&
+    overlayImgElem.naturalWidth > 0
+    // videoElem.videoWidth > 0 &&  // No depender de videoWidth/Height aquí, puede no estar listo
+    // videoElem.videoHeight > 0
+  ) {
+    if (videoElem.readyState < videoElem.HAVE_METADATA && videoElem.srcObject) {
+      console.log('[OverlayPhoto] Video metadata not loaded yet for initial size. Waiting.')
+      videoElem.onloadedmetadata = () => {
+        console.log('[OverlayPhoto] Video metadata loaded. Recalculating initial size.')
         setInitialOverlaySizeAndCallInteract()
+        videoElem.onloadedmetadata = null
       }
-      videoElem.addEventListener('loadedmetadata', onMetadataLoaded)
-      return
-    }
-
-    if (videoElem.videoWidth === 0 || videoElem.videoHeight === 0) {
-      console.warn(
-        '[OverlayPhoto] Video dimensions are still zero after check. Cannot set initial overlay size accurately.',
-      )
-      nextTick(() => {
-        initInteractOnImage()
-      })
       return
     }
 
     const videoDisplayWidth = videoElem.clientWidth
     const videoDisplayHeight = videoElem.clientHeight
+
+    if (videoDisplayWidth === 0 || videoDisplayHeight === 0) {
+      console.warn(
+        '[OverlayPhoto] Video display dimensions are zero. Retrying initial size calc shortly.',
+      )
+      setTimeout(setInitialOverlaySizeAndCallInteract, 100) // Reintentar brevemente
+      return
+    }
 
     const initialWidthFactor = 0.6
     let initialWidth = videoDisplayWidth * initialWidthFactor
@@ -359,7 +368,7 @@ function setInitialOverlaySizeAndCallInteract() {
     })
   } else if (overlayImageElement.value) {
     console.warn(
-      '[OverlayPhoto] Video element or image natural dimensions not ready for precise initial sizing, initializing InteractJS with image defaults.',
+      '[OverlayPhoto] Video dimensions not ready OR overlay image not fully loaded for precise initial sizing, initializing InteractJS with image defaults.',
     )
     nextTick(() => {
       initInteractOnImage()
@@ -367,15 +376,16 @@ function setInitialOverlaySizeAndCallInteract() {
   }
 }
 
-async function takePhoto() {
+async function takePhotoAndPreview() {
   if (!videoPlayer.value || !cameraStream.value || !overlayDetails.value) {
     toast.error('Cámara o superposición no están listos.')
     return
   }
   isCapturing.value = true
+  await nextTick()
+
   const video = videoPlayer.value
   const canvas = document.createElement('canvas')
-
   const canvasWidth = video.clientWidth
   const canvasHeight = video.clientHeight
 
@@ -396,13 +406,6 @@ async function takePhoto() {
 
   const videoActualWidth = video.videoWidth
   const videoActualHeight = video.videoHeight
-
-  if (videoActualWidth === 0 || videoActualHeight === 0) {
-    toast.error('Dimensiones reales del video son cero. No se puede capturar.')
-    isCapturing.value = false
-    return
-  }
-
   const videoAspectRatio = videoActualWidth / videoActualHeight
   const canvasAspectRatio = canvasWidth / canvasHeight
   let renderWidth, renderHeight, xStart, yStart
@@ -432,36 +435,57 @@ async function takePhoto() {
     const overlayHeightOnCanvas = parseFloat(img.style.height) || img.clientHeight
     ctx.drawImage(img, xOnCanvas, yOnCanvas, overlayWidthOnCanvas, overlayHeightOnCanvas)
   }
-  try {
-    const imageDataUrl = canvas.toDataURL('image/png')
-    const link = document.createElement('a')
-    link.href = imageDataUrl
-    const timestamp = new Date().toISOString().replace(/[:.-]/g, '').slice(0, -4)
-    link.download = `${overlayDetails.value.image_name || 'foto-magica'}_${timestamp}.png`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    toast.success('¡Foto guardada!')
-  } catch (e) {
-    if (e.name === 'SecurityError') {
-      toast.error('Error de seguridad. Revisa CORS si la imagen de superposición es externa.')
-      error.value = 'Error de seguridad (CORS).'
+
+  capturedImageDataUrl.value = canvas.toDataURL('image/png')
+  currentViewMode.value = 'previewing'
+  cleanupCamera()
+  cleanupInteract()
+  isCapturing.value = false
+}
+
+function downloadCapturedPhoto() {
+  if (!capturedImageDataUrl.value) return
+  const link = document.createElement('a')
+  link.href = capturedImageDataUrl.value
+  const timestamp = new Date().toISOString().replace(/[:.-]/g, '').slice(0, -4)
+  link.download = `${overlayDetails.value?.image_name || 'foto-magica'}_${timestamp}.png`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  toast.success('¡Foto guardada!')
+}
+
+async function retakePhoto() {
+  currentViewMode.value = 'capturing'
+  capturedImageDataUrl.value = ''
+  if (viewActive.value && !error.value && overlayDetails.value?.r2_key) {
+    await nextTick() // Asegurar que el DOM de captura esté listo
+    if (videoPlayer.value) {
+      await startCamera()
+      // setInitialOverlaySizeAndCallInteract se llamará desde el @loadedmetadata del video
+      // o desde el @load de la imagen.
     } else {
-      toast.error('Error al guardar la foto.')
-      error.value = 'Error al procesar la foto.'
+      console.error(
+        '[OverlayPhoto] Retake: videoPlayer ref no está disponible después de nextTick.',
+      )
     }
-  } finally {
-    isCapturing.value = false
   }
 }
 </script>
 
 <template>
   <div class="overlay-photo-capture-view">
-    <div v-if="loading && !overlayDetails && !error" class="loading-indicator">Cargando...</div>
-    <div v-if="error && !loading" class="error-message central-error">{{ error }}</div>
+    <div v-if="loading && currentViewMode === 'capturing'" class="loading-indicator">
+      Cargando...
+    </div>
+    <div
+      v-if="error && !loading && currentViewMode === 'capturing'"
+      class="error-message central-error"
+    >
+      {{ error }}
+    </div>
 
-    <div v-if="!loading && overlayDetails" class="capture-area">
+    <div v-if="!loading && overlayDetails && currentViewMode === 'capturing'" class="capture-area">
       <h2 v-if="overlayDetails.image_name" class="view-title-overlay">
         {{ overlayDetails.image_name }}
       </h2>
@@ -503,7 +527,7 @@ async function takePhoto() {
       </div>
       <div v-if="cameraError" class="error-message camera-error-message">{{ cameraError }}</div>
       <button
-        @click="takePhoto"
+        @click="takePhotoAndPreview"
         :disabled="
           !!cameraError ||
           !cameraStream ||
@@ -512,12 +536,29 @@ async function takePhoto() {
           !!error ||
           !imageUrlToLoad
         "
-        class="btn-take-photo"
+        class="btn-capture-action"
       >
         {{ isCapturing ? 'Procesando...' : '📸 Tomar Foto' }}
       </button>
     </div>
-    <div v-else-if="!loading && !error && !overlayDetails" class="no-details-message">
+
+    <div v-if="currentViewMode === 'previewing' && capturedImageDataUrl" class="preview-area">
+      <h2 class="view-title-overlay">Vista Previa</h2>
+      <div class="preview-image-container">
+        <img :src="capturedImageDataUrl" alt="Foto capturada" class="captured-photo-preview" />
+      </div>
+      <div class="preview-actions">
+        <button @click="downloadCapturedPhoto" class="btn-capture-action download">
+          Descargar
+        </button>
+        <button @click="retakePhoto" class="btn-capture-action retake">Volver a Tomar</button>
+      </div>
+    </div>
+
+    <div
+      v-else-if="!loading && !error && !overlayDetails && currentViewMode === 'capturing'"
+      class="no-details-message"
+    >
       <p>No se pudieron cargar los detalles de la Foto Mágica.</p>
     </div>
   </div>
@@ -529,29 +570,32 @@ async function takePhoto() {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background-color: #000;
+  background-color: #1a1a1a;
   color: #f0f0f0;
   box-sizing: border-box;
   overflow: hidden;
 }
-.capture-area {
+.capture-area,
+.preview-area {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 700px;
+  max-width: 600px;
   margin-left: auto;
   margin-right: auto;
   background-color: transparent;
-  overflow-y: auto;
-  padding: 10px;
+  padding: 15px;
   box-sizing: border-box;
+}
+.preview-area {
+  justify-content: center;
 }
 .view-title-overlay {
   text-align: center;
   margin-top: 0;
-  margin-bottom: 8px;
-  font-size: 1.1em;
+  margin-bottom: 10px;
+  font-size: 1.3em;
   flex-shrink: 0;
   font-weight: 500;
   color: #eee;
@@ -567,6 +611,7 @@ async function takePhoto() {
   text-align: center;
   padding: 15px;
   border-radius: 4px;
+  font-size: 1.1em;
 }
 .loading-indicator {
   color: #ccc;
@@ -594,21 +639,21 @@ async function takePhoto() {
 .camera-container {
   position: relative;
   width: 100%;
-  flex-grow: 1;
+  aspect-ratio: 3 / 4;
+  max-height: 70vh;
   background-color: #111;
-  border-radius: 4px;
+  border-radius: 8px;
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 250px;
+  margin-bottom: 15px;
 }
 .video-feed {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 0;
   z-index: 1;
 }
 .overlay-image-on-camera {
@@ -625,42 +670,91 @@ async function takePhoto() {
 .overlay-image-on-camera:active {
   cursor: grabbing;
 }
-.btn-take-photo {
-  margin: 10px auto;
-  padding: 10px 20px;
-  font-size: 1em;
+
+.btn-capture-action {
+  margin: 15px auto 10px auto;
+  padding: 12px 25px;
+  font-size: 1.1em;
   background-color: #4caf50;
   color: #fff;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.2s;
   flex-shrink: 0;
   display: block;
-  min-width: 180px;
+  min-width: 200px;
   font-weight: 500;
 }
-.btn-take-photo:hover:not(:disabled) {
+.btn-capture-action:hover:not(:disabled) {
   background-color: #45a049;
 }
-.btn-take-photo:disabled {
+.btn-capture-action:disabled {
   background-color: #757575;
   color: #bdbdbd;
   cursor: not-allowed;
 }
 
+.preview-image-container {
+  width: 100%;
+  max-height: 60vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+  background-color: #222;
+  border-radius: 8px;
+}
+.captured-photo-preview {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.preview-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.preview-actions .btn-capture-action.download {
+  background-color: #2196f3;
+}
+.preview-actions .btn-capture-action.download:hover:not(:disabled) {
+  background-color: #1976d2;
+}
+.preview-actions .btn-capture-action.retake {
+  background-color: #f44336;
+}
+.preview-actions .btn-capture-action.retake:hover:not(:disabled) {
+  background-color: #d32f2f;
+}
+
 @media (max-width: 600px) {
-  .view-title-overlay {
-    font-size: 0.9em;
-    margin-bottom: 5px;
+  .capture-area,
+  .preview-area {
+    padding: 10px;
+    max-width: 100%;
   }
-  .btn-take-photo {
-    font-size: 0.9em;
-    padding: 8px 18px;
-    min-width: 160px;
+  .view-title-overlay {
+    font-size: 1.1em;
+    margin-bottom: 8px;
+  }
+  .btn-capture-action {
+    font-size: 1em;
+    padding: 10px 20px;
+    min-width: 180px;
   }
   .camera-container {
-    min-height: 200px;
+    min-height: 250px;
+    max-height: 65vh;
+  }
+  .preview-image-container {
+    max-height: 55vh;
+  }
+  .preview-actions .btn-capture-action {
+    flex-basis: 45%;
+    min-width: 140px;
   }
 }
 </style>
