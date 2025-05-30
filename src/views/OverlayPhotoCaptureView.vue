@@ -20,6 +20,7 @@ const R2_PUBLIC_BASE_URL = 'https://pub-48e6b80b718c43a99a9b98163de9920c.r2.dev'
 let interactionInstance = null
 const isCapturing = ref(false)
 const imageUrlToLoad = ref('')
+const viewActive = ref(false)
 
 function getOverlayFullUrl(r2Key) {
   if (!r2Key) return ''
@@ -40,38 +41,46 @@ watch(
       imageUrlToLoad.value = baseUrl
     } else {
       imageUrlToLoad.value = ''
-      if (newDetails && !newDetails.r2_key) {
-        error.value = 'Error: No se encontró la clave de la imagen (r2_key).'
-      }
     }
   },
   { immediate: true, deep: true },
 )
 
 async function initializeView() {
+  console.log('[OverlayPhoto] InitializeView START')
   loading.value = true
   error.value = ''
   cameraError.value = ''
-  overlayDetails.value = null
-  imageUrlToLoad.value = ''
   isCapturing.value = false
-  // No reseteamos capturedImage aquí para que se mantenga si el usuario vuelve
-  if (cameraStream.value) {
-    cameraStream.value.getTracks().forEach((track) => track.stop())
-    cameraStream.value = null
-  }
-  if (videoPlayer.value && videoPlayer.value.srcObject) {
-    const tracks = videoPlayer.value.srcObject.getTracks()
-    tracks.forEach((track) => track.stop())
-    videoPlayer.value.srcObject = null
-  }
+
+  cleanupCamera()
+
   await fetchOverlayDetails()
   loading.value = false
+  console.log('[OverlayPhoto] InitializeView END, loading:', loading.value, 'error:', error.value)
+
+  if (viewActive.value && !error.value && overlayDetails.value?.r2_key) {
+    console.log(
+      '[OverlayPhoto] InitializeView: Condiciones para startCamera met. Llamando a startCamera.',
+    )
+    await startCamera()
+  } else {
+    console.log(
+      '[OverlayPhoto] InitializeView: Condiciones para startCamera NO met. viewActive:',
+      viewActive.value,
+      'error:',
+      error.value,
+      'r2_key:',
+      overlayDetails.value?.r2_key,
+    )
+  }
 }
 
 async function fetchOverlayDetails() {
+  console.log('[OverlayPhoto] Fetching overlay details for ID:', props.overlayId)
   if (!props.overlayId) {
     error.value = 'No se proporcionó ID de overlay.'
+    loading.value = false
     return
   }
   try {
@@ -84,121 +93,130 @@ async function fetchOverlayDetails() {
       .select('id, image_name, r2_key, description, is_public')
       .eq('id', props.overlayId)
       .single()
+
     if (dbError) {
       if (status === 406 || dbError.code === 'PGRST116') {
+        error.value = `No se encontró la Foto Mágica con ID: ${props.overlayId}`
       } else {
         throw dbError
       }
     }
+
     if (data) {
       overlayDetails.value = data
       if (!data.r2_key) {
         error.value = `Configuración de imagen incompleta (ID: ${props.overlayId}) (falta r2_key).`
+        toast.error(error.value)
       }
-    } else {
-      if (!error.value) {
-        error.value = `No se encontró la Foto Mágica con ID: ${props.overlayId}`
-      }
+    } else if (!error.value) {
+      error.value = `No se encontró la Foto Mágica con ID: ${props.overlayId}`
     }
   } catch (err) {
     error.value = `Error al cargar detalles: ${err.message || 'Error desconocido.'}`
+    toast.error(error.value)
   }
 }
 
 async function startCamera() {
+  console.log('[OverlayPhoto] Attempting to start camera. Current stream:', cameraStream.value)
+  if (cameraStream.value) {
+    console.log('[OverlayPhoto] Camera stream already active. Skipping startCamera.')
+    return
+  }
   cameraError.value = ''
   if (!videoPlayer.value) {
     cameraError.value = 'Error interno: Referencia al reproductor de video no encontrada.'
+    console.error(cameraError.value)
     return
   }
   if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     try {
+      console.log('[OverlayPhoto] Requesting user media (camera)...')
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' },
         audio: false,
       })
+      console.log('[OverlayPhoto] Media stream obtained.')
       cameraStream.value = stream
       videoPlayer.value.srcObject = stream
       try {
         await videoPlayer.value.play()
+        console.log('[OverlayPhoto] Video player started.')
       } catch (playError) {
         cameraError.value = 'No se pudo iniciar video de cámara.'
+        console.error('[OverlayPhoto] Play error:', playError)
       }
     } catch (err) {
+      console.error('[OverlayPhoto] GetUserMedia error:', err.name, err.message)
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        cameraError.value = 'Permiso denegado.'
+        cameraError.value = 'Permiso de cámara denegado por el usuario.'
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        cameraError.value = 'No se encontró cámara.'
+        cameraError.value = 'No se encontró una cámara compatible.'
       } else if (err.name === 'NotReadableError') {
-        cameraError.value = 'Cámara en uso o no accesible.'
+        cameraError.value = 'La cámara está en uso o no es accesible.'
       } else {
-        cameraError.value = `Error cámara: ${err.name}`
+        cameraError.value = `Error al acceder a la cámara: ${err.name}`
       }
+      toast.error(cameraError.value)
     }
   } else {
-    cameraError.value = 'API MediaDevices no soportada.'
+    cameraError.value = 'La API MediaDevices (cámara) no es soportada por este navegador.'
+    console.error(cameraError.value)
+    toast.error(cameraError.value)
   }
 }
 
-watch(
-  [() => overlayDetails.value, () => loading.value, videoPlayer],
-  async ([details, isLoadingVal, videoElm]) => {
-    if (
-      !isLoadingVal &&
-      details &&
-      details.r2_key &&
-      !error.value &&
-      videoElm &&
-      !cameraStream.value
-    ) {
-      await startCamera()
-    }
-  },
-  { immediate: true },
-)
-
-function cleanupResources() {
+function cleanupCamera() {
+  console.log('[OverlayPhoto] Cleanup Camera Called')
   if (cameraStream.value) {
     cameraStream.value.getTracks().forEach((track) => track.stop())
     cameraStream.value = null
+    console.log('[OverlayPhoto] Camera stream stopped and nulled')
   }
   if (videoPlayer.value && videoPlayer.value.srcObject) {
-    const tracks = videoPlayer.value.srcObject.getTracks()
-    tracks.forEach((track) => track.stop())
     videoPlayer.value.srcObject = null
+    console.log('[OverlayPhoto] Video player srcObject nulled')
   }
+}
+
+function cleanupInteract() {
   if (interactionInstance) {
     interactionInstance.unset()
     interactionInstance = null
+    console.log('[OverlayPhoto] InteractJS instance unset.')
   }
 }
 
 onMounted(() => {
+  console.log('[OverlayPhoto] Component Mounted. Initializing view...')
+  viewActive.value = true
   initializeView()
 })
+
 onUnmounted(() => {
-  cleanupResources()
+  console.log('[OverlayPhoto] Component Unmounted. Cleaning up resources...')
+  viewActive.value = false
+  cleanupCamera()
+  cleanupInteract()
 })
+
 onActivated(() => {
+  console.log('[OverlayPhoto] Component Activated. Re-initializing view...')
+  viewActive.value = true
   initializeView()
-}) // Re-inicializar si se usa KeepAlive
+})
+
 onDeactivated(() => {
-  cleanupResources()
-}) // Limpiar si se usa KeepAlive
+  console.log('[OverlayPhoto] Component Deactivated. Cleaning up resources...')
+  viewActive.value = false
+  cleanupCamera()
+  cleanupInteract()
+})
 
 function initInteractOnImage() {
   if (overlayImageElement.value && videoPlayer.value) {
-    if (
-      interactionInstance &&
-      interactionInstance.target &&
-      interactionInstance.target === overlayImageElement.value
-    ) {
-      interactionInstance.unset()
-      interactionInstance = null
-    } else if (interactionInstance) {
-      interactionInstance.unset()
-      interactionInstance = null
-    }
+    cleanupInteract()
+
     interactionInstance = interact(overlayImageElement.value)
       .draggable({
         listeners: {
@@ -232,10 +250,13 @@ function initInteractOnImage() {
             ratio: 'preserve',
             equalDelta: true,
             modifiers: [interact.modifiers.restrictSize({ max: 'parent' })],
-          }), // MANTENER ASPECT RATIO
+          }),
         ],
         inertia: false,
       })
+    console.log('[OverlayPhoto] InteractJS initialized on overlay image.')
+  } else {
+    console.warn('[OverlayPhoto] Cannot init InteractJS: overlay image or video player not ready.')
   }
 }
 
@@ -246,28 +267,49 @@ function setInitialOverlaySizeAndCallInteract() {
     videoElem &&
     overlayImgElem &&
     overlayImgElem.naturalWidth > 0 &&
-    videoElem.clientWidth > 0 &&
-    videoElem.clientHeight > 0
+    videoElem.videoWidth > 0 &&
+    videoElem.videoHeight > 0
   ) {
-    const videoWidth = videoElem.clientWidth
-    const videoHeight = videoElem.clientHeight
+    if (videoElem.readyState < videoElem.HAVE_METADATA) {
+      console.log('[OverlayPhoto] Video metadata not loaded yet for initial size. Waiting.')
+      videoElem.onloadedmetadata = () => {
+        console.log('[OverlayPhoto] Video metadata loaded. Recalculating initial size.')
+        setInitialOverlaySizeAndCallInteract()
+        videoElem.onloadedmetadata = null
+      }
+      return
+    }
+
+    const videoDisplayWidth = videoElem.clientWidth
+    const videoDisplayHeight = videoElem.clientHeight
+
     const initialWidthFactor = 0.6
-    let initialWidth = videoWidth * initialWidthFactor
+    let initialWidth = videoDisplayWidth * initialWidthFactor
     let initialHeight = (overlayImgElem.naturalHeight / overlayImgElem.naturalWidth) * initialWidth
-    if (initialHeight > videoHeight * initialWidthFactor) {
-      initialHeight = videoHeight * initialWidthFactor
+
+    if (initialHeight > videoDisplayHeight * initialWidthFactor) {
+      initialHeight = videoDisplayHeight * initialWidthFactor
       initialWidth = (overlayImgElem.naturalWidth / overlayImgElem.naturalHeight) * initialHeight
     }
-    if (initialWidth > videoWidth * 0.95) initialWidth = videoWidth * 0.95
-    if (initialHeight > videoHeight * 0.95) initialHeight = videoHeight * 0.95
+    if (initialWidth > videoDisplayWidth * 0.95) initialWidth = videoDisplayWidth * 0.95
+    if (initialHeight > videoDisplayHeight * 0.95) initialHeight = videoDisplayHeight * 0.95
+
     overlayImgElem.style.width = `${initialWidth}px`
     overlayImgElem.style.height = `${initialHeight}px`
-    overlayPosition.value.x = (videoWidth - initialWidth) / 2
-    overlayPosition.value.y = (videoHeight - initialHeight) / 2
+    overlayPosition.value.x = (videoDisplayWidth - initialWidth) / 2
+    overlayPosition.value.y = (videoDisplayHeight - initialHeight) / 2
+
+    console.log(
+      `[OverlayPhoto] Initial overlay size set: ${initialWidth}x${initialHeight}. Position: x=${overlayPosition.value.x}, y=${overlayPosition.value.y}`,
+    )
+
     nextTick(() => {
       initInteractOnImage()
     })
   } else if (overlayImageElement.value) {
+    console.warn(
+      '[OverlayPhoto] Video dimensions not ready for precise initial sizing, initializing InteractJS with image defaults.',
+    )
     nextTick(() => {
       initInteractOnImage()
     })
@@ -276,37 +318,37 @@ function setInitialOverlaySizeAndCallInteract() {
 
 async function takePhoto() {
   if (!videoPlayer.value || !cameraStream.value || !overlayDetails.value) {
-    toast.error('Cámara o overlay no listos.')
+    toast.error('Cámara o superposición no están listos.')
     return
   }
   isCapturing.value = true
   const video = videoPlayer.value
   const canvas = document.createElement('canvas')
-  if (
-    video.videoWidth === 0 ||
-    video.videoHeight === 0 ||
-    video.clientWidth === 0 ||
-    video.clientHeight === 0
-  ) {
-    toast.error('Dimensiones de video no válidas.')
+
+  const canvasWidth = video.clientWidth
+  const canvasHeight = video.clientHeight
+
+  if (canvasWidth === 0 || canvasHeight === 0) {
+    toast.error('Dimensiones de visualización de video no válidas.')
     isCapturing.value = false
     return
   }
-  const videoActualWidth = video.videoWidth
-  const videoActualHeight = video.videoHeight
-  const canvasWidth = video.clientWidth
-  const canvasHeight = video.clientHeight
+
   canvas.width = canvasWidth
   canvas.height = canvasHeight
   const ctx = canvas.getContext('2d')
   if (!ctx) {
-    toast.error('Error al preparar canvas.')
+    toast.error('Error al preparar el lienzo de captura.')
     isCapturing.value = false
     return
   }
+
+  const videoActualWidth = video.videoWidth
+  const videoActualHeight = video.videoHeight
   const videoAspectRatio = videoActualWidth / videoActualHeight
   const canvasAspectRatio = canvasWidth / canvasHeight
   let renderWidth, renderHeight, xStart, yStart
+
   if (videoAspectRatio > canvasAspectRatio) {
     renderHeight = canvasHeight
     renderWidth = renderHeight * videoAspectRatio
@@ -319,6 +361,7 @@ async function takePhoto() {
     yStart = (canvasHeight - renderHeight) / 2
   }
   ctx.drawImage(video, xStart, yStart, renderWidth, renderHeight)
+
   if (
     overlayImageElement.value &&
     overlayImageElement.value.complete &&
@@ -343,11 +386,11 @@ async function takePhoto() {
     toast.success('¡Foto guardada!')
   } catch (e) {
     if (e.name === 'SecurityError') {
-      toast.error('Error de seguridad. Revisa CORS.')
+      toast.error('Error de seguridad. Revisa CORS si la imagen de superposición es externa.')
       error.value = 'Error de seguridad (CORS).'
     } else {
-      toast.error('Error al guardar foto.')
-      error.value = 'Error al procesar foto.'
+      toast.error('Error al guardar la foto.')
+      error.value = 'Error al procesar la foto.'
     }
   } finally {
     isCapturing.value = false
@@ -359,11 +402,13 @@ async function takePhoto() {
   <div class="overlay-photo-capture-view">
     <div v-if="loading && !overlayDetails && !error" class="loading-indicator">Cargando...</div>
     <div v-if="error && !loading" class="error-message central-error">{{ error }}</div>
+
     <div v-if="!loading && overlayDetails" class="capture-area">
       <h2 v-if="overlayDetails.image_name" class="view-title-overlay">
         {{ overlayDetails.image_name }}
       </h2>
       <h2 v-else class="view-title-overlay">Captura de Foto Mágica</h2>
+
       <div class="camera-container">
         <video
           ref="videoPlayer"
@@ -487,19 +532,7 @@ async function takePhoto() {
 .camera-error-message {
   margin-top: 10px;
 }
-.overlay-info-header {
-  margin-bottom: 5px;
-  flex-shrink: 0;
-  text-align: center;
-}
-.description-text {
-  font-size: 0.8em;
-  color: #bdbdbd;
-  margin-bottom: 5px;
-  max-height: 2.4em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+
 .camera-container {
   position: relative;
   width: 100%;
@@ -557,6 +590,7 @@ async function takePhoto() {
   color: #bdbdbd;
   cursor: not-allowed;
 }
+
 @media (max-width: 600px) {
   .view-title-overlay {
     font-size: 0.9em;
@@ -566,9 +600,6 @@ async function takePhoto() {
     font-size: 0.9em;
     padding: 8px 18px;
     min-width: 160px;
-  }
-  .description-text {
-    font-size: 0.75em;
   }
   .camera-container {
     min-height: 200px;
