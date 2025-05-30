@@ -59,11 +59,21 @@ async function initializeView() {
   loading.value = false
   console.log('[OverlayPhoto] InitializeView END, loading:', loading.value, 'error:', error.value)
 
+  await nextTick() // Esperar a que el DOM se actualice
+
   if (viewActive.value && !error.value && overlayDetails.value?.r2_key) {
-    console.log(
-      '[OverlayPhoto] InitializeView: Condiciones para startCamera met. Llamando a startCamera.',
-    )
-    await startCamera()
+    if (videoPlayer.value) {
+      console.log(
+        '[OverlayPhoto] InitializeView: videoPlayer ref disponible. Llamando a startCamera.',
+      )
+      await startCamera()
+    } else {
+      console.error(
+        '[OverlayPhoto] InitializeView: videoPlayer ref AÚN ES NULL después de nextTick. No se puede iniciar cámara.',
+      )
+      cameraError.value = 'Error interno: No se pudo acceder al elemento de video.'
+      toast.error(cameraError.value)
+    }
   } else {
     console.log(
       '[OverlayPhoto] InitializeView: Condiciones para startCamera NO met. viewActive:',
@@ -266,17 +276,28 @@ function setInitialOverlaySizeAndCallInteract() {
   if (
     videoElem &&
     overlayImgElem &&
-    overlayImgElem.naturalWidth > 0 &&
-    videoElem.videoWidth > 0 &&
-    videoElem.videoHeight > 0
+    overlayImgElem.naturalWidth > 0
+    // No verificar videoWidth/Height aquí, esperar a loadedmetadata
   ) {
     if (videoElem.readyState < videoElem.HAVE_METADATA) {
       console.log('[OverlayPhoto] Video metadata not loaded yet for initial size. Waiting.')
       videoElem.onloadedmetadata = () => {
         console.log('[OverlayPhoto] Video metadata loaded. Recalculating initial size.')
-        setInitialOverlaySizeAndCallInteract()
+        // Asegurarse de que videoElem.onloadedmetadata no se llame recursivamente si setInitialOverlaySizeAndCallInteract se llama de nuevo
         videoElem.onloadedmetadata = null
+        setInitialOverlaySizeAndCallInteract()
       }
+      return
+    }
+
+    // Ahora que metadata está cargada, videoWidth y videoHeight deberían ser válidos
+    if (videoElem.videoWidth === 0 || videoElem.videoHeight === 0) {
+      console.warn(
+        '[OverlayPhoto] Video dimensions are still zero after loadedmetadata. Cannot set initial overlay size accurately.',
+      )
+      nextTick(() => {
+        initInteractOnImage()
+      }) // Intentar inicializar interact de todas formas
       return
     }
 
@@ -308,7 +329,7 @@ function setInitialOverlaySizeAndCallInteract() {
     })
   } else if (overlayImageElement.value) {
     console.warn(
-      '[OverlayPhoto] Video dimensions not ready for precise initial sizing, initializing InteractJS with image defaults.',
+      '[OverlayPhoto] Video element or image natural dimensions not ready for precise initial sizing, initializing InteractJS with image defaults.',
     )
     nextTick(() => {
       initInteractOnImage()
