@@ -22,6 +22,24 @@ const isCapturing = ref(false)
 const imageUrlToLoad = ref('')
 const viewActive = ref(false)
 
+// Breakpoints
+const isSmallMobile = ref(false)
+const isMobileDevice = ref(false) // Para teléfonos >= 480 y < 768
+const isTablet = ref(false)
+// const isDesktop = computed(() => !isSmallMobile.value && !isMobileDevice.value && !isTablet.value); // No usado directamente aún
+
+function updateDeviceFlags() {
+  if (typeof window !== 'undefined') {
+    const width = window.innerWidth
+    isSmallMobile.value = width < 480
+    isMobileDevice.value = width >= 480 && width < 768
+    isTablet.value = width >= 768 && width < 1200
+    console.log(
+      `[OverlayPhoto DeviceFlags] SmallMobile: ${isSmallMobile.value}, MobileDevice: ${isMobileDevice.value}, Tablet: ${isTablet.value}, Width: ${width}`,
+    )
+  }
+}
+
 function getOverlayFullUrl(r2Key) {
   if (!r2Key) return ''
   if (r2Key.startsWith('http://') || r2Key.startsWith('https://')) {
@@ -48,6 +66,7 @@ watch(
 
 async function initializeView() {
   console.log('[OverlayPhoto] InitializeView START')
+  updateDeviceFlags() // Actualizar flags de dispositivo al inicializar
   loading.value = true
   error.value = ''
   cameraError.value = ''
@@ -59,31 +78,7 @@ async function initializeView() {
   loading.value = false
   console.log('[OverlayPhoto] InitializeView END, loading:', loading.value, 'error:', error.value)
 
-  await nextTick() // Esperar a que el DOM se actualice
-
-  if (viewActive.value && !error.value && overlayDetails.value?.r2_key) {
-    if (videoPlayer.value) {
-      console.log(
-        '[OverlayPhoto] InitializeView: videoPlayer ref disponible. Llamando a startCamera.',
-      )
-      await startCamera()
-    } else {
-      console.error(
-        '[OverlayPhoto] InitializeView: videoPlayer ref AÚN ES NULL después de nextTick. No se puede iniciar cámara.',
-      )
-      cameraError.value = 'Error interno: No se pudo acceder al elemento de video.'
-      toast.error(cameraError.value)
-    }
-  } else {
-    console.log(
-      '[OverlayPhoto] InitializeView: Condiciones para startCamera NO met. viewActive:',
-      viewActive.value,
-      'error:',
-      error.value,
-      'r2_key:',
-      overlayDetails.value?.r2_key,
-    )
-  }
+  // La cámara se iniciará mediante el watcher de videoPlayer
 }
 
 async function fetchOverlayDetails() {
@@ -128,17 +123,25 @@ async function fetchOverlayDetails() {
 }
 
 async function startCamera() {
-  console.log('[OverlayPhoto] Attempting to start camera. Current stream:', cameraStream.value)
+  console.log(
+    '[OverlayPhoto] Attempting to start camera. Current stream:',
+    !!cameraStream.value,
+    'videoPlayer ref:',
+    !!videoPlayer.value,
+  )
   if (cameraStream.value) {
     console.log('[OverlayPhoto] Camera stream already active. Skipping startCamera.')
     return
   }
-  cameraError.value = ''
   if (!videoPlayer.value) {
-    cameraError.value = 'Error interno: Referencia al reproductor de video no encontrada.'
+    // Esta guarda es crucial
+    cameraError.value = 'Error interno: Elemento de video no listo para iniciar cámara.'
     console.error(cameraError.value)
+    // No retornar aquí necesariamente, el watcher podría volver a intentarlo cuando videoPlayer.value esté listo
     return
   }
+  cameraError.value = ''
+
   if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     try {
       console.log('[OverlayPhoto] Requesting user media (camera)...')
@@ -148,26 +151,27 @@ async function startCamera() {
       })
       console.log('[OverlayPhoto] Media stream obtained.')
       cameraStream.value = stream
-      videoPlayer.value.srcObject = stream
-      try {
+      if (videoPlayer.value) {
+        // Doble check
+        videoPlayer.value.srcObject = stream
         await videoPlayer.value.play()
         console.log('[OverlayPhoto] Video player started.')
-      } catch (playError) {
-        cameraError.value = 'No se pudo iniciar video de cámara.'
-        console.error('[OverlayPhoto] Play error:', playError)
+      } else {
+        throw new Error('videoPlayer se volvió nulo antes de asignar srcObject')
       }
     } catch (err) {
-      console.error('[OverlayPhoto] GetUserMedia error:', err.name, err.message)
+      console.error('[OverlayPhoto] GetUserMedia o Play error:', err.name, err.message)
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         cameraError.value = 'Permiso de cámara denegado por el usuario.'
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         cameraError.value = 'No se encontró una cámara compatible.'
-      } else if (err.name === 'NotReadableError') {
+      } else if (err.name === 'NotReadableError' || err.name === 'AbortError') {
         cameraError.value = 'La cámara está en uso o no es accesible.'
       } else {
         cameraError.value = `Error al acceder a la cámara: ${err.name}`
       }
       toast.error(cameraError.value)
+      cleanupCamera() // Limpiar si falla el inicio
     }
   } else {
     cameraError.value = 'La API MediaDevices (cámara) no es soportada por este navegador.'
@@ -175,6 +179,39 @@ async function startCamera() {
     toast.error(cameraError.value)
   }
 }
+
+// Watcher para iniciar la cámara cuando todas las condiciones se cumplen, incluyendo videoPlayer.value
+watch(
+  [
+    videoPlayer,
+    () => loading.value,
+    () => overlayDetails.value,
+    () => viewActive.value,
+    () => error.value,
+    () => cameraError.value,
+  ],
+  async ([videoElm, isLoadingVal, details, isActive, currentError, currentCamError]) => {
+    console.log(
+      `[OverlayPhoto Watch videoPlayer] videoElm: ${!!videoElm}, isLoading: ${isLoadingVal}, details: ${!!details?.r2_key}, isActive: ${isActive}, stream: ${!!cameraStream.value}, error: ${currentError}, camError: ${currentCamError}`,
+    )
+    if (
+      isActive &&
+      !isLoadingVal &&
+      details &&
+      details.r2_key &&
+      videoElm &&
+      !cameraStream.value &&
+      !currentError &&
+      !currentCamError
+    ) {
+      console.log(
+        '[OverlayPhoto Watch videoPlayer] Condiciones para startCamera met. Llamando a startCamera.',
+      )
+      await startCamera()
+    }
+  },
+  { immediate: true, deep: true },
+) // immediate true para el primer intento, deep por overlayDetails
 
 function cleanupCamera() {
   console.log('[OverlayPhoto] Cleanup Camera Called')
@@ -184,7 +221,7 @@ function cleanupCamera() {
     console.log('[OverlayPhoto] Camera stream stopped and nulled')
   }
   if (videoPlayer.value && videoPlayer.value.srcObject) {
-    videoPlayer.value.srcObject = null
+    videoPlayer.value.srcObject = null // Importante para permitir reasignación
     console.log('[OverlayPhoto] Video player srcObject nulled')
   }
 }
@@ -198,9 +235,10 @@ function cleanupInteract() {
 }
 
 onMounted(() => {
-  console.log('[OverlayPhoto] Component Mounted. Initializing view...')
+  console.log('[OverlayPhoto] Component Mounted.')
   viewActive.value = true
   initializeView()
+  window.addEventListener('resize', updateDeviceFlags)
 })
 
 onUnmounted(() => {
@@ -208,12 +246,14 @@ onUnmounted(() => {
   viewActive.value = false
   cleanupCamera()
   cleanupInteract()
+  window.removeEventListener('resize', updateDeviceFlags)
 })
 
 onActivated(() => {
   console.log('[OverlayPhoto] Component Activated. Re-initializing view...')
   viewActive.value = true
   initializeView()
+  window.addEventListener('resize', updateDeviceFlags)
 })
 
 onDeactivated(() => {
@@ -221,6 +261,7 @@ onDeactivated(() => {
   viewActive.value = false
   cleanupCamera()
   cleanupInteract()
+  window.removeEventListener('resize', updateDeviceFlags)
 })
 
 function initInteractOnImage() {
@@ -273,31 +314,27 @@ function initInteractOnImage() {
 function setInitialOverlaySizeAndCallInteract() {
   const videoElem = videoPlayer.value
   const overlayImgElem = overlayImageElement.value
-  if (
-    videoElem &&
-    overlayImgElem &&
-    overlayImgElem.naturalWidth > 0
-    // No verificar videoWidth/Height aquí, esperar a loadedmetadata
-  ) {
-    if (videoElem.readyState < videoElem.HAVE_METADATA) {
-      console.log('[OverlayPhoto] Video metadata not loaded yet for initial size. Waiting.')
-      videoElem.onloadedmetadata = () => {
-        console.log('[OverlayPhoto] Video metadata loaded. Recalculating initial size.')
-        // Asegurarse de que videoElem.onloadedmetadata no se llame recursivamente si setInitialOverlaySizeAndCallInteract se llama de nuevo
-        videoElem.onloadedmetadata = null
+  if (videoElem && overlayImgElem && overlayImgElem.naturalWidth > 0) {
+    if (videoElem.readyState < videoElem.HAVE_METADATA && videoElem.videoWidth === 0) {
+      console.log(
+        '[OverlayPhoto] Video metadata not loaded yet for initial size. Waiting for event.',
+      )
+      const onMetadataLoaded = () => {
+        console.log('[OverlayPhoto] Video metadata loaded via event. Recalculating initial size.')
+        videoElem.removeEventListener('loadedmetadata', onMetadataLoaded)
         setInitialOverlaySizeAndCallInteract()
       }
+      videoElem.addEventListener('loadedmetadata', onMetadataLoaded)
       return
     }
 
-    // Ahora que metadata está cargada, videoWidth y videoHeight deberían ser válidos
     if (videoElem.videoWidth === 0 || videoElem.videoHeight === 0) {
       console.warn(
-        '[OverlayPhoto] Video dimensions are still zero after loadedmetadata. Cannot set initial overlay size accurately.',
+        '[OverlayPhoto] Video dimensions are still zero after check. Cannot set initial overlay size accurately.',
       )
       nextTick(() => {
         initInteractOnImage()
-      }) // Intentar inicializar interact de todas formas
+      })
       return
     }
 
@@ -366,6 +403,13 @@ async function takePhoto() {
 
   const videoActualWidth = video.videoWidth
   const videoActualHeight = video.videoHeight
+
+  if (videoActualWidth === 0 || videoActualHeight === 0) {
+    toast.error('Dimensiones reales del video son cero. No se puede capturar.')
+    isCapturing.value = false
+    return
+  }
+
   const videoAspectRatio = videoActualWidth / videoActualHeight
   const canvasAspectRatio = canvasWidth / canvasHeight
   let renderWidth, renderHeight, xStart, yStart
