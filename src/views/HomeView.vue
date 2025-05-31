@@ -2,7 +2,7 @@
 import { RouterLink } from 'vue-router'
 import { reactive } from 'vue'
 import { useToast } from 'vue-toastification'
-import WeatherZolve from '@/components/WeatherZolve.vue' // IMPORTADO
+import WeatherZolve from '@/components/WeatherZolve.vue'
 
 const toast = useToast()
 const contactForm = reactive({ name: '', email: '', message: '', submitting: false })
@@ -46,13 +46,9 @@ async function handleContactSubmit() {
       <div class="logo-container-home">
         <img src="/Zolve_Logo.png" alt="Logo Zolve" class="logo-home-styled" />
       </div>
-      <div class="cta-buttons">
-        <router-link :to="{ name: 'login' }" class="btn btn-primary"
-          >Iniciar Sesión / Registrarse</router-link
-        >
-        <router-link :to="{ name: 'how-to' }" class="btn btn-secondary">Cómo Usar AR</router-link>
-      </div>
-      <section class="info-section">
+
+      <!-- 1. SECCIÓN: ¿QUÉ ES ESTO? -->
+      <section class="info-section what-is-this-section">
         <h2>¿Qué es esto?</h2>
         <p>
           Es la evolución de los regalos y los recuerdos compartidos. Con Zolve, te permitimos
@@ -63,11 +59,51 @@ async function handleContactSubmit() {
           corazón y crea lazos inolvidables.
         </p>
       </section>
+
+      <!-- 2. BOTONES CTA PRINCIPALES -->
+      <div class="cta-buttons">
+        <router-link :to="{ name: 'login' }" class="btn btn-primary"
+          >Iniciar Sesión / Registrarse</router-link
+        >
+        <router-link :to="{ name: 'how-to' }" class="btn btn-secondary">Cómo Usar AR</router-link>
+      </div>
+
+      <!-- 3. SECCIÓN DE NOTICIAS -->
+      <section class="info-section zolve-news-section">
+        <h2>Noticias de Zolve</h2>
+        <div class="news-image-container">
+          <img src="/ZolveNoticias.webp" alt="Novedades Zolve" class="news-image" />
+        </div>
+        <div class="news-columns-container">
+          <div class="news-column">
+            <h3>¡AR para tus Productos!</h3>
+            <p>
+              Tenemos habilitado nuestro sistema de Realidad Aumentada para tus productos. ¡Dale
+              vida a tus regalos y merchandising de una forma innovadora y sorprendente!
+              <br />
+              ¡Descubrelo ahora! Revisa nuestra sección de cómo usarlo.
+            </p>
+          </div>
+          <div class="news-column">
+            <h3>¡Fotos Mágicas!</h3>
+            <p>
+              Hemos agregado la sección "Fotos Mágicas", una nueva funcionalidad para que te saques
+              una foto divertida con tu SKZOO favorita. Podrás usarla como sticker y darle el tamaño
+              que quieras. ¡Pruébalo!
+            </p>
+          </div>
+        </div>
+      </section>
+      <!-- FIN SECCIÓN DE NOTICIAS -->
+
+      <!-- 4. SECCIÓN: PRÓXIMAMENTE -->
       <section class="info-section">
         <h2>Próximamente</h2>
         <p>Visita nuestra tienda para productos exclusivos y más experiencias AR.</p>
         <router-link :to="{ name: 'store' }" class="btn btn-store">Ir a la Tienda</router-link>
       </section>
+
+      <!-- 5. SECCIÓN: CONTACTO -->
       <section class="info-section contact">
         <h2>¿Tienes una idea o alguna pregunta?</h2>
         <p class="contact-subtitle">¡Nos encantaría escucharte!</p>
@@ -114,7 +150,7 @@ async function handleContactSubmit() {
 <style scoped>
 .home-container {
   max-width: 800px;
-  margin: 0 auto 40px auto; /* Ajustado el margen superior a 0 si WeatherZolve está encima */
+  margin: 0 auto 40px auto;
   padding: 20px;
   text-align: center;
   font-family: var(--font-family-base);
@@ -150,8 +186,16 @@ async function handleContactSubmit() {
   border: 4px solid var(--brand-pink);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
+
+/* Estilo para la sección "¿Qué es esto?" para quitarle el borde superior si está primera */
+.what-is-this-section {
+  border-top: none !important; /* Quitar el borde de info-section */
+  padding-top: 0 !important; /* Quitar padding si no hay borde */
+  margin-top: 30px; /* Ajustar margen superior si es necesario */
+}
+
 .cta-buttons {
-  margin: 30px 0;
+  margin: 40px 0; /* Aumentado margen para separar de la sección "¿Qué es esto?" */
   display: flex;
   justify-content: center;
   gap: 15px;
@@ -167,6 +211,70 @@ async function handleContactSubmit() {
   margin-left: auto;
   margin-right: auto;
 }
+
+.zolve-news-section {
+  background-color: var(--color-background-soft);
+  padding: 40px 20px;
+  border-radius: 12px;
+  margin-top: 40px;
+  margin-bottom: 50px;
+  border-top: 1px solid var(--color-border); /* Devolver el borde aquí o quitar si prefieres continuidad */
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+.zolve-news-section h2 {
+  font-size: 2.2rem;
+  color: var(--brand-orange);
+  margin-bottom: 30px;
+}
+
+.news-image-container {
+  margin-bottom: 35px;
+  text-align: center;
+}
+
+.news-image {
+  max-width: 180px;
+  height: auto;
+  border-radius: 8px;
+}
+
+.news-columns-container {
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.news-column {
+  flex: 1;
+  min-width: 280px;
+  max-width: 350px;
+  padding: 25px;
+  background-color: var(--color-background);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+
+.news-column h3 {
+  font-size: 1.5rem;
+  color: var(--brand-pink);
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.news-column p {
+  font-size: 1rem;
+  line-height: 1.65;
+  margin-bottom: 0;
+  color: var(--color-text-soft, var(--color-text));
+}
+
 .contact {
   background-color: var(--color-background-soft);
   padding: 30px;
@@ -206,6 +314,7 @@ async function handleContactSubmit() {
   background-color: var(--brand-turquoise);
 }
 .btn-secondary:hover {
+  color: var(--vt-c-white);
   background-color: var(--color-link-hover);
 }
 .btn-store {
@@ -264,6 +373,27 @@ async function handleContactSubmit() {
 .btn-contact-submit:disabled {
   background-color: #ccc;
 }
+
+@media (max-width: 767px) {
+  .news-columns-container {
+    flex-direction: column;
+    gap: 25px;
+  }
+  .news-column {
+    max-width: 100%;
+    padding: 20px;
+  }
+  .zolve-news-section h2 {
+    font-size: 1.9rem;
+  }
+  .news-column h3 {
+    font-size: 1.3rem;
+  }
+  .news-column p {
+    font-size: 0.9rem;
+  }
+}
+
 @media (max-width: 820px) {
   .home-container {
     padding: 30px 15px;
@@ -281,8 +411,11 @@ async function handleContactSubmit() {
     text-align: center;
   }
   .home-container h2 {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     text-align: center;
+  }
+  .zolve-news-section h2 {
+    font-size: 1.8rem;
   }
   .home-container p {
     font-size: 1rem;
@@ -299,7 +432,7 @@ async function handleContactSubmit() {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
-    margin: 20px 0;
+    margin: 30px 0; /* Ajustado el margen para que no esté tan pegado */
   }
   .cta-buttons .btn {
     width: 100%;
@@ -309,6 +442,11 @@ async function handleContactSubmit() {
   .info-section {
     margin-top: 30px;
     padding-top: 20px;
+  }
+  .what-is-this-section {
+    /* Asegurar que en móvil también se ajuste bien */
+    margin-top: 20px;
+    padding-top: 0;
   }
   .contact {
     padding: 20px;
@@ -341,7 +479,10 @@ async function handleContactSubmit() {
     font-size: 1.7rem;
   }
   .home-container h2 {
-    font-size: 1.3rem;
+    font-size: 1.4rem;
+  }
+  .zolve-news-section h2 {
+    font-size: 1.6rem;
   }
   .home-container p {
     font-size: 0.9rem;
