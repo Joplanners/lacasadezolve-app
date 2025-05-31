@@ -148,6 +148,10 @@ async function handleContactSubmit() {
 </template>
 
 <style scoped>
+.home-view-wrapper {
+  /* Si WeatherZolve está siempre arriba, podrías querer que este wrapper maneje el scroll general */
+}
+
 .home-container {
   max-width: 800px;
   margin: 0 auto 40px auto;
@@ -187,15 +191,14 @@ async function handleContactSubmit() {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 
-/* Estilo para la sección "¿Qué es esto?" para quitarle el borde superior si está primera */
 .what-is-this-section {
-  border-top: none !important; /* Quitar el borde de info-section */
-  padding-top: 0 !important; /* Quitar padding si no hay borde */
-  margin-top: 30px; /* Ajustar margen superior si es necesario */
+  border-top: none !important;
+  padding-top: 0 !important;
+  margin-top: 30px;
 }
 
 .cta-buttons {
-  margin: 40px 0; /* Aumentado margen para separar de la sección "¿Qué es esto?" */
+  margin: 40px 0;
   display: flex;
   justify-content: center;
   gap: 15px;
@@ -207,6 +210,7 @@ async function handleContactSubmit() {
   border-top: 1px solid var(--color-border);
 }
 .info-section p {
+  /* Párrafos generales de info-section */
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
@@ -218,7 +222,7 @@ async function handleContactSubmit() {
   border-radius: 12px;
   margin-top: 40px;
   margin-bottom: 50px;
-  border-top: 1px solid var(--color-border); /* Devolver el borde aquí o quitar si prefieres continuidad */
+  border-top: 1px solid var(--color-border);
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
 }
 
@@ -374,6 +378,8 @@ async function handleContactSubmit() {
   background-color: #ccc;
 }
 
+/* --- Media Queries para Responsividad --- */
+
 @media (max-width: 767px) {
   .news-columns-container {
     flex-direction: column;
@@ -382,14 +388,14 @@ async function handleContactSubmit() {
   .news-column {
     max-width: 100%;
     padding: 20px;
-  }
-  .zolve-news-section h2 {
-    font-size: 1.9rem;
+    text-align: center; /* Centrar todo el contenido de la columna de noticias */
   }
   .news-column h3 {
+    /* Ya se centra por herencia de .home-container h2 o .news-column si se añade text-align:center arriba */
     font-size: 1.3rem;
   }
   .news-column p {
+    /* Ya se centra por herencia de .news-column si se añade text-align:center arriba */
     font-size: 0.9rem;
   }
 }
@@ -404,7 +410,7 @@ async function handleContactSubmit() {
     width: 95%;
     margin: 20px auto 20px auto;
     padding: 20px 10px;
-    text-align: left;
+    /* text-align: left; No es necesario si queremos centrado por defecto */
   }
   .home-container h1 {
     font-size: 2rem;
@@ -416,11 +422,29 @@ async function handleContactSubmit() {
   }
   .zolve-news-section h2 {
     font-size: 1.8rem;
+    text-align: center; /* Asegurar centrado también para el título de noticias */
+  }
+  /* Centrar párrafos en móvil */
+  .home-container > p, /* Párrafo de bienvenida */
+  .info-section p, 
+  .news-column p,
+  .contact-subtitle {
+    /* También el subtitulo de contacto */
+    text-align: center;
+  }
+  .news-column h3 {
+    /* Centrar también los h3 de las noticias en móvil */
+    text-align: center;
   }
   .home-container p {
+    /* Reset para el tamaño de fuente general de párrafos en home-container */
     font-size: 1rem;
-    text-align: left;
   }
+  .news-column p {
+    /* Tamaño específico para párrafos de noticias en móvil */
+    font-size: 0.95rem; /* Un poco más grande que el anterior 0.9rem */
+  }
+
   .logo-container-home {
     margin-bottom: 25px;
   }
@@ -432,19 +456,19 @@ async function handleContactSubmit() {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
-    margin: 30px 0; /* Ajustado el margen para que no esté tan pegado */
+    margin: 30px 0;
   }
   .cta-buttons .btn {
     width: 100%;
     padding: 14px 20px;
     font-size: 1.1rem;
+    text-align: center;
   }
   .info-section {
     margin-top: 30px;
     padding-top: 20px;
   }
   .what-is-this-section {
-    /* Asegurar que en móvil también se ajuste bien */
     margin-top: 20px;
     padding-top: 0;
   }
@@ -452,16 +476,14 @@ async function handleContactSubmit() {
     padding: 20px;
     margin-top: 30px;
   }
-  .contact-subtitle {
-    font-size: 0.9rem;
-    margin-bottom: 15px;
-    text-align: center;
-  }
+  /* .contact-subtitle ya está cubierto arriba para centrarse */
   .contact-form {
     gap: 15px;
   }
   .form-group-contact label {
+    /* Mantener labels a la izquierda para formularios */
     font-size: 0.95rem;
+    text-align: left;
   }
   .form-group-contact input[type='text'],
   .form-group-contact input[type='email'],
@@ -472,6 +494,7 @@ async function handleContactSubmit() {
   .btn-contact-submit {
     font-size: 1.1rem;
     padding: 14px;
+    text-align: center;
   }
 }
 @media (max-width: 400px) {
@@ -484,9 +507,16 @@ async function handleContactSubmit() {
   .zolve-news-section h2 {
     font-size: 1.6rem;
   }
+  /* Párrafos ya centrados por la regla de 600px si la cascada lo permite */
+  /* Si necesitas ser más específico: */
+  /* .home-container > p, .info-section p, .news-column p { font-size: 0.9rem; text-align: center; } */
   .home-container p {
     font-size: 0.9rem;
-  }
+  } /* Ajuste general si es necesario */
+  .news-column p {
+    font-size: 0.85rem;
+  } /* Aún más específico para noticias si es necesario */
+
   .logo-home-styled {
     width: 100px;
     height: 100px;
