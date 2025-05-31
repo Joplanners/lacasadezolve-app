@@ -25,10 +25,29 @@ const viewActive = ref(false)
 const currentViewMode = ref('capturing')
 const capturedImageDataUrl = ref('')
 
+const currentFacingMode = ref('user') // 'user' (frontal) o 'environment' (trasera)
+const hasMultipleCameras = ref(false)
+
 const isSmallMobile = ref(false)
 const isMobileDevice = ref(false)
 const isTablet = ref(false)
 const isDesktop = ref(false)
+
+async function checkForMultipleCameras() {
+  if (navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === 'function') {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoInputDevices = devices.filter((device) => device.kind === 'videoinput')
+      hasMultipleCameras.value = videoInputDevices.length > 1
+      console.log('[OverlayPhoto] Video input devices found:', videoInputDevices.length)
+    } catch (e) {
+      console.warn('[OverlayPhoto] Could not enumerate devices:', e)
+      hasMultipleCameras.value = false // Asumir que no si hay error
+    }
+  } else {
+    hasMultipleCameras.value = false // API no soportada
+  }
+}
 
 function getOverlayFullUrl(r2Key) {
   if (!r2Key) return ''
@@ -75,6 +94,7 @@ async function initializeView(isReactivating = false) {
 
   cleanupCamera()
   updateDeviceSizeClassifiers()
+  await checkForMultipleCameras()
 
   if (!overlayDetails.value || !isReactivating) {
     await fetchOverlayDetails()
@@ -111,16 +131,7 @@ async function initializeView(isReactivating = false) {
       toast.error(cameraError.value)
     }
   } else {
-    console.log(
-      '[OverlayPhoto] InitializeView: Condiciones para startCamera NO met. viewActive:',
-      viewActive.value,
-      'mode:',
-      currentViewMode.value,
-      'error:',
-      error.value,
-      'r2_key:',
-      overlayDetails.value?.r2_key,
-    )
+    console.log('[OverlayPhoto] InitializeView: Condiciones para startCamera NO met.')
   }
 }
 
@@ -166,10 +177,18 @@ async function fetchOverlayDetails() {
 }
 
 async function startCamera() {
-  console.log('[OverlayPhoto] Attempting to start camera. Current stream:', cameraStream.value)
+  console.log(
+    '[OverlayPhoto] Attempting to start camera. Current stream:',
+    cameraStream.value,
+    'Facing mode:',
+    currentFacingMode.value,
+  )
   if (cameraStream.value) {
-    console.log('[OverlayPhoto] Camera stream already active. Skipping startCamera.')
-    return
+    console.log(
+      '[OverlayPhoto] Camera stream already active. Cleaning up before restart for new facing mode.',
+    )
+    cleanupCamera() // Limpiar stream existente antes de cambiar
+    await nextTick() // Dar tiempo para que se liberen los recursos
   }
   cameraError.value = ''
   if (!videoPlayer.value) {
@@ -179,9 +198,12 @@ async function startCamera() {
   }
   if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     try {
-      console.log('[OverlayPhoto] Requesting user media (camera)...')
+      console.log(
+        '[OverlayPhoto] Requesting user media (camera) with facingMode:',
+        currentFacingMode.value,
+      )
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
+        video: { facingMode: currentFacingMode.value },
         audio: false,
       })
       console.log('[OverlayPhoto] Media stream obtained.')
@@ -199,9 +221,10 @@ async function startCamera() {
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         cameraError.value = 'Permiso de cámara denegado por el usuario.'
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        cameraError.value = 'No se encontró una cámara compatible.'
-      } else if (err.name === 'NotReadableError') {
-        cameraError.value = 'La cámara está en uso o no es accesible.'
+        cameraError.value = 'No se encontró una cámara compatible con el modo seleccionado.'
+      } else if (err.name === 'NotReadableError' || err.name === 'OverconstrainedError') {
+        cameraError.value =
+          'La cámara está en uso, no es accesible o no soporta la configuración solicitada (ej. modo frontal/trasero).'
       } else {
         cameraError.value = `Error al acceder a la cámara: ${err.name}`
       }
@@ -212,6 +235,18 @@ async function startCamera() {
     console.error(cameraError.value)
     toast.error(cameraError.value)
   }
+}
+
+async function switchCamera() {
+  if (!hasMultipleCameras.value) {
+    toast.info('No se detectaron múltiples cámaras en este dispositivo.')
+    return
+  }
+  console.log('[OverlayPhoto] Switching camera...')
+  currentFacingMode.value = currentFacingMode.value === 'user' ? 'environment' : 'user'
+  // Detener la cámara actual y reiniciar con el nuevo facingMode
+  // startCamera se encargará de limpiar el stream anterior.
+  await startCamera()
 }
 
 function cleanupCamera() {
@@ -315,13 +350,7 @@ function initInteractOnImage() {
 function setInitialOverlaySizeAndCallInteract() {
   const videoElem = videoPlayer.value
   const overlayImgElem = overlayImageElement.value
-  if (
-    videoElem &&
-    overlayImgElem &&
-    overlayImgElem.naturalWidth > 0
-    // videoElem.videoWidth > 0 &&  // No depender de videoWidth/Height aquí, puede no estar listo
-    // videoElem.videoHeight > 0
-  ) {
+  if (videoElem && overlayImgElem && overlayImgElem.naturalWidth > 0) {
     if (videoElem.readyState < videoElem.HAVE_METADATA && videoElem.srcObject) {
       console.log('[OverlayPhoto] Video metadata not loaded yet for initial size. Waiting.')
       videoElem.onloadedmetadata = () => {
@@ -339,7 +368,7 @@ function setInitialOverlaySizeAndCallInteract() {
       console.warn(
         '[OverlayPhoto] Video display dimensions are zero. Retrying initial size calc shortly.',
       )
-      setTimeout(setInitialOverlaySizeAndCallInteract, 100) // Reintentar brevemente
+      setTimeout(setInitialOverlaySizeAndCallInteract, 100)
       return
     }
 
@@ -459,11 +488,9 @@ async function retakePhoto() {
   currentViewMode.value = 'capturing'
   capturedImageDataUrl.value = ''
   if (viewActive.value && !error.value && overlayDetails.value?.r2_key) {
-    await nextTick() // Asegurar que el DOM de captura esté listo
+    await nextTick()
     if (videoPlayer.value) {
       await startCamera()
-      // setInitialOverlaySizeAndCallInteract se llamará desde el @loadedmetadata del video
-      // o desde el @load de la imagen.
     } else {
       console.error(
         '[OverlayPhoto] Retake: videoPlayer ref no está disponible después de nextTick.',
@@ -526,20 +553,30 @@ async function retakePhoto() {
         </div>
       </div>
       <div v-if="cameraError" class="error-message camera-error-message">{{ cameraError }}</div>
-      <button
-        @click="takePhotoAndPreview"
-        :disabled="
-          !!cameraError ||
-          !cameraStream ||
-          !overlayDetails ||
-          isCapturing ||
-          !!error ||
-          !imageUrlToLoad
-        "
-        class="btn-capture-action"
-      >
-        {{ isCapturing ? 'Procesando...' : '📸 Tomar Foto' }}
-      </button>
+      <div class="capture-buttons-row">
+        <button
+          @click="takePhotoAndPreview"
+          :disabled="
+            !!cameraError ||
+            !cameraStream ||
+            !overlayDetails ||
+            isCapturing ||
+            !!error ||
+            !imageUrlToLoad
+          "
+          class="btn-capture-action main-action"
+        >
+          {{ isCapturing ? 'Procesando...' : '📸 Tomar Foto' }}
+        </button>
+        <button
+          v-if="hasMultipleCameras && cameraStream"
+          @click="switchCamera"
+          class="btn-capture-action switch-camera"
+          title="Cambiar cámara"
+        >
+          🔄
+        </button>
+      </div>
     </div>
 
     <div v-if="currentViewMode === 'previewing' && capturedImageDataUrl" class="preview-area">
@@ -647,7 +684,7 @@ async function retakePhoto() {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 .video-feed {
   display: block;
@@ -671,24 +708,46 @@ async function retakePhoto() {
   cursor: grabbing;
 }
 
+.capture-buttons-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px; /* Espacio entre botón de captura y switch */
+  margin: 10px auto;
+  flex-shrink: 0;
+}
+
 .btn-capture-action {
-  margin: 15px auto 10px auto;
-  padding: 12px 25px;
+  padding: 12px 20px;
   font-size: 1.1em;
-  background-color: #4caf50;
   color: #fff;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.2s;
-  flex-shrink: 0;
-  display: block;
-  min-width: 200px;
   font-weight: 500;
 }
-.btn-capture-action:hover:not(:disabled) {
+.btn-capture-action.main-action {
+  background-color: #4caf50;
+  min-width: 180px;
+}
+.btn-capture-action.main-action:hover:not(:disabled) {
   background-color: #45a049;
 }
+
+.btn-capture-action.switch-camera {
+  background-color: #007bff; /* Azul para switch */
+  width: 50px; /* Botón más pequeño para switch */
+  height: 50px;
+  padding: 0;
+  font-size: 1.5em; /* Icono más grande */
+  line-height: 50px; /* Centrar icono */
+  text-align: center;
+}
+.btn-capture-action.switch-camera:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
 .btn-capture-action:disabled {
   background-color: #757575;
   color: #bdbdbd;
@@ -743,7 +802,15 @@ async function retakePhoto() {
   .btn-capture-action {
     font-size: 1em;
     padding: 10px 20px;
-    min-width: 180px;
+  }
+  .btn-capture-action.main-action {
+    min-width: 160px;
+  }
+  .btn-capture-action.switch-camera {
+    width: 45px;
+    height: 45px;
+    font-size: 1.3em;
+    line-height: 45px;
   }
   .camera-container {
     min-height: 250px;
