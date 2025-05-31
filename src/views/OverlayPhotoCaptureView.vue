@@ -25,7 +25,7 @@ const viewActive = ref(false)
 const currentViewMode = ref('capturing')
 const capturedImageDataUrl = ref('')
 
-const currentFacingMode = ref('user') // 'user' (frontal) o 'environment' (trasera)
+const currentFacingMode = ref('user')
 const hasMultipleCameras = ref(false)
 
 const isSmallMobile = ref(false)
@@ -42,10 +42,11 @@ async function checkForMultipleCameras() {
       console.log('[OverlayPhoto] Video input devices found:', videoInputDevices.length)
     } catch (e) {
       console.warn('[OverlayPhoto] Could not enumerate devices:', e)
-      hasMultipleCameras.value = false // Asumir que no si hay error
+      hasMultipleCameras.value = false
     }
   } else {
-    hasMultipleCameras.value = false // API no soportada
+    console.warn('[OverlayPhoto] enumerateDevices API not supported.')
+    hasMultipleCameras.value = false
   }
 }
 
@@ -187,8 +188,8 @@ async function startCamera() {
     console.log(
       '[OverlayPhoto] Camera stream already active. Cleaning up before restart for new facing mode.',
     )
-    cleanupCamera() // Limpiar stream existente antes de cambiar
-    await nextTick() // Dar tiempo para que se liberen los recursos
+    cleanupCamera()
+    await nextTick()
   }
   cameraError.value = ''
   if (!videoPlayer.value) {
@@ -244,8 +245,6 @@ async function switchCamera() {
   }
   console.log('[OverlayPhoto] Switching camera...')
   currentFacingMode.value = currentFacingMode.value === 'user' ? 'environment' : 'user'
-  // Detener la cámara actual y reiniciar con el nuevo facingMode
-  // startCamera se encargará de limpiar el stream anterior.
   await startCamera()
 }
 
@@ -685,6 +684,7 @@ async function retakePhoto() {
   justify-content: center;
   align-items: center;
   margin-bottom: 10px;
+  touch-action: none; /* Añadido aquí */
 }
 .video-feed {
   display: block;
@@ -712,7 +712,7 @@ async function retakePhoto() {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 15px; /* Espacio entre botón de captura y switch */
+  gap: 15px;
   margin: 10px auto;
   flex-shrink: 0;
 }
@@ -736,12 +736,12 @@ async function retakePhoto() {
 }
 
 .btn-capture-action.switch-camera {
-  background-color: #007bff; /* Azul para switch */
-  width: 50px; /* Botón más pequeño para switch */
+  background-color: #007bff;
+  width: 50px;
   height: 50px;
   padding: 0;
-  font-size: 1.5em; /* Icono más grande */
-  line-height: 50px; /* Centrar icono */
+  font-size: 1.5em;
+  line-height: 50px;
   text-align: center;
 }
 .btn-capture-action.switch-camera:hover:not(:disabled) {
