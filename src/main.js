@@ -40,8 +40,22 @@ app.mount('#app')
 
 const authStore = useAuthStore(pinia)
 
+// --- LÓGICA DE CIERRE DE SESIÓN MEJORADA ---
+
+// Esta bandera nos dirá si el usuario se ha ido de la pestaña en algún momento.
+let wasEverHidden = false
+
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
+  // Si el usuario se va (cambia de pestaña/app), simplemente levantamos la bandera.
+  if (document.visibilityState === 'hidden') {
+    wasEverHidden = true
+    return // No hacemos nada más por ahora.
+  }
+
+  // Este código solo se ejecuta cuando la pestaña se vuelve VISIBLE.
+  // Y crucialmente, solo actuamos si la bandera `wasEverHidden` es verdadera.
+  if (document.visibilityState === 'visible' && wasEverHidden) {
+    // Si al volver, el usuario estaba logueado, cerramos la sesión.
     if (authStore.isLoggedIn) {
       authStore.signOut()
     }
