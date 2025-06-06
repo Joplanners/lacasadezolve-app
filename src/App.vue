@@ -28,11 +28,10 @@ const appHeaderActualHeight = ref(0)
 const userDisplayName = computed(() => {
   if (user.value?.email) {
     const emailParts = user.value.email.split('@')
-    // Capitalizar la primera letra del nombre de usuario del email
     const namePart = emailParts[0]
     return namePart.charAt(0).toUpperCase() + namePart.slice(1)
   }
-  return 'Zolve' // Fallback si no hay email (raro si está logueado)
+  return 'Zolve'
 })
 
 const calculateNavbarHeights = () => {
@@ -55,7 +54,6 @@ const calculateNavbarHeights = () => {
   navbarCombinedHeight.value = totalCombinedH
   appHeaderActualHeight.value = currentHeaderH
   if (currentHeaderH >= 0 && showNavbar.value) {
-    // Permitir 0 si el header está oculto pero el navbar debe mostrarse
     document.documentElement.style.setProperty('--app-header-actual-height', `${currentHeaderH}px`)
   }
 }
@@ -82,10 +80,7 @@ const showNavbar = computed(() => {
 })
 
 const showFooter = computed(() => {
-  if (isARExperienceActive.value || isOverlayPhotoCaptureActive.value) {
-    return false
-  }
-  return true
+  return !isARExperienceActive.value && !isOverlayPhotoCaptureActive.value
 })
 
 const showZolveBot = computed(() => {
@@ -370,15 +365,11 @@ const handleLogout = async () => {
     await authStore.signOut()
     router.push({ name: 'home' })
   } catch (error) {
-    /* Silenciado */
+    window.location.assign('/')
   }
 }
-function cookieStatus(status) {
-  /* Lógica */
-}
-function cookieRemoved() {
-  /* Lógica */
-}
+function cookieStatus(status) {}
+function cookieRemoved() {}
 
 const mainContentPaddingTop = computed(() => {
   if ((isOverlayPhotoCaptureActive.value || isARExperienceActive.value) && showNavbar.value) {
