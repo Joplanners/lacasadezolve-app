@@ -7,7 +7,6 @@ export const useAuthStore = defineStore('auth', () => {
   const session = ref(null)
   const userRole = ref(null)
   const isPasswordRecoveryMode = ref(false)
-  const isCheckingSession = ref(false)
 
   let resolveAuthReady
   const authReadyPromise = new Promise((resolve) => {
@@ -29,9 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
         .select('role')
         .eq('id', userId)
         .single()
-      if (error && status !== 406) {
-        throw error
-      }
+      if (error && status !== 406) throw error
       userRole.value = data?.role || 'user'
     } catch (catchError) {
       console.error('AuthStore - fetchUserRole: Error:', catchError)
@@ -39,86 +36,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function setSession(newSession) {
-    const oldUserId = session.value?.user?.id
+  supabase.auth.onAuthStateChange(async (event, newSession) => {
     session.value = newSession
-    if (newSession?.user) {
-      if (newSession.user.id !== oldUserId || !userRole.value) {
-        await fetchUserRole(newSession.user.id)
-      }
+
+    if (newSession) {
+      // Si hay sesión, siempre nos aseguramos de tener el rol
+      await fetchUserRole(newSession.user.id)
     } else {
+      // Si no hay sesión, limpiamos el rol
       userRole.value = null
     }
-  }
 
-  function clearSession() {
-    session.value = null
-    userRole.value = null
-    isPasswordRecoveryMode.value = false
-    if (!authHasInitialized && resolveAuthReady) {
+    // Lógica para modo recuperación de contraseña
+    if (event === 'PASSWORD_RECOVERY') {
+      isPasswordRecoveryMode.value = true
+      // No redirigimos desde aquí para evitar conflictos con el router guard
+    } else if (event !== 'USER_UPDATED') {
+      // Cualquier otro evento que no sea solo una actualización de usuario
+      // desactiva el modo de recuperación.
+      isPasswordRecoveryMode.value = false
+    }
+
+    // Resolvemos la promesa de "autenticación lista" la primera vez que se ejecuta esto.
+    // Esto es crucial para que el router sepa cuándo puede empezar a navegar.
+    if (!authHasInitialized) {
       resolveAuthReady()
       authHasInitialized = true
-    }
-  }
-
-  async function checkSessionOnLoad() {
-    if (isCheckingSession.value) {
-      return
-    }
-    isCheckingSession.value = true
-    try {
-      const { data, error } = await supabase.auth.getSession()
-      if (error) throw error
-      await setSession(data.session)
-    } catch (error) {
-      console.error('AuthStore: Error en checkSessionOnLoad catch:', error)
-      clearSession()
-    } finally {
-      isCheckingSession.value = false
-      if (!authHasInitialized && resolveAuthReady) {
-        resolveAuthReady()
-        authHasInitialized = true
-      }
-    }
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
-
-  supabase.auth.onAuthStateChange(async (event, newSession) => {
-    if (event === 'PASSWORD_RECOVERY') {
-      clearSession()
-      isPasswordRecoveryMode.value = true
-      router.push({ name: 'update-password' })
-      return
-    }
-    if (event === 'USER_UPDATED') {
-      isPasswordRecoveryMode.value = false
-      return
-    }
-    if (event === 'SIGNED_OUT') {
-      clearSession()
-      if (router.currentRoute.value.meta.requiresAuth) {
-        router.push({ name: 'login' })
-      }
-      return
-    }
-    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-      isPasswordRecoveryMode.value = false
-      await setSession(newSession)
-      if (!authHasInitialized && resolveAuthReady) {
-        resolveAuthReady()
-        authHasInitialized = true
-      }
-      const isLoginPage = router.currentRoute.value.name === 'login'
-      if (event === 'SIGNED_IN' && isLoginPage) {
-        if (userRole.value === 'admin') {
-          router.push({ name: 'admin-dashboard' })
-        } else {
-          router.push({ name: 'profile' })
-        }
-      }
     }
   })
 
@@ -126,7 +69,10 @@ export const useAuthStore = defineStore('auth', () => {
     return authReadyPromise
   }
 
-  checkSessionOnLoad()
+  async function signOut() {
+    await supabase.auth.signOut()
+    // onAuthStateChange se encargará de limpiar el estado y el router de redirigir
+  }
 
   return {
     session,
@@ -135,7 +81,6 @@ export const useAuthStore = defineStore('auth', () => {
     userRole: readonly(userRole),
     isPasswordRecoveryMode: readonly(isPasswordRecoveryMode),
     waitForAuthReady,
-    checkSessionOnLoad,
     signOut,
   }
 })
