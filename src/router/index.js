@@ -147,32 +147,59 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
-
-  await authStore.waitForAuthReady()
-
+  try {
+    await authStore.authReadyPromise
+  } catch (error) {
+    //
+  }
   const isLoggedIn = authStore.isLoggedIn
   const userRole = authStore.userRole
+  const isRecovery = authStore.isPasswordRecoveryMode
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
+  const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin)
 
   if (to.name === 'update-password') {
-    return next()
+    next()
+    return
   }
 
-  if (isLoggedIn) {
-    if (to.name === 'login') {
-      return next({ name: userRole === 'admin' ? 'admin-dashboard' : 'profile' })
+  if (!isLoggedIn) {
+    if (requiresAuth || requiresAdmin) {
+      next({ name: 'login', query: { redirect: to.fullPath } })
+    } else {
+      next()
     }
-    const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin)
-    if (requiresAdmin && userRole !== 'admin') {
-      return next({ name: 'profile' })
-    }
-    return next()
-  } else {
-    if (requiresAuth) {
-      return next({ name: 'login', query: { redirect: to.fullPath } })
-    }
-    return next()
+    return
   }
+
+  if (requiresAdmin) {
+    if (userRole === 'admin') {
+      next()
+    } else {
+      next({ name: 'profile' })
+    }
+    return
+  }
+
+  if (to.name === 'login') {
+    if (!isRecovery) {
+      if (userRole === 'admin') {
+        next({ name: 'admin-dashboard' })
+      } else {
+        next({ name: 'profile' })
+      }
+    } else {
+      next()
+    }
+    return
+  }
+
+  if (to.name === 'update-password' && !isRecovery) {
+    if (userRole === 'admin') next({ name: 'admin-dashboard' })
+    else next({ name: 'profile' })
+    return
+  }
+  next()
 })
 
 export default router
