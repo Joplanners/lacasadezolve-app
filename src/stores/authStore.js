@@ -99,10 +99,15 @@ export const useAuthStore = defineStore('auth', () => {
       )
       return
     }
+
     if (event === 'SIGNED_OUT') {
       clearSession()
+      // ¡AQUÍ ESTÁ LA MAGIA!
+      // Después de limpiar la sesión, redirigimos explícitamente al login.
+      router.push({ name: 'login' })
       return
     }
+
     if (_isPasswordRecoveryMode.value) {
       if (event === 'SIGNED_IN' && newSession?.user) {
         _isPasswordRecoveryMode.value = false
