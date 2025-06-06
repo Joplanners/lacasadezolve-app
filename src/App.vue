@@ -13,6 +13,42 @@ const route = useRoute()
 
 const { isLoggedIn, user, isPasswordRecoveryMode, userRole } = storeToRefs(authStore)
 
+// --- LÓGICA DE CIERRE DE SESIÓN AL VOLVER A LA APP ---
+// La ponemos aquí porque App.vue es el corazón de la app y siempre está "vivo".
+
+onMounted(() => {
+  // Esta bandera solo existirá mientras el componente App esté montado.
+  // Nos ayuda a saber si el usuario se ha ido de la pestaña ALGUNA VEZ.
+  let wasEverHidden = false
+
+  const handleVisibilityChange = () => {
+    // Si la pestaña se oculta (cambio de app, etc.), levantamos la bandera.
+    if (document.visibilityState === 'hidden') {
+      wasEverHidden = true
+      return // No hacemos nada más.
+    }
+
+    // Si la pestaña se vuelve visible Y la bandera nos dice que el usuario
+    // ya se había ido antes, entonces actuamos.
+    if (document.visibilityState === 'visible' && wasEverHidden) {
+      // Si al volver, el usuario estaba logueado, cerramos la sesión.
+      if (authStore.isLoggedIn) {
+        authStore.signOut()
+      }
+    }
+  }
+
+  // Añadimos el listener cuando el componente se monta.
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+
+  // Es buena práctica limpiar el listener cuando el componente se destruye.
+  onUnmounted(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+  })
+})
+
+// --- El resto de tu código de App.vue se mantiene igual ---
+
 const isMobileMenuOpen = ref(false)
 const isMobileView = ref(window.innerWidth < 768)
 const isLandscape = ref(false)
@@ -271,6 +307,8 @@ const handleResizeAndOrientation = () => {
   nextTick(calculateNavbarHeights)
 }
 
+// Se borra el onMounted que tenías, porque la lógica se integra en el nuevo
+// que hemos añadido al principio para la visibilidad.
 onMounted(() => {
   handleResizeAndOrientation()
   window.addEventListener('resize', handleResizeAndOrientation)
