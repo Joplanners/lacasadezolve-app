@@ -6,7 +6,6 @@ import AdminLayout from '../layouts/AdminLayout.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // ... Tu lista de rutas no cambia, la pego aquí para que quede completo ...
     {
       path: '/',
       name: 'home',
@@ -23,7 +22,7 @@ const router = createRouter({
       path: '/actualizar-contrasena',
       name: 'update-password',
       component: () => import('../views/UpdatePasswordView.vue'),
-      meta: { requiresAuth: false, requiresPasswordRecovery: true }, // --> NUEVO: Meta para proteger esta ruta
+      meta: { requiresAuth: false }, // Se manejará con la lógica del store
     },
     {
       path: '/como-usar-ar',
@@ -85,63 +84,104 @@ const router = createRouter({
           name: 'admin-dashboard',
           component: () => import('../views/Admin/AdminDashboardView.vue'),
         },
-        // ... El resto de tus rutas de admin ...
+        {
+          path: 'usuarios',
+          name: 'admin-users',
+          component: () => import('../views/Admin/AdminUserListView.vue'),
+        },
+        {
+          path: 'marcadores',
+          name: 'admin-markers',
+          component: () => import('../views/Admin/AdminMarkersListView.vue'),
+        },
+        {
+          path: 'marcadores/nuevo',
+          name: 'admin-marker-new',
+          component: () => import('../views/Admin/AdminMarkerFormView.vue'),
+          props: { isEditMode: false },
+        },
+        {
+          path: 'marcadores/editar/:id',
+          name: 'admin-marker-edit',
+          component: () => import('../views/Admin/AdminMarkerFormView.vue'),
+          props: { isEditMode: true },
+        },
+        {
+          path: 'contenidos',
+          name: 'admin-contents',
+          component: () => import('../views/Admin/AdminContentsListView.vue'),
+        },
+        {
+          path: 'contenidos/nuevo',
+          name: 'admin-content-new',
+          component: () => import('../views/Admin/AdminContentFormView.vue'),
+          props: { isEditMode: false },
+        },
+        {
+          path: 'contenidos/editar/:id',
+          name: 'admin-content-edit',
+          component: () => import('../views/Admin/AdminContentFormView.vue'),
+          props: { isEditMode: true },
+        },
+        {
+          path: 'superposiciones',
+          name: 'admin-overlay-images',
+          component: () => import('../views/Admin/AdminOverlayImageListView.vue'),
+        },
+        {
+          path: 'superposiciones/nueva',
+          name: 'admin-overlay-image-new',
+          component: () => import('../views/Admin/AdminOverlayImageFormView.vue'),
+          props: { isEditMode: false },
+        },
+        {
+          path: 'superposiciones/editar/:id',
+          name: 'admin-overlay-image-edit',
+          component: () => import('../views/Admin/AdminOverlayImageFormView.vue'),
+          props: { isEditMode: true },
+        },
       ],
     },
   ],
 })
 
-// --- ¡AQUÍ ESTÁ LA NUEVA GUARDIA DE NAVEGACIÓN! ---
+// Guardia de Navegación Global
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // --> PASO 1: Esperar a que la autenticación se haya inicializado.
-  // Reemplaza la promesa manual por un chequeo robusto de la bandera `authInitialized`.
-  if (!authStore.authInitialized) {
-    await new Promise((resolve) => {
-      const unsubscribe = authStore.$subscribe((mutation, state) => {
-        if (state.authInitialized) {
-          unsubscribe()
-          resolve()
-        }
-      })
-    })
-  }
+  // Esperamos a que la promesa 'authReady' se resuelva. Esto asegura que
+  // el primer chequeo de onAuthStateChange de Supabase se ha completado.
+  await authStore.authReadyPromise
 
-  // --> PASO 2: Obtenemos el estado ACTUAL y las reglas de la ruta a la que vamos.
+  // Obtenemos el estado de autenticación DESPUÉS de que la promesa se resolvió.
   const isLoggedIn = authStore.isLoggedIn
-  const isAdmin = authStore.userRole === 'admin'
-  const isRecoveryMode = authStore.isPasswordRecoveryMode
+  const userRole = authStore.userRole
 
+  // Obtenemos los requisitos de la ruta a la que se intenta navegar.
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
   const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin)
-  const requiresPasswordRecovery = to.matched.some((record) => record.meta.requiresPasswordRecovery)
 
-  // --> PASO 3: Aplicamos las reglas de forma clara y ordenada.
-
-  // Regla para la página de actualizar contraseña
-  if (requiresPasswordRecovery && !isRecoveryMode) {
-    return next({ name: 'home' }) // Si no estás en modo recuperación, no puedes entrar aquí
+  // REGLA 1: Si la ruta requiere ser admin y el usuario no lo es...
+  if (requiresAdmin && userRole !== 'admin') {
+    // Lo redirigimos a su perfil. No tiene permiso.
+    return next({ name: 'profile' })
   }
 
-  // Si intentas ir al login, pero ya estás logueado...
-  if (to.name === 'login' && isLoggedIn) {
-    if (isAdmin) return next({ name: 'admin-dashboard' }) // ... el admin va a su dashboard
-    return next({ name: 'profile' }) // ... el usuario normal a su perfil
-  }
-
-  // Si la ruta requiere que seas admin y no lo eres...
-  if (requiresAdmin && !isAdmin) {
-    return next({ name: 'profile' }) // ... te mandamos a tu perfil (o a una página de no autorizado)
-  }
-
-  // Si la ruta requiere autenticación y no estás logueado...
+  // REGLA 2: Si la ruta requiere estar logueado y el usuario no lo está...
   if (requiresAuth && !isLoggedIn) {
-    return next({ name: 'login', query: { redirect: to.fullPath } }) // ... te mandamos al login
+    // Lo redirigimos a la página de login.
+    return next({ name: 'login', query: { redirect: to.fullPath } })
   }
 
-  // Si ninguna de las reglas anteriores te bloqueó, puedes pasar.
-  return next()
+  // REGLA 3: Si el usuario intenta ir a la página de login pero ya está logueado...
+  if (to.name === 'login' && isLoggedIn) {
+    // Lo redirigimos a la página apropiada según su rol.
+    if (userRole === 'admin') return next({ name: 'admin-dashboard' })
+    return next({ name: 'profile' })
+  }
+
+  // Si ninguna de las reglas anteriores detuvo la navegación, permitimos el paso.
+  next()
 })
 
 export default router
