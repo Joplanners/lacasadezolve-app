@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue' // --> Añadimos watch
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthStore } from '@/stores/authStore'
-import { RouterLink, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 
 const authStore = useAuthStore()
@@ -34,41 +34,106 @@ const errorOverlays = ref('')
 
 const R2_PUBLIC_BASE_URL = 'https://pub-48e6b80b718c43a99a9b98163de9920c.r2.dev'
 
+// --- FUNCIONES DE CARGA DE DATOS ---
+// Convertimos las funciones de carga en funciones reutilizables
+
+async function fetchFullProfile(userId) {
+  loadingProfile.value = true
+  errorProfile.value = ''
+  profileData.value = null
+  try {
+    const { data: userData } = await supabase.auth.getUser()
+    if (!userData?.user) throw new Error('No se pudo obtener el usuario de Supabase.')
+    const baseData = { email: userData.user.email, id: userData.user.id }
+
+    const { data: profileDetails, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle()
+    if (error) throw error
+
+    profileData.value = { ...baseData, ...profileDetails }
+  } catch (error) {
+    errorProfile.value = 'Error al cargar el perfil.'
+  } finally {
+    loadingProfile.value = false
+  }
+}
+
+async function fetchUserVisibleMarkers(userId) {
+  loadingMarkers.value = true
+  errorMarkers.value = ''
+  userMarkers.value = []
+  try {
+    const { data, error } = await supabase
+      .from('markers')
+      .select(`id, name, mind_file_name`)
+      .or(`is_public.eq.true,and(is_public.eq.false,user_id.eq.${userId})`)
+      .order('name', { ascending: true })
+    if (error) throw error
+    userMarkers.value = (data || []).filter((marker) => marker.mind_file_name)
+  } catch (error) {
+    errorMarkers.value = 'Error al cargar los marcadores disponibles.'
+  } finally {
+    loadingMarkers.value = false
+  }
+}
+
+async function fetchAvailableOverlays(userId) {
+  loadingOverlays.value = true
+  errorOverlays.value = ''
+  try {
+    const { data, error } = await supabase.rpc(
+      'get_available_overlay_images_for_user_or_admin_view',
+      { p_user_id: userId },
+    )
+    if (error) throw error
+    availableOverlays.value = data || []
+  } catch (err) {
+    errorOverlays.value = err.message || 'Error al cargar fotos mágicas disponibles.'
+  } finally {
+    loadingOverlays.value = false
+  }
+}
+
+// --> ¡LA CLAVE ESTÁ AQUÍ! Reemplazamos onMounted con un watcher.
+// Este observador se dispara en cuanto el 'user' del store está disponible.
+watch(
+  () => authStore.user,
+  (currentUser) => {
+    // Si hay un usuario (no es null)...
+    if (currentUser && currentUser.id) {
+      // ...llamamos a todas las funciones para cargar sus datos.
+      console.log('Usuario detectado en ProfileView, cargando datos...')
+      fetchFullProfile(currentUser.id)
+      fetchUserVisibleMarkers(currentUser.id)
+      fetchAvailableOverlays(currentUser.id)
+    } else {
+      // Si el usuario se vuelve null (cierra sesión), limpiamos los datos y mostramos errores.
+      console.log('Usuario no detectado o cerró sesión en ProfileView.')
+      profileData.value = null
+      userMarkers.value = []
+      availableOverlays.value = []
+      errorProfile.value = 'Debes iniciar sesión para ver tu perfil.'
+      errorMarkers.value = 'Debes iniciar sesión para ver tus experiencias AR.'
+      errorOverlays.value = 'Debes iniciar sesión para ver las fotos mágicas.'
+      loadingProfile.value = false
+      loadingMarkers.value = false
+      loadingOverlays.value = false
+    }
+  },
+  { immediate: true }, // Se ejecuta inmediatamente al cargar el componente
+)
+
+// --- El resto de tus funciones de componente se quedan igual ---
+
 function getOverlayImageUrl(r2Key) {
   if (!r2Key) return ''
   if (r2Key.startsWith('http://') || r2Key.startsWith('https://')) {
     return r2Key
   }
   return `${R2_PUBLIC_BASE_URL}/${r2Key}`
-}
-
-async function fetchFullProfile() {
-  loadingProfile.value = true
-  errorProfile.value = ''
-  profileData.value = null
-  if (!authStore.user?.id) {
-    errorProfile.value = 'No se pudo obtener la información del usuario.'
-    loadingProfile.value = false
-    return
-  }
-  try {
-    const baseData = { email: authStore.user.email, id: authStore.user.id }
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authStore.user.id)
-      .maybeSingle()
-    if (error) throw error
-    if (data) {
-      profileData.value = { ...baseData, ...data }
-    } else {
-      profileData.value = baseData
-    }
-  } catch (error) {
-    errorProfile.value = 'Error al cargar el perfil.'
-  } finally {
-    loadingProfile.value = false
-  }
 }
 
 function startEditing() {
@@ -116,57 +181,6 @@ async function saveProfile() {
   }
 }
 
-async function fetchUserVisibleMarkers() {
-  loadingMarkers.value = true
-  errorMarkers.value = ''
-  userMarkers.value = []
-  const userId = authStore.user?.id
-  if (!userId) {
-    errorMarkers.value = 'No se pudo identificar al usuario para buscar marcadores.'
-    loadingMarkers.value = false
-    return
-  }
-  try {
-    const { data, error } = await supabase
-      .from('markers')
-      .select(`id, name, mind_file_name`)
-      .or(`is_public.eq.true,and(is_public.eq.false,user_id.eq.${userId})`)
-      .order('name', { ascending: true })
-    if (error) throw error
-    userMarkers.value = (data || []).filter((marker) => marker.mind_file_name)
-  } catch (error) {
-    errorMarkers.value = 'Error al cargar los marcadores disponibles.'
-    toast.error(errorMarkers.value)
-  } finally {
-    loadingMarkers.value = false
-  }
-}
-
-async function fetchAvailableOverlays() {
-  if (!authStore.user || !authStore.user.id) {
-    errorOverlays.value = 'Usuario no autenticado.'
-    loadingOverlays.value = false
-    return
-  }
-  loadingOverlays.value = true
-  errorOverlays.value = ''
-  try {
-    const { data, error } = await supabase.rpc(
-      'get_available_overlay_images_for_user_or_admin_view',
-      {
-        p_user_id: authStore.user.id,
-      },
-    )
-    if (error) throw error
-    availableOverlays.value = data || []
-  } catch (err) {
-    errorOverlays.value = err.message || 'Error al cargar fotos mágicas disponibles.'
-    toast.error(errorOverlays.value)
-  } finally {
-    loadingOverlays.value = false
-  }
-}
-
 function startArExperience(experienceId) {
   router.push({ name: 'ar-experience', params: { markerId: experienceId } })
 }
@@ -174,33 +188,6 @@ function startArExperience(experienceId) {
 function startOverlayPhotoCapture(overlay) {
   router.push({ name: 'overlay-photo-capture', params: { overlayId: overlay.id } })
 }
-
-onMounted(() => {
-  authStore
-    .waitForAuthReady()
-    .then(() => {
-      if (authStore.isLoggedIn && authStore.user) {
-        fetchFullProfile()
-        fetchUserVisibleMarkers()
-        fetchAvailableOverlays()
-      } else {
-        errorProfile.value = 'Debes iniciar sesión para ver tu perfil.'
-        errorMarkers.value = 'Debes iniciar sesión para ver tus experiencias AR.'
-        errorOverlays.value = 'Debes iniciar sesión para ver las fotos mágicas.'
-        loadingProfile.value = false
-        loadingMarkers.value = false
-        loadingOverlays.value = false
-      }
-    })
-    .catch((err) => {
-      errorProfile.value = 'Error de autenticación.'
-      errorMarkers.value = 'Error de autenticación.'
-      errorOverlays.value = 'Error de autenticación.'
-      loadingProfile.value = false
-      loadingMarkers.value = false
-      loadingOverlays.value = false
-    })
-})
 
 const userDisplayName = computed(() => {
   if (profileData.value?.first_name) {
@@ -214,6 +201,7 @@ const userDisplayName = computed(() => {
 </script>
 
 <template>
+  <!-- Tu sección de template se queda exactamente igual, no necesita cambios -->
   <div class="profile-view">
     <div v-if="!isEditing">
       <h2>Perfil de {{ userDisplayName }}</h2>
@@ -367,6 +355,7 @@ const userDisplayName = computed(() => {
 </template>
 
 <style scoped>
+/* Tu sección de <style> se queda exactamente igual */
 .profile-view {
   max-width: 700px;
   margin: 30px auto;

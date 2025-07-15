@@ -1,7 +1,13 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { supabase } from '@/lib/supabaseClient.js'
 import PasswordInput from '@/components/PasswordInput.vue'
+import { useAuthStore } from '@/stores/authStore'
+import { useRouter } from 'vue-router'
+
+// Obtenemos acceso al store y al router
+const authStore = useAuthStore()
+const router = useRouter()
 
 const email = ref('')
 const password = ref('')
@@ -15,6 +21,26 @@ const forgotPasswordEmail = ref('')
 const forgotPasswordLoading = ref(false)
 const forgotPasswordMessage = ref('')
 const forgotPasswordErrorMsg = ref('')
+
+// "Observador" que reacciona a los cambios en el estado de login.
+watch(
+  () => authStore.isLoggedIn,
+  (newValue) => {
+    // Si el nuevo valor de isLoggedIn es 'true'...
+    if (newValue) {
+      console.log('Usuario logueado en AuthView, redirigiendo...')
+      // ...lo redirigimos a la página correcta según su rol.
+      if (authStore.userRole === 'admin') {
+        router.push({ name: 'admin-dashboard' })
+      } else {
+        router.push({ name: 'profile' })
+      }
+    }
+  },
+  // { immediate: true } intenta ejecutar el watcher al cargar el componente,
+  // por si el usuario ya estaba logueado y llegó a esta página por error.
+  { immediate: true },
+)
 
 const clearAllMessages = () => {
   message.value = ''
@@ -34,11 +60,12 @@ const handleLogin = async () => {
   clearAllMessages()
   loading.value = true
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.value,
       password: password.value,
     })
     if (error) throw error
+    // La redirección ahora es manejada por el watcher
   } catch (error) {
     console.error('AuthView: Error en inicio de sesión:', error.message)
     errorMsg.value = `Error al iniciar sesión: ${error.message}`
@@ -169,12 +196,9 @@ const switchToLoginRegister = () => {
     <div v-else>
       <h1>{{ isRegistering ? 'Crear Cuenta Nueva' : 'Bienvenido a Zolve' }}</h1>
 
-      <!-- ***** IMAGEN DEL ZORRITO ***** -->
       <div class="logo-image-container">
-        <!-- CAMBIA 'logo-zolve.png' AL NOMBRE DE TU IMAGEN EN LA CARPETA 'public' -->
         <img src="/Zolve_Logo.png" alt="Logo Zolve" class="auth-logo" />
       </div>
-      <!-- ***** FIN IMAGEN DEL ZORRITO ***** -->
 
       <form @submit.prevent="isRegistering ? handleRegister() : handleLogin()">
         <div class="form-group">
