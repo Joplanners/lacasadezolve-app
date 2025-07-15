@@ -4,157 +4,125 @@ import { supabase } from '@/lib/supabaseClient'
 import router from '@/router'
 
 export const useAuthStore = defineStore('auth', () => {
+  // --- ESTADO ---
   const session = ref(null)
+  const userRole = ref(null)
   const _isPasswordRecoveryMode = ref(false)
   const isPasswordRecoveryMode = readonly(_isPasswordRecoveryMode)
-  const userRole = ref(null)
-  let resolveAuthReady
-  const authReadyPromise = new Promise((resolve) => {
-    resolveAuthReady = resolve
-  })
-  let authHasInitialized = false
-  const user = computed(() => session.value?.user || null)
-  const isLoggedIn = computed(() => !!session.value)
 
+  // --> ¡SIMPLIFICACIÓN! Nos despedimos de la promesa 'authReady' manual.
+  // El listener de Supabase se encargará de todo de forma natural.
+  const authInitialized = ref(false)
+
+  // --- GETTERS (COMPUTEDS) ---
+  const user = computed(() => session.value?.user ?? null)
+  const isLoggedIn = computed(() => !!user.value) // --> Usamos 'user' en lugar de 'session' para más precisión
+
+  // --- ACCIONES ---
+
+  // --> MEJORA: Esta función ahora es privada del store (no se retorna)
+  // Será llamada únicamente por el listener, asegurando una única fuente de verdad.
   async function fetchUserRole(userId) {
     if (!userId) {
       userRole.value = null
       return
     }
-    userRole.value = null
     try {
-      const { data, error, status } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
         .single()
-      if (error && status !== 406) {
+
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 es 'no rows returned', lo cual es normal
         throw error
       }
       userRole.value = data?.role || 'user'
     } catch (catchError) {
       console.error('AuthStore - fetchUserRole: Error:', catchError)
-      userRole.value = 'user'
+      userRole.value = 'user' // --> Asumimos 'user' como rol por defecto en caso de error
     }
   }
 
-  async function setSession(newSession, calledDuringRecovery = false) {
-    const oldUserId = session.value?.user?.id
-    session.value = newSession
-    let roleCheckPromise = Promise.resolve()
-    if (!newSession) {
-      userRole.value = null
-    }
-    if (newSession?.user) {
-      if (!calledDuringRecovery && (newSession.user.id !== oldUserId || userRole.value === null)) {
-        roleCheckPromise = fetchUserRole(newSession.user.id)
-      } else if (calledDuringRecovery) {
-        userRole.value = null
-      }
-    } else if (session.value === null) {
-      userRole.value = null
-    }
-    await roleCheckPromise
-  }
-
-  function clearSession() {
-    setSession(null)
-    _isPasswordRecoveryMode.value = false
-    if (!authHasInitialized && resolveAuthReady) {
-      resolveAuthReady()
-      authHasInitialized = true
-    }
-  }
-
-  async function checkSessionOnLoad() {
-    try {
-      const { data, error } = await supabase.auth.getSession()
-      if (error) throw error
-      await setSession(data.session)
-    } catch (error) {
-      console.error('AuthStore: Error en checkSessionOnLoad catch:', error)
-      clearSession()
-    } finally {
-      if (!authHasInitialized && resolveAuthReady) {
-        resolveAuthReady()
-        authHasInitialized = true
-      }
-    }
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
-
+  // --> ¡ESTE ES EL CORAZÓN DE LA SOLUCIÓN!
+  // El listener de Supabase se convierte en el único responsable
+  // de manejar todos los cambios de autenticación.
   supabase.auth.onAuthStateChange(async (event, newSession) => {
+    console.log('onAuthStateChange evento:', event) // Para depuración
+
     if (event === 'PASSWORD_RECOVERY') {
-      clearSession()
       _isPasswordRecoveryMode.value = true
+      session.value = newSession // Guardamos la sesión de recuperación
+      // Redirigimos al usuario para que actualice su contraseña.
+      // La ruta debe estar protegida para solo permitir el acceso en este modo.
       router.push({ name: 'update-password' })
-      setTimeout(
-        () => {
-          if (_isPasswordRecoveryMode.value) _isPasswordRecoveryMode.value = false
-        },
-        10 * 60 * 1000,
-      )
       return
     }
 
-    if (event === 'SIGNED_OUT') {
-      clearSession()
-      // ¡AQUÍ ESTÁ LA MAGIA!
-      // Después de limpiar la sesión, redirigimos explícitamente al login.
-      router.push({ name: 'login' })
-      return
-    }
+    session.value = newSession
 
-    if (_isPasswordRecoveryMode.value) {
-      if (event === 'SIGNED_IN' && newSession?.user) {
-        _isPasswordRecoveryMode.value = false
+    if (newSession?.user) {
+      // Si hay un usuario, buscamos su rol
+      await fetchUserRole(newSession.user.id)
+
+      // Si venimos de un inicio de sesión o recuperación exitosa, redirigimos
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        _isPasswordRecoveryMode.value = false // Nos aseguramos de salir del modo recuperación
+
+        // Esperamos un ciclo para que el router esté listo
+        await router.isReady()
+
+        if (router.currentRoute.value.name === 'login') {
+          if (userRole.value === 'admin') {
+            router.push({ name: 'admin-dashboard' })
+          } else {
+            router.push({ name: 'profile' })
+          }
+        }
       }
-      return
-    }
+    } else {
+      // Si no hay sesión, limpiamos el rol y nos aseguramos de estar en una ruta pública
+      userRole.value = null
+      _isPasswordRecoveryMode.value = false // Salimos del modo recuperación
 
-    await setSession(newSession)
-
-    if (
-      !authHasInitialized &&
-      (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') &&
-      resolveAuthReady
-    ) {
-      resolveAuthReady()
-      authHasInitialized = true
-    }
-
-    if (event === 'SIGNED_IN' && router.currentRoute.value.name === 'login') {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-      if (userRole.value === 'admin') {
-        router.push({ name: 'admin-dashboard' })
-      } else {
-        router.push({ name: 'profile' })
+      // Si el usuario cierra sesión activamente, lo llevamos al login
+      if (event === 'SIGNED_OUT') {
+        router.push({ name: 'login' })
       }
+    }
+
+    // --> Marcamos la autenticación como inicializada la primera vez que se recibe un evento
+    if (!authInitialized.value) {
+      authInitialized.value = true
     }
   })
 
-  async function waitForAuthReady() {
-    return authReadyPromise
+  // --> ELIMINADO: `setSession`, `clearSession`, `checkSessionOnLoad`
+  // Toda esta lógica ahora está centralizada y simplificada dentro de onAuthStateChange.
+
+  async function signOut() {
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      console.error('Error al cerrar sesión:', error)
+    }
   }
 
   function exitPasswordRecoveryMode() {
     _isPasswordRecoveryMode.value = false
   }
 
-  checkSessionOnLoad()
-
   return {
-    session,
+    // Estado y Getters
+    session: readonly(session), // Es buena práctica exponer el estado como readonly
     user,
     isLoggedIn,
     userRole: readonly(userRole),
     isPasswordRecoveryMode,
-    waitForAuthReady,
-    exitPasswordRecoveryMode,
-    checkSessionOnLoad,
+    authInitialized: readonly(authInitialized), // Exponemos si la auth ha sido chequeada
+
+    // Acciones
     signOut,
+    exitPasswordRecoveryMode,
   }
 })
