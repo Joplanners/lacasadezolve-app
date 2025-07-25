@@ -144,4 +144,41 @@ onMounted(() => {
   width: 100%;
   box-sizing: border-box; /* Asegura que el padding no afecte el ancho total */
 }
+
+/*Estilos desde profile duplicados para evitar conflictos */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 0.95em;
+  transition:
+    background-color 0.2s ease,
+    transform 0.1s ease;
+  margin: 5px;
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-medium);
+  gap: 8px;
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.btn-secondary {
+  background-color: var(--brand-turquoise);
+  color: var(--vt-c-white) !important;
+}
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-link-hover);
+}
+.btn-primary {
+  background-color: var(--brand-pink);
+  color: var(--vt-c-white) !important;
+}
+.btn-primary:hover:not(:disabled) {
+  background-color: #e65c7a;
+}
 </style>
