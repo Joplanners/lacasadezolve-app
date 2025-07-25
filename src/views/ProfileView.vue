@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
-import Avatar from '@/components/Avatar.vue' // Importamos el nuevo componente
+import Avatar from '@/components/Avatar.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -99,12 +99,10 @@ watch(
   () => authStore.user,
   (currentUser) => {
     if (currentUser && currentUser.id) {
-      console.log('Usuario detectado en ProfileView, cargando datos...')
       fetchFullProfile(currentUser.id)
       fetchUserVisibleMarkers(currentUser.id)
       fetchAvailableOverlays(currentUser.id)
     } else {
-      console.log('Usuario no detectado o cerró sesión en ProfileView.')
       profileData.value = null
       userMarkers.value = []
       availableOverlays.value = []
@@ -146,29 +144,23 @@ function cancelEditing() {
   saveError.value = ''
 }
 
-// Modificamos saveProfile para que incluya la URL del avatar
 async function saveProfile() {
   if (!profileData.value?.id) return
   savingProfile.value = true
   saveError.value = ''
   try {
     const updates = {
-      // Guardamos los datos del formulario de edición
       first_name: editableProfileData.first_name || null,
       last_name: editableProfileData.last_name || null,
       city: editableProfileData.city || null,
       phone: editableProfileData.phone || null,
       birth_date: editableProfileData.birth_date || null,
       gender: editableProfileData.gender || null,
-      // Y crucialmente, guardamos la nueva ruta del avatar que el componente Avatar actualizó
       avatar_url: profileData.value.avatar_url,
     }
     const { error } = await supabase.from('profiles').update(updates).eq('id', profileData.value.id)
     if (error) throw error
-
-    // Actualizamos los datos locales para que reflejen los cambios
     Object.assign(profileData.value, updates)
-
     isEditing.value = false
     toast.success('Perfil actualizado con éxito')
   } catch (error) {
@@ -176,6 +168,26 @@ async function saveProfile() {
     toast.error(saveError.value)
   } finally {
     savingProfile.value = false
+  }
+}
+
+// --> ¡NUEVA FUNCIÓN DEDICADA! <--
+async function updateAvatarUrl(newPath) {
+  if (!profileData.value?.id) return
+
+  try {
+    // Actualizamos ÚNICAMENTE la columna avatar_url en la base de datos
+    const { error } = await supabase
+      .from('profiles')
+      .update({ avatar_url: newPath })
+      .eq('id', profileData.value.id)
+    if (error) throw error
+
+    // Actualizamos el dato local para que la nueva imagen se muestre
+    profileData.value.avatar_url = newPath
+    toast.success('Foto de perfil actualizada con éxito')
+  } catch (error) {
+    toast.error(`Error al guardar la foto: ${error.message}`)
   }
 }
 
