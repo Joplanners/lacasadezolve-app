@@ -1,0 +1,47 @@
+[33m8e7f6a8[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Elimina listener de visibilidad para habilitar la persistencia de sesión, cambios en authstore, main.js e index.js
+[33m1f6ad3c[m Elimina listener de visibilidad para habilitar la persistencia de sesión
+[33m0846008[m Soluciona bug de sesión con onAuthStateChange v.3 y perfiles
+[33mcb4dc73[m Soluciona bug de sesión con onAuthStateChange v.2
+[33m0ab13e1[m Soluciona bug de sesión con onAuthStateChange
+[33md8fe2f6[m otra vez persistencia en vez de hidden
+[33m36f07a6[m  cierre de sesion mejorada
+[33m385bf6d[m guiar al usuario al inicio de sesion
+[33mb081a18[m cierre de sesion forazado con hidden
+[33ma051bfa[m otro cambio de persistencia
+[33m568bf13[m persistencia de sesion
+[33m89c16e1[m cambios para una escucha global, ojalá funke
+[33m4b93d1a[m  centrar contenido en moviles
+[33m4b30e59[m nuevo inicio de pagina
+[33mb1f0b57[m mejora en el pinchazo
+[33m58ce802[m cambio de camara
+[33m88b3c98[m nueva funcionalidad perfecta en pc
+[33mf9c1c16[m nuevo cambio ya que la version del movil sigue sin funcionar
+[33m1f93cd9[m nuevo cambio ya que la version del movil no funciona bien
+[33mec1e453[m otro cambio para overlyphotocapture
+[33md090fa4[m cambio para overlyphotocapture
+[33md3e9162[m deshacer el cambio
+[33m745abb6[m volver a actualizar componente en overlayphotocaptureview
+[33m8401eca[m cambio en el prompt
+[33mfc934dc[m esperemos que esto funcione, solo potrait
+[33m1d2a912[m otro cambio
+[33m1cfb719[m index
+[33m9f50ba3[m otro cambio para landscope
+[33mb479350[m cambios para landscape
+[33mf02603f[m nuevo enfoque para tablets
+[33m2bd8f22[m problemas en tablet
+[33m1475fed[m version ARExperienceView con mensaje y botones y cambios de resize estables
+[33maf25b65[m cambio para reden
+[33mbb04b2b[m Sacamos los botones y hacemos click
+[33m7550ac6[m nueva modificacion para arexperience
+[33mcee2382[m cambio de vertical a horizontal en moviles
+[33m56431ce[m cambio de resize
+[33mf586dc2[m Actualización del index.html corrigiendo las importaciones
+[33m8040134[m depuracion de celular
+[33md5c0e1f[m cambio en ARExperience tamaño del contenido en moviles mas grande, con landscope para que al girar las flechas queden al lado del contenido
+[33mdd029f7[m cambios para la estabilidad de weatherzolve, ARExperience y Overlayphotocaptureview
+[33m250ba24[m cambios en como se maneja el enlace para refrescar la ubicacion, segun el caso, no se muestra si se acepta acceder a la ubicacion, no se muestra si se deniega, si hay errores, se muestra el mensaje y se intenta arreglar el error si vuelve a fallar en el intento no se vuelve a mostrar
+[33m74d37fa[m cambios en el clima con mensajes
+[33m255e212[m Actualización de función de clima y ajustes de UI
+[33m171a2d1[m Add terser as a dev dependency for production build
+[33m04e61fb[m Preparando despliegue final: Funciones Netlify, UI, e imágenes WebP
+[33mb591a8c[m Reemplazo completo del proyecto con la versión actual

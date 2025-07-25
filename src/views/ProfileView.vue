@@ -1,9 +1,10 @@
 <script setup>
-import { ref, reactive, computed, watch } from 'vue' // --> Añadimos watch
+import { ref, reactive, computed, watch } from 'vue'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
+import Avatar from '@/components/Avatar.vue' // Importamos el nuevo componente
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -33,9 +34,6 @@ const loadingOverlays = ref(true)
 const errorOverlays = ref('')
 
 const R2_PUBLIC_BASE_URL = 'https://pub-48e6b80b718c43a99a9b98163de9920c.r2.dev'
-
-// --- FUNCIONES DE CARGA DE DATOS ---
-// Convertimos las funciones de carga en funciones reutilizables
 
 async function fetchFullProfile(userId) {
   loadingProfile.value = true
@@ -97,20 +95,15 @@ async function fetchAvailableOverlays(userId) {
   }
 }
 
-// --> ¡LA CLAVE ESTÁ AQUÍ! Reemplazamos onMounted con un watcher.
-// Este observador se dispara en cuanto el 'user' del store está disponible.
 watch(
   () => authStore.user,
   (currentUser) => {
-    // Si hay un usuario (no es null)...
     if (currentUser && currentUser.id) {
-      // ...llamamos a todas las funciones para cargar sus datos.
       console.log('Usuario detectado en ProfileView, cargando datos...')
       fetchFullProfile(currentUser.id)
       fetchUserVisibleMarkers(currentUser.id)
       fetchAvailableOverlays(currentUser.id)
     } else {
-      // Si el usuario se vuelve null (cierra sesión), limpiamos los datos y mostramos errores.
       console.log('Usuario no detectado o cerró sesión en ProfileView.')
       profileData.value = null
       userMarkers.value = []
@@ -123,10 +116,8 @@ watch(
       loadingOverlays.value = false
     }
   },
-  { immediate: true }, // Se ejecuta inmediatamente al cargar el componente
+  { immediate: true },
 )
-
-// --- El resto de tus funciones de componente se quedan igual ---
 
 function getOverlayImageUrl(r2Key) {
   if (!r2Key) return ''
@@ -155,22 +146,29 @@ function cancelEditing() {
   saveError.value = ''
 }
 
+// Modificamos saveProfile para que incluya la URL del avatar
 async function saveProfile() {
   if (!profileData.value?.id) return
   savingProfile.value = true
   saveError.value = ''
   try {
     const updates = {
+      // Guardamos los datos del formulario de edición
       first_name: editableProfileData.first_name || null,
       last_name: editableProfileData.last_name || null,
       city: editableProfileData.city || null,
       phone: editableProfileData.phone || null,
       birth_date: editableProfileData.birth_date || null,
       gender: editableProfileData.gender || null,
+      // Y crucialmente, guardamos la nueva ruta del avatar que el componente Avatar actualizó
+      avatar_url: profileData.value.avatar_url,
     }
     const { error } = await supabase.from('profiles').update(updates).eq('id', profileData.value.id)
     if (error) throw error
-    profileData.value = { ...profileData.value, ...updates }
+
+    // Actualizamos los datos locales para que reflejen los cambios
+    Object.assign(profileData.value, updates)
+
     isEditing.value = false
     toast.success('Perfil actualizado con éxito')
   } catch (error) {
@@ -201,7 +199,6 @@ const userDisplayName = computed(() => {
 </script>
 
 <template>
-  <!-- Tu sección de template se queda exactamente igual, no necesita cambios -->
   <div class="profile-view">
     <div v-if="!isEditing">
       <h2>Perfil de {{ userDisplayName }}</h2>
@@ -214,6 +211,12 @@ const userDisplayName = computed(() => {
     <div v-if="errorProfile && !loadingProfile" class="error-message">{{ errorProfile }}</div>
 
     <div v-if="profileData && !loadingProfile" class="profile-info">
+      <!-- AÑADIDO: Contenedor y componente Avatar -->
+      <div class="profile-avatar-container">
+        <Avatar v-model:path="profileData.avatar_url" @upload="saveProfile" />
+        <p v-if="!isEditing" class="avatar-helper-text">Sube o cambia tu foto de perfil.</p>
+      </div>
+
       <div v-if="!isEditing">
         <p><strong>Email:</strong> {{ profileData.email || '-' }}</p>
         <p><strong>Nombre:</strong> {{ profileData.first_name || '(No especificado)' }}</p>
@@ -355,7 +358,21 @@ const userDisplayName = computed(() => {
 </template>
 
 <style scoped>
-/* Tu sección de <style> se queda exactamente igual */
+/* AÑADIDO: Estilos para el nuevo contenedor del avatar */
+.profile-avatar-container {
+  margin-bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.avatar-helper-text {
+  margin-top: 10px;
+  font-size: 0.85em;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* El resto de tus estilos originales se mantienen intactos */
 .profile-view {
   max-width: 700px;
   margin: 30px auto;
@@ -427,7 +444,7 @@ const userDisplayName = computed(() => {
   gap: 12px;
 }
 .edit-profile-form .form-save-error {
-  margin-bottom: 20px; /* Para que no esté pegado a los botones */
+  margin-bottom: 20px;
 }
 
 .section-divider {
@@ -469,7 +486,7 @@ const userDisplayName = computed(() => {
   border: 1px solid #ef9a9a;
 }
 .no-items {
-  background-color: #f1f8e9; /* Un verde claro para "no items" */
+  background-color: #f1f8e9;
   color: #33691e;
   border: 1px solid #c5e1a5;
 }
@@ -492,7 +509,7 @@ const userDisplayName = computed(() => {
   transition:
     transform 0.2s ease-in-out,
     box-shadow 0.2s ease-in-out;
-  min-height: 280px; /* Para asegurar altura mínima de cards */
+  min-height: 280px;
 }
 .item-card:hover {
   transform: translateY(-4px);
@@ -535,7 +552,7 @@ const userDisplayName = computed(() => {
   font-weight: var(--font-weight-medium);
   line-height: 1.3;
   overflow-wrap: break-word;
-  word-break: break-word; /* Para nombres largos */
+  word-break: break-word;
   hyphens: auto;
 }
 .card-description {
@@ -543,8 +560,8 @@ const userDisplayName = computed(() => {
   color: #555;
   margin-bottom: 15px;
   line-height: 1.4;
-  flex-grow: 1; /* Para que ocupe espacio y empuje botón hacia abajo */
-  max-height: 4.2em; /* aprox 3 líneas */
+  flex-grow: 1;
+  max-height: 4.2em;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
@@ -554,13 +571,13 @@ const userDisplayName = computed(() => {
 }
 .item-card .btn {
   margin-top: auto;
-  width: calc(100% - 10px); /* Un poco menos del 100% para padding visual */
+  width: calc(100% - 10px);
   padding: 9px 15px;
   font-size: 0.9em;
 }
 
 .btn {
-  display: inline-flex; /* Para alinear icono y texto */
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 10px 18px;
@@ -575,13 +592,12 @@ const userDisplayName = computed(() => {
   margin: 5px;
   font-family: var(--font-family-base);
   font-weight: var(--font-weight-medium);
-  gap: 8px; /* Espacio entre icono y texto del botón */
+  gap: 8px;
 }
 .btn:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 .btn-secondary {
-  /* Para Editar Perfil y "Iniciar Foto" */
   background-color: var(--brand-turquoise);
   color: var(--vt-c-white) !important;
 }
@@ -589,7 +605,6 @@ const userDisplayName = computed(() => {
   background-color: var(--color-link-hover);
 }
 .btn-primary {
-  /* Para "Iniciar AR" */
   background-color: var(--brand-pink);
   color: var(--vt-c-white) !important;
 }
@@ -617,7 +632,6 @@ const userDisplayName = computed(() => {
   opacity: 0.7;
 }
 
-/* Estilos de tu ProfileView original para marker-list (si los quieres mantener o adaptar) */
 .marker-list {
   list-style: none;
   padding: 0;
@@ -638,7 +652,6 @@ const userDisplayName = computed(() => {
   flex-grow: 1;
   margin-right: 15px;
 }
-/* Ya tenemos estilos generales para .btn, así que .btn-view-ar-small se puede simplificar o unificar */
 
 @media (max-width: 640px) {
   .profile-view {
@@ -685,13 +698,12 @@ const userDisplayName = computed(() => {
   }
 
   .items-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* Más pequeñas en móvil */
-    gap: 15px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
   .item-card {
     min-height: auto;
     padding: 12px;
-  } /* Altura automática y menos padding */
+  }
   .card-thumbnail,
   .card-icon-placeholder {
     height: 100px;
@@ -716,7 +728,7 @@ const userDisplayName = computed(() => {
 
 @media (max-width: 400px) {
   .items-grid {
-    grid-template-columns: 1fr; /* Una columna en pantallas muy pequeñas */
+    grid-template-columns: 1fr;
   }
   .profile-view h2 {
     font-size: 1.3rem;
