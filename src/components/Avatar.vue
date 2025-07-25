@@ -101,7 +101,11 @@ onMounted(() => {
         style="display: none"
       />
       <!-- Este es el botón visible que el usuario ve y presiona -->
-      <button @click="triggerFileInput" class="btn btn-secondary" :disabled="uploading">
+      <button
+        @click="triggerFileInput"
+        class="btn btn-secondary btn-edit-profile"
+        :disabled="uploading"
+      >
         {{ uploading ? 'Subiendo...' : 'Cambiar Foto' }}
       </button>
     </div>
