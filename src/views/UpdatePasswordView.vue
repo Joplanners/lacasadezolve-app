@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue' // <-- Añadimos 'watch'
+import { ref, watch, onUnmounted } from 'vue'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
@@ -11,38 +11,32 @@ const confirmPassword = ref('')
 const message = ref('')
 const errorMsg = ref('')
 const loading = ref(false)
+
+const showForm = ref(false)
 const verificationError = ref('')
 
-// --> DIAGNÓSTICO #1: Observamos el estado del modo recuperación
-// Este watch nos avisará en la consola CADA VEZ que el valor cambie.
-watch(
+// Este 'watcher' es la solución. Se sienta a esperar pacientemente
+// a que el authStore le avise que el modo recuperación está activo.
+const unwatch = watch(
   () => authStore.isPasswordRecoveryMode,
-  (newValue, oldValue) => {
-    console.log(`[WATCHER] isPasswordRecoveryMode cambió de ${oldValue} a ${newValue}`)
+  (isRecovery) => {
+    if (isRecovery) {
+      // Cuando el store se actualiza, mostramos el formulario.
+      showForm.value = true
+      verificationError.value = ''
+    } else {
+      // Si por alguna razón el modo se desactiva, mostramos el error.
+      showForm.value = false
+      verificationError.value =
+        'El enlace es inválido o ha expirado. Por favor, solicita uno nuevo.'
+    }
   },
-  { immediate: true },
+  { immediate: true }, // Se ejecuta al cargar el componente para comprobar el estado inicial.
 )
 
-const showForm = computed(() => authStore.isPasswordRecoveryMode)
-
-onMounted(() => {
-  // --> DIAGNÓSTICO #2: Vemos el estado al momento de montar
-  console.log(
-    `[onMounted] Componente montado. isPasswordRecoveryMode es: ${authStore.isPasswordRecoveryMode}`,
-  )
-
-  // Ponemos un timeout que nos avisará si después de 3 segundos,
-  // el modo recuperación NUNCA se activó.
-  const verificationTimeout = setTimeout(() => {
-    if (!authStore.isPasswordRecoveryMode) {
-      console.error('[TIMEOUT] Después de 3 segundos, el modo recuperación nunca se activó.')
-      verificationError.value = 'El enlace es inválido o ha expirado.'
-    }
-  }, 3000)
-
-  onUnmounted(() => {
-    clearTimeout(verificationTimeout)
-  })
+onUnmounted(() => {
+  unwatch() // Limpiamos el watcher.
+  authStore.exitPasswordRecoveryMode() // Limpiamos el estado al salir.
 })
 
 const handleUpdatePassword = async () => {
@@ -50,8 +44,11 @@ const handleUpdatePassword = async () => {
     errorMsg.value = 'Las contraseñas no coinciden.'
     return
   }
-  if (!newPassword.value || newPassword.value.length < 6) {
-    errorMsg.value = 'La contraseña debe tener al menos 6 caracteres.'
+  // Validación de contraseña segura
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+  if (!passwordRegex.test(newPassword.value)) {
+    errorMsg.value =
+      'La contraseña debe tener al menos 8 caracteres, mayúsculas, minúsculas, números y símbolos.'
     return
   }
 
@@ -65,17 +62,14 @@ const handleUpdatePassword = async () => {
     })
     if (error) throw error
 
-    message.value = '¡Contraseña actualizada con éxito! Redirigiendo al login...'
+    message.value = '¡Contraseña actualizada con éxito! Redirigiendo...'
     authStore.exitPasswordRecoveryMode()
 
     setTimeout(() => {
-      // Tu router usa 'login', no 'auth'
-      router.push({ name: 'login' })
+      router.replace({ name: 'login' })
     }, 3000)
   } catch (error) {
-    console.error('Error al actualizar contraseña:', error.message)
     errorMsg.value = `Error al actualizar: ${error.message}`
-    authStore.exitPasswordRecoveryMode()
   } finally {
     loading.value = false
   }
