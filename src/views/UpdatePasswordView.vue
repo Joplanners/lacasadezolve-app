@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, watch, onUnmounted } from 'vue' // --> Cambiamos los imports
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
@@ -12,24 +12,35 @@ const message = ref('')
 const errorMsg = ref('')
 const loading = ref(false)
 
-const showForm = computed(() => authStore.isPasswordRecoveryMode)
+// Esta variable ahora controlará si mostramos el formulario o el mensaje de error.
+const showForm = ref(false)
 const verificationError = ref('')
-let verificationTimeout = null
 
-onMounted(() => {
-  console.log('UpdatePasswordView: Mounted.')
-  verificationTimeout = setTimeout(() => {
-    if (!authStore.isPasswordRecoveryMode) {
-      console.warn('UpdatePasswordView: Timeout - Modo recuperación no activo.')
-      verificationError.value = 'El enlace es inválido o ha expirado.'
+// Usamos un 'watcher' para reaccionar a los cambios en el store.
+const unwatch = watch(
+  () => authStore.isPasswordRecoveryMode,
+  (isRecovery) => {
+    if (isRecovery) {
+      // Si el store nos dice que estamos en modo recuperación, mostramos el formulario.
+      console.log('UpdatePasswordView: Modo recuperación detectado. Mostrando formulario.')
+      showForm.value = true
+      verificationError.value = ''
+    } else {
+      // Si no estamos en modo recuperación, mostramos el error.
+      console.warn('UpdatePasswordView: Modo recuperación no está activo.')
+      showForm.value = false
+      verificationError.value =
+        'El enlace es inválido o ha expirado. Por favor, solicita uno nuevo.'
     }
-  }, 3000)
-})
+  },
+  { immediate: true }, // Se ejecuta inmediatamente al cargar el componente.
+)
 
 onUnmounted(() => {
-  clearTimeout(verificationTimeout)
-  // Quizás también forzar salida del modo recuperación si se sale de la página
-  // authStore.exitPasswordRecoveryMode(); // Opcional
+  // Limpiamos el watcher cuando el componente se destruye para evitar memory leaks.
+  unwatch()
+  // Y nos aseguramos de salir del modo recuperación si el usuario se va de la página.
+  authStore.exitPasswordRecoveryMode()
 })
 
 const handleUpdatePassword = async () => {
@@ -37,8 +48,11 @@ const handleUpdatePassword = async () => {
     errorMsg.value = 'Las contraseñas no coinciden.'
     return
   }
-  if (!newPassword.value || newPassword.value.length < 6) {
-    errorMsg.value = 'La contraseña debe tener al menos 6 caracteres.'
+  // --> ¡IMPORTANTE! Aquí debemos validar contra las nuevas reglas de seguridad
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+  if (!passwordRegex.test(newPassword.value)) {
+    errorMsg.value =
+      'La contraseña debe tener al menos 8 caracteres, incluyendo mayúsculas, minúsculas, números y símbolos.'
     return
   }
 
@@ -52,22 +66,22 @@ const handleUpdatePassword = async () => {
     })
     if (error) throw error
 
-    message.value = '¡Contraseña actualizada con éxito! Redirigiendo al login...'
-    authStore.exitPasswordRecoveryMode() // Salir del modo recuperación
+    message.value = '¡Contraseña actualizada con éxito! Redirigiendo al login en 3 segundos...'
+    // La sesión ya se limpia sola por el evento de Supabase. Salimos del modo.
+    authStore.exitPasswordRecoveryMode()
 
-    // Redirigir después de un delay, sin forzar signOut aquí
     setTimeout(() => {
-      router.push({ name: 'auth' })
+      router.replace({ name: 'login' }) // Usamos replace para una mejor UX
     }, 3000)
   } catch (error) {
     console.error('Error al actualizar contraseña:', error.message)
     errorMsg.value = `Error al actualizar: ${error.message}`
-    authStore.exitPasswordRecoveryMode() // Salir del modo si hay error también
   } finally {
     loading.value = false
   }
 }
 </script>
+
 <template>
   <div class="update-password-container">
     <h1>Establecer Nueva Contraseña</h1>
@@ -111,6 +125,7 @@ const handleUpdatePassword = async () => {
     <p v-if="errorMsg" class="error-message">{{ errorMsg }}</p>
   </div>
 </template>
+
 <style scoped>
 .update-password-container {
   max-width: 400px;
