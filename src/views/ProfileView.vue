@@ -227,7 +227,10 @@ const userDisplayName = computed(() => {
       <div class="profile-main-grid">
         <!-- Columna 1: Contenedor del Avatar -->
         <div class="profile-avatar-container">
-          <Avatar v-model:path="profileData.avatar_url" @upload="saveProfile" />
+          <Avatar
+            v-model:path="profileData.avatar_url"
+            @upload="updateAvatarUrl(profileData.avatar_url)"
+          />
           <p v-if="!isEditing" class="avatar-helper-text">Sube o cambia tu foto de perfil.</p>
         </div>
 
