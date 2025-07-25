@@ -1,11 +1,10 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue' // Se añade 'computed'
 import { supabase } from '@/lib/supabaseClient.js'
 import PasswordInput from '@/components/PasswordInput.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter } from 'vue-router'
 
-// Obtenemos acceso al store y al router
 const authStore = useAuthStore()
 const router = useRouter()
 
@@ -22,14 +21,45 @@ const forgotPasswordLoading = ref(false)
 const forgotPasswordMessage = ref('')
 const forgotPasswordErrorMsg = ref('')
 
-// "Observador" que reacciona a los cambios en el estado de login.
+// --- INICIO DE LA NUEVA LÓGICA DE VALIDACIÓN DE CONTRASEÑA ---
+
+// Aquí definimos las reglas que configuramos en Supabase.
+// Usamos 'computed' para que solo se apliquen en el modo de registro.
+const passwordRequirements = computed(() => {
+  if (!isRegistering.value) return [] // No hay requisitos para el login
+  return [
+    { text: 'Al menos 8 caracteres', regex: /.{8,}/ },
+    { text: 'Incluye una mayúscula (A-Z)', regex: /[A-Z]/ },
+    { text: 'Incluye una minúscula (a-z)', regex: /[a-z]/ },
+    { text: 'Incluye un número (0-9)', regex: /[0-9]/ },
+    { text: 'Incluye un símbolo (!@#$...)', regex: /[^A-Za-z0-9]/ },
+  ]
+})
+
+// Esta propiedad computada revisa la contraseña actual contra las reglas
+// y nos devuelve una lista con el estado de cada una (válida o no).
+const passwordValidation = computed(() => {
+  const value = password.value
+  return passwordRequirements.value.map((req) => ({
+    ...req,
+    valid: req.regex.test(value),
+  }))
+})
+
+// Esta propiedad computada es un simple 'true' o 'false'.
+// Será 'true' solo si TODAS las reglas en `passwordValidation` son válidas.
+const isPasswordValid = computed(() => {
+  if (!isRegistering.value) return true // Para el login, el botón siempre está habilitado
+  if (passwordRequirements.value.length === 0) return true
+  return passwordValidation.value.every((req) => req.valid)
+})
+
+// --- FIN DE LA NUEVA LÓGICA ---
+
 watch(
   () => authStore.isLoggedIn,
   (newValue) => {
-    // Si el nuevo valor de isLoggedIn es 'true'...
     if (newValue) {
-      console.log('Usuario logueado en AuthView, redirigiendo...')
-      // ...lo redirigimos a la página correcta según su rol.
       if (authStore.userRole === 'admin') {
         router.push({ name: 'admin-dashboard' })
       } else {
@@ -37,8 +67,6 @@ watch(
       }
     }
   },
-  // { immediate: true } intenta ejecutar el watcher al cargar el componente,
-  // por si el usuario ya estaba logueado y llegó a esta página por error.
   { immediate: true },
 )
 
@@ -65,7 +93,6 @@ const handleLogin = async () => {
       password: password.value,
     })
     if (error) throw error
-    // La redirección ahora es manejada por el watcher
   } catch (error) {
     console.error('AuthView: Error en inicio de sesión:', error.message)
     errorMsg.value = `Error al iniciar sesión: ${error.message}`
@@ -75,6 +102,12 @@ const handleLogin = async () => {
 }
 
 const handleRegister = async () => {
+  // Añadimos una comprobación extra aquí por si acaso
+  if (!isPasswordValid.value) {
+    errorMsg.value = 'La contraseña no cumple con todos los requisitos de seguridad.'
+    return
+  }
+
   clearAllMessages()
   loading.value = true
   try {
@@ -151,7 +184,7 @@ const switchToLoginRegister = () => {
 
 <template>
   <div class="auth-container">
-    <!-- === FORMULARIO DE OLVIDÉ CONTRASEÑA === -->
+    <!-- === FORMULARIO DE OLVIDÉ CONTRASEÑA (Sin cambios) === -->
     <div v-if="isForgotPasswordMode">
       <h1>Restablecer Contraseña</h1>
       <div class="logo-image-container">
@@ -215,6 +248,7 @@ const switchToLoginRegister = () => {
           />
         </div>
 
+        <!-- INICIO DE LA MODIFICACIÓN -->
         <PasswordInput
           v-model="password"
           id="auth-password"
@@ -223,11 +257,32 @@ const switchToLoginRegister = () => {
           :disabled="loading"
           :required="true"
           placeholder="Tu contraseña segura"
-        />
+        >
+          <!-- Este bloque de código se insertará en el 'slot' de PasswordInput.vue -->
+          <template #requirements>
+            <ul v-if="isRegistering && password.length > 0" class="requirements-list">
+              <li
+                v-for="(req, index) in passwordValidation"
+                :key="index"
+                :class="{ valid: req.valid }"
+              >
+                <!-- Usamos un span para el icono para mejor estilo -->
+                <span class="requirement-icon">{{ req.valid ? '✓' : '✗' }}</span>
+                {{ req.text }}
+              </li>
+            </ul>
+          </template>
+        </PasswordInput>
 
-        <button type="submit" class="btn btn-primary" :disabled="loading">
+        <!-- Modificamos la condición 'disabled' del botón -->
+        <button
+          type="submit"
+          class="btn btn-primary"
+          :disabled="loading || (isRegistering && !isPasswordValid)"
+        >
           {{ loading ? 'Procesando...' : isRegistering ? 'Crear mi Cuenta' : 'Ingresar' }}
         </button>
+        <!-- FIN DE LA MODIFICACIÓN -->
       </form>
 
       <p v-if="!isRegistering" class="forgot-password">
@@ -276,27 +331,25 @@ const switchToLoginRegister = () => {
   background-color: var(--color-background-soft);
 }
 h1 {
-  margin-bottom: 15px; /* Reducido un poco para dar espacio al logo */
+  margin-bottom: 15px;
   color: var(--color-heading);
   font-weight: var(--font-weight-bold);
 }
 
-/* Estilos para el contenedor de la imagen del logo */
 .logo-image-container {
   display: flex;
   justify-content: center;
-  margin-top: 0px; /* Espacio entre el h1 y la imagen, puede ser 0 si el h1 ya tiene margen inferior */
-  margin-bottom: 25px; /* Espacio entre la imagen y el formulario */
+  margin-top: 0px;
+  margin-bottom: 25px;
 }
 
-/* Estilos para la imagen del logo (el zorrito) */
 .auth-logo {
-  width: 90px; /* Ajusta el tamaño deseado */
-  height: 90px; /* Mismo valor que width para un círculo perfecto si la imagen es cuadrada */
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid var(--brand-pink); /* Borde opcional */
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15); /* Sombra opcional */
+  border: 3px solid var(--brand-pink);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
 .form-group {
@@ -445,6 +498,32 @@ label {
   line-height: 1.5;
 }
 
+/* --- ESTILOS AÑADIDOS PARA LA LISTA DE REQUISITOS --- */
+.requirements-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  color: var(--color-text-muted, #6c757d); /* Color por defecto para requisitos no cumplidos */
+}
+
+.requirements-list li {
+  transition: color 0.3s ease;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.requirements-list li.valid {
+  color: var(--brand-green, #28a745); /* Color verde para requisitos cumplidos */
+  font-weight: var(--font-weight-medium);
+}
+
+.requirement-icon {
+  margin-right: 8px;
+  width: 1em; /* Asegura que los iconos tengan el mismo ancho */
+}
+/* --- FIN DE ESTILOS AÑADIDOS --- */
+
 @media (max-width: 480px) {
   .auth-container {
     width: 90%;
@@ -456,15 +535,15 @@ label {
 
   h1 {
     font-size: 1.6rem;
-    margin-bottom: 10px; /* Ajustar si es necesario con el logo */
+    margin-bottom: 10px;
   }
 
   .auth-logo {
-    width: 70px; /* Logo un poco más pequeño en móviles */
+    width: 70px;
     height: 70px;
   }
   .logo-image-container {
-    margin-bottom: 20px; /* Ajustar espacio inferior del logo en móviles */
+    margin-bottom: 20px;
   }
 
   .form-input {
