@@ -4,24 +4,29 @@ import { supabase } from '@/lib/supabaseClient'
 import { useAuthStore } from '@/stores/authStore'
 
 const props = defineProps({
-  path: String, // Recibe la ruta del avatar actual (ej: 'public/avatar1.png')
+  path: String,
 })
 
 const emit = defineEmits(['update:path', 'upload'])
 const authStore = useAuthStore()
 
-const size = ref('10em') // Tamaño visual del avatar
+const size = ref('10em')
 const uploading = ref(false)
-const src = ref(null) // La URL visible de la imagen
+const src = ref(null)
 const files = ref(null)
+const fileInput = ref(null) // Referencia para el input de archivo oculto
 
-// Función para descargar y mostrar la imagen actual desde Supabase Storage
+// Nueva función que se llama al hacer clic en el botón
+function triggerFileInput() {
+  // Simula un clic en el input de archivo, que está oculto
+  fileInput.value.click()
+}
+
 async function downloadImage() {
   if (!props.path) {
     src.value = null
     return
   }
-
   try {
     const { data, error } = await supabase.storage.from('avatars').download(props.path)
     if (error) throw error
@@ -32,27 +37,20 @@ async function downloadImage() {
   }
 }
 
-// Función que se dispara cuando el usuario selecciona un archivo
 async function uploadAvatar(event) {
   files.value = event.target.files
   if (!files.value || files.value.length === 0) {
     return
   }
-
   const file = files.value[0]
   const fileExt = file.name.split('.').pop()
-  // Usamos el ID del usuario para crear una ruta única y segura
   const filePath = `${authStore.user.id}/${Math.random()}.${fileExt}`
-
   try {
     uploading.value = true
-    // Subimos el archivo a Supabase Storage
     const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file)
     if (uploadError) throw uploadError
-
-    // Emitimos los eventos para que el componente padre se entere del cambio
-    emit('update:path', filePath) // Notifica a ProfileView la nueva ruta del archivo
-    emit('upload') // Avisa a ProfileView que debe guardar el perfil
+    emit('update:path', filePath)
+    emit('upload')
   } catch (error) {
     alert(error.message)
   } finally {
@@ -60,8 +58,6 @@ async function uploadAvatar(event) {
   }
 }
 
-// Observa si la ruta del avatar cambia (cuando se carga el perfil por primera vez)
-// y descarga la imagen.
 watch(
   () => props.path,
   (newPath) => {
@@ -73,7 +69,6 @@ watch(
   },
 )
 
-// Al montar el componente, intenta descargar la imagen inicial
 onMounted(() => {
   if (props.path) {
     downloadImage()
@@ -94,18 +89,21 @@ onMounted(() => {
       <span class="initials-placeholder">📷</span>
     </div>
 
-    <div class="upload-button-container" :style="{ width: size }">
-      <label class="btn btn-secondary" for="single-avatar-upload">
-        {{ uploading ? 'Subiendo...' : 'Cambiar Foto' }}
-      </label>
+    <div class="upload-button-container">
+      <!-- Este input está ahora oculto, pero hace el trabajo de abrir el explorador de archivos -->
       <input
-        style="visibility: hidden; position: absolute"
+        ref="fileInput"
         type="file"
         id="single-avatar-upload"
         accept="image/*"
         @change="uploadAvatar"
         :disabled="uploading"
+        style="display: none"
       />
+      <!-- Este es el botón visible que el usuario ve y presiona -->
+      <button @click="triggerFileInput" class="btn btn-secondary" :disabled="uploading">
+        {{ uploading ? 'Subiendo...' : 'Cambiar Foto' }}
+      </button>
     </div>
   </div>
 </template>
