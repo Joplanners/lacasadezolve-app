@@ -211,74 +211,81 @@ const userDisplayName = computed(() => {
     <div v-if="errorProfile && !loadingProfile" class="error-message">{{ errorProfile }}</div>
 
     <div v-if="profileData && !loadingProfile" class="profile-info">
-      <!-- AÑADIDO: Contenedor y componente Avatar -->
-      <div class="profile-avatar-container">
-        <Avatar v-model:path="profileData.avatar_url" @upload="saveProfile" />
-        <p v-if="!isEditing" class="avatar-helper-text">Sube o cambia tu foto de perfil.</p>
-      </div>
+      <!-- INICIO DE LA MODIFICACIÓN ESTRUCTURAL -->
+      <div class="profile-main-grid">
+        <!-- Columna 1: Contenedor del Avatar -->
+        <div class="profile-avatar-container">
+          <Avatar v-model:path="profileData.avatar_url" @upload="saveProfile" />
+          <p v-if="!isEditing" class="avatar-helper-text">Sube o cambia tu foto de perfil.</p>
+        </div>
 
-      <div v-if="!isEditing">
-        <p><strong>Email:</strong> {{ profileData.email || '-' }}</p>
-        <p><strong>Nombre:</strong> {{ profileData.first_name || '(No especificado)' }}</p>
-        <p><strong>Apellido:</strong> {{ profileData.last_name || '(No especificado)' }}</p>
-        <p><strong>Ciudad:</strong> {{ profileData.city || '(No especificado)' }}</p>
-        <p><strong>Teléfono:</strong> {{ profileData.phone || '(No especificado)' }}</p>
-        <p>
-          <strong>F. Nacimiento:</strong>
-          {{
-            profileData.birth_date
-              ? new Date(profileData.birth_date + 'T00:00:00').toLocaleDateString('es-CL')
-              : '(No especificada)'
-          }}
-        </p>
-        <p><strong>Género:</strong> {{ profileData.gender || '(No especificado)' }}</p>
-        <button @click="startEditing" class="btn btn-secondary btn-edit-profile">
-          Editar Perfil
-        </button>
-      </div>
-      <div v-else>
-        <form @submit.prevent="saveProfile" class="edit-profile-form">
-          <p><strong>Email:</strong> {{ profileData.email }} (No editable)</p>
-          <div class="form-group">
-            <label for="firstName">Nombre:</label>
-            <input type="text" id="firstName" v-model="editableProfileData.first_name" />
-          </div>
-          <div class="form-group">
-            <label for="lastName">Apellido:</label>
-            <input type="text" id="lastName" v-model="editableProfileData.last_name" />
-          </div>
-          <div class="form-group">
-            <label for="city">Ciudad:</label>
-            <input type="text" id="city" v-model="editableProfileData.city" />
-          </div>
-          <div class="form-group">
-            <label for="phone">Teléfono:</label>
-            <input type="tel" id="phone" v-model="editableProfileData.phone" />
-          </div>
-          <div class="form-group">
-            <label for="birthDate">Fecha Nacimiento:</label>
-            <input type="date" id="birthDate" v-model="editableProfileData.birth_date" />
-          </div>
-          <div class="form-group">
-            <label for="gender">Género:</label>
-            <input type="text" id="gender" v-model="editableProfileData.gender" />
-          </div>
-          <p v-if="saveError" class="error-message form-save-error">{{ saveError }}</p>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-save" :disabled="savingProfile">
-              {{ savingProfile ? 'Guardando...' : 'Guardar Cambios' }}
-            </button>
-            <button
-              type="button"
-              @click="cancelEditing"
-              class="btn btn-cancel"
-              :disabled="savingProfile"
-            >
-              Cancelar
+        <!-- Columna 2: Contenedor de los Detalles del Perfil -->
+        <div class="profile-details-container">
+          <div v-if="!isEditing">
+            <p><strong>Email:</strong> {{ profileData.email || '-' }}</p>
+            <p><strong>Nombre:</strong> {{ profileData.first_name || '(No especificado)' }}</p>
+            <p><strong>Apellido:</strong> {{ profileData.last_name || '(No especificado)' }}</p>
+            <p><strong>Ciudad:</strong> {{ profileData.city || '(No especificado)' }}</p>
+            <p><strong>Teléfono:</strong> {{ profileData.phone || '(No especificado)' }}</p>
+            <p>
+              <strong>F. Nacimiento:</strong>
+              {{
+                profileData.birth_date
+                  ? new Date(profileData.birth_date + 'T00:00:00').toLocaleDateString('es-CL')
+                  : '(No especificada)'
+              }}
+            </p>
+            <p><strong>Género:</strong> {{ profileData.gender || '(No especificado)' }}</p>
+            <button @click="startEditing" class="btn btn-secondary btn-edit-profile">
+              Editar Perfil
             </button>
           </div>
-        </form>
+          <div v-else>
+            <form @submit.prevent="saveProfile" class="edit-profile-form">
+              <p><strong>Email:</strong> {{ profileData.email }} (No editable)</p>
+              <div class="form-group">
+                <label for="firstName">Nombre:</label>
+                <input type="text" id="firstName" v-model="editableProfileData.first_name" />
+              </div>
+              <div class="form-group">
+                <label for="lastName">Apellido:</label>
+                <input type="text" id="lastName" v-model="editableProfileData.last_name" />
+              </div>
+              <div class="form-group">
+                <label for="city">Ciudad:</label>
+                <input type="text" id="city" v-model="editableProfileData.city" />
+              </div>
+              <div class="form-group">
+                <label for="phone">Teléfono:</label>
+                <input type="tel" id="phone" v-model="editableProfileData.phone" />
+              </div>
+              <div class="form-group">
+                <label for="birthDate">Fecha Nacimiento:</label>
+                <input type="date" id="birthDate" v-model="editableProfileData.birth_date" />
+              </div>
+              <div class="form-group">
+                <label for="gender">Género:</label>
+                <input type="text" id="gender" v-model="editableProfileData.gender" />
+              </div>
+              <p v-if="saveError" class="error-message form-save-error">{{ saveError }}</p>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-save" :disabled="savingProfile">
+                  {{ savingProfile ? 'Guardando...' : 'Guardar Cambios' }}
+                </button>
+                <button
+                  type="button"
+                  @click="cancelEditing"
+                  class="btn btn-cancel"
+                  :disabled="savingProfile"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
+      <!-- FIN DE LA MODIFICACIÓN ESTRUCTURAL -->
     </div>
 
     <hr v-if="(profileData || !loadingProfile) && !isEditing" class="section-divider" />
@@ -358,21 +365,6 @@ const userDisplayName = computed(() => {
 </template>
 
 <style scoped>
-/* AÑADIDO: Estilos para el nuevo contenedor del avatar */
-.profile-avatar-container {
-  margin-bottom: 30px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.avatar-helper-text {
-  margin-top: 10px;
-  font-size: 0.85em;
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
-/* El resto de tus estilos originales se mantienen intactos */
 .profile-view {
   max-width: 700px;
   margin: 30px auto;
@@ -383,6 +375,30 @@ const userDisplayName = computed(() => {
   font-family: var(--font-family-base);
   background-color: var(--vt-c-white);
 }
+
+/* --- INICIO DE NUESTROS NUEVOS ESTILOS --- */
+
+/* Estilos para el contenedor del avatar (centrado de texto) */
+.profile-avatar-container {
+  margin-bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center; /* Centra el texto del botón y el párrafo de ayuda */
+}
+.avatar-helper-text {
+  margin-top: 10px;
+  font-size: 0.85em;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Por defecto (móvil), el grid se comporta como un bloque normal */
+.profile-main-grid {
+  display: block;
+}
+
+/* --- FIN DE NUESTROS NUEVOS ESTILOS --- */
 
 .profile-view h2 {
   text-align: center;
@@ -653,6 +669,32 @@ const userDisplayName = computed(() => {
   margin-right: 15px;
 }
 
+/* --- INICIO DE LA REGLA RESPONSIVA --- */
+/* Esta regla solo se aplica si el ancho de la pantalla es de 768px o más */
+@media (min-width: 768px) {
+  .profile-main-grid {
+    display: grid;
+    grid-template-columns: 250px 1fr; /* Columna 1 de 250px, Columna 2 toma el resto */
+    gap: 40px; /* Espacio entre las columnas */
+    align-items: start; /* Alinea los items al principio de su celda */
+  }
+
+  .profile-avatar-container {
+    margin-bottom: 0; /* Ya no necesita margen inferior, el 'gap' del grid se encarga */
+  }
+
+  .profile-details-container {
+    text-align: left; /* Alineamos el texto a la izquierda en la columna de datos */
+  }
+
+  .profile-info strong {
+    /* Opcional: ajustamos el ancho mínimo del 'strong' si es necesario */
+    min-width: 120px;
+  }
+}
+/* --- FIN DE LA REGLA RESPONSIVA --- */
+
+/* Tus @media para 640px y 400px se mantienen sin cambios */
 @media (max-width: 640px) {
   .profile-view {
     width: 95%;
