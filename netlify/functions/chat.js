@@ -5,7 +5,7 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 import { createClient } from '@supabase/supabase-js'
 
 const GEMINI_API_KEY = process.env.ZOLVE_GEMINI_API_KEY
-const MODEL_NAME = 'gemini-1.5-flash-latest'
+const MODEL_NAME = 'gemini-2.0-flash'
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -45,7 +45,7 @@ const MAX_DAILY_REQUESTS_CONFIG_KEY = 'gemini_chat_daily_count'
 const SLEEP_MESSAGE =
   '¡Zorry! 🦊💤 Zolve ha respondido muchas preguntas hoy y necesita recargar energías. Estaré de vuelta mañana para seguir ayudándote. ¡Buenos tutos!'
 
-export async function handler(event, context) {
+export async function handler(event, _context) {
   const headers = {
     'Access-Control-Allow-Origin': event.headers?.origin || '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -115,15 +115,13 @@ export async function handler(event, context) {
         currentCount = counterData.current_count
       }
     } else {
-      const { error: insertError } = await supabase
-        .from('api_usage_counters')
-        .insert({
-          service_name: MAX_DAILY_REQUESTS_CONFIG_KEY,
-          current_count: 0,
-          last_reset_date: today,
-          max_limit: maxLimit,
-          updated_at: new Date().toISOString(),
-        })
+      const { error: insertError } = await supabase.from('api_usage_counters').insert({
+        service_name: MAX_DAILY_REQUESTS_CONFIG_KEY,
+        current_count: 0,
+        last_reset_date: today,
+        max_limit: maxLimit,
+        updated_at: new Date().toISOString(),
+      })
       if (insertError) {
         console.error('[Netlify Fn chat] Supabase contador INSERT error:', insertError.message)
         throw new Error('Error al verificar límite (DB insert).')
