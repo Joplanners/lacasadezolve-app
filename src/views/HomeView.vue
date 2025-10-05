@@ -14,16 +14,30 @@ async function handleContactSubmit() {
   }
   contactForm.submitting = true
   try {
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    const mockSuccess = Math.random() > 0.2
-    if (mockSuccess) {
-      toast.success('¡Gracias por tu mensaje! Te contactaremos pronto.')
-      contactForm.name = ''
-      contactForm.email = ''
-      contactForm.message = ''
-    } else {
-      throw new Error('No se pudo enviar el mensaje en este momento.')
+    // Apuntamos a nuestra nueva Netlify Function
+    const response = await fetch('/.netlify/functions/send-contact', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: contactForm.name,
+        email: contactForm.email,
+        message: contactForm.message,
+      }),
+    })
+
+    // Si la respuesta del backend no es exitosa, lanzamos un error
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'No se pudo enviar el mensaje en este momento.')
     }
+
+    // Si todo salió bien
+    toast.success('¡Gracias por tu mensaje! Te contactaremos pronto.')
+    contactForm.name = ''
+    contactForm.email = ''
+    contactForm.message = ''
   } catch (error) {
     console.error('Error al enviar formulario de contacto:', error)
     toast.error(
@@ -426,7 +440,7 @@ async function handleContactSubmit() {
   }
   /* Centrar párrafos en móvil */
   .home-container > p, /* Párrafo de bienvenida */
-  .info-section p, 
+  .info-section p,
   .news-column p,
   .contact-subtitle {
     /* También el subtitulo de contacto */

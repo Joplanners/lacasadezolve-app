@@ -40,14 +40,13 @@
 
     <!-- Botón Flotante para abrir el chat -->
     <transition name="fab-fade">
-      <button
-        v-if="!isChatOpen"
-        @click="openChat"
-        class="chat-fab"
-        aria-label="Abrir chat de ZolveBot"
-      >
-        <img src="/zolve-chat-icon.png" alt="Abrir Chat" />
-      </button>
+      <div v-if="!isChatOpen" @click="openChat" class="fab-container">
+        <div class="fab-text">¿Tienes preguntas?</div>
+
+        <button class="chat-fab" aria-label="Abrir chat de ZolveBot">
+          <img src="/zolve-chat-icon.png" alt="Abrir Chat" />
+        </button>
+      </div>
     </transition>
   </div>
 </template>
@@ -95,6 +94,16 @@ Proceso de Creación y Entrega:
 - El tiempo de confección general es de aproximadamente 3 días hábiles, pero puede variar según la demanda y la complejidad del pedido.
 - Las entregas se coordinan previamente con el cliente.
 - Se requiere el pago del producto para comenzar con su confección.
+
+Proceso de Venta y Boletas:
+  - ¡Sí, damos boleta! Somos un negocio formalizado. Cada compra incluye su boleta correspondiente.
+
+Envíos y Entregas:
+  - Envíos a Regiones (fuera de Santiago): Se realizan a través de Starken, generalmente en la modalidad "por pagar" para que el cliente pague el costo del envío al recibirlo.
+  - Entregas en la Región Metropolitana (Santiago): Somos una tienda 100% online, por lo que las entregas son presenciales y siempre se coordinan previamente con el cliente. Ofrecemos puntos de entrega gratuitos en las estaciones de Metro La Cisterna y Metro Einstein. Si participamos en alguna feria o evento, también podemos coordinar la entrega en ese lugar.
+
+Métodos de Pago:
+  - Actualmente, el método de pago principal es por transferencia bancaria. Estamos trabajando para añadir una pasarela de pagos a la web muy pronto. Los datos para la transferencia se entregan al momento de confirmar el pedido.
 
 Sobre la Experiencia de Realidad Aumentada (AR): // <-- Sección AR como un "producto/servicio"
 - Nuestra Web AR está disponible para CUALQUIERA de nuestros productos personalizables (cuadernos, agendas, planners, entradas, etc.). Permite añadir un mensaje especial o contenido interactivo.
@@ -235,7 +244,7 @@ const handleSendMessage = async () => {
       try {
         const errorData = await response.json()
         errorDetail = errorData.error || errorData.details || errorDetail
-      } catch (e) {
+      } catch {
         // No se pudo parsear JSON, usar el statusText
       }
       console.error('Error desde el backend:', errorDetail)
@@ -510,5 +519,24 @@ watch(isChatOpen, (isOpen) => {
     width: 45px;
     height: 45px;
   }
+}
+/* Contenedor para el botón y el texto */
+.fab-container {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* Espacio entre el texto y el botón */
+  cursor: pointer; /* Para que toda el área se sienta clickeable */
+}
+
+/* Burbuja de texto */
+.fab-text {
+  background-color: var(--color-background, #ffffff);
+  color: var(--color-text, #333333);
+  padding: 8px 16px;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-weight: 500;
+  font-size: 0.95em;
+  white-space: nowrap; /* Evita que el texto se parta en dos líneas */
 }
 </style>
