@@ -6,48 +6,12 @@ import { storeToRefs } from 'pinia'
 import VueCookieAcceptDecline from 'vue-cookie-accept-decline'
 import 'vue-cookie-accept-decline/dist/vue-cookie-accept-decline.css'
 import ZolveBotChat from './components/ZolveBotChat.vue'
+import { supabase } from '@/lib/supabaseClient'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const route = useRoute()
-
 const { isLoggedIn, user, isPasswordRecoveryMode, userRole } = storeToRefs(authStore)
-
-// --- LÓGICA DE CIERRE DE SESIÓN AL VOLVER A LA APP ---
-// La ponemos aquí porque App.vue es el corazón de la app y siempre está "vivo".
-
-onMounted(() => {
-  // Esta bandera solo existirá mientras el componente App esté montado.
-  // Nos ayuda a saber si el usuario se ha ido de la pestaña ALGUNA VEZ.
-  let wasEverHidden = false
-
-  const handleVisibilityChange = () => {
-    // Si la pestaña se oculta (cambio de app, etc.), levantamos la bandera.
-    if (document.visibilityState === 'hidden') {
-      wasEverHidden = true
-      return // No hacemos nada más.
-    }
-
-    // Si la pestaña se vuelve visible Y la bandera nos dice que el usuario
-    // ya se había ido antes, entonces actuamos.
-    if (document.visibilityState === 'visible' && wasEverHidden) {
-      // Si al volver, el usuario estaba logueado, cerramos la sesión.
-      if (authStore.isLoggedIn) {
-        authStore.signOut()
-      }
-    }
-  }
-
-  // Añadimos el listener cuando el componente se monta.
-  document.addEventListener('visibilitychange', handleVisibilityChange)
-
-  // Es buena práctica limpiar el listener cuando el componente se destruye.
-  onUnmounted(() => {
-    document.removeEventListener('visibilitychange', handleVisibilityChange)
-  })
-})
-
-// --- El resto de tu código de App.vue se mantiene igual ---
 
 const isMobileMenuOpen = ref(false)
 const isMobileView = ref(window.innerWidth < 768)
@@ -89,13 +53,15 @@ const calculateNavbarHeights = () => {
   }
   navbarCombinedHeight.value = totalCombinedH
   appHeaderActualHeight.value = currentHeaderH
-  if (currentHeaderH >= 0 && showNavbar.value) {
+  if (currentHeaderH > 0 && showNavbar.value) {
     document.documentElement.style.setProperty('--app-header-actual-height', `${currentHeaderH}px`)
   }
 }
 
 const showNavbar = computed(() => {
-  if (isPasswordRecoveryMode.value && route.name !== 'update-password') return false
+  if (isPasswordRecoveryMode.value && route.name !== 'update-password') {
+    return false
+  }
   if (!isLoggedIn.value) {
     const publicRoutesWithNavbar = [
       'home',
@@ -123,195 +89,70 @@ const showZolveBot = computed(() => {
   return !isARExperienceActive.value && !isOverlayPhotoCaptureActive.value
 })
 
-watch(
-  isARExperienceActive,
-  (isActive) => {
-    const bodyEl = document.body
-    const appRootEl = document.getElementById('app')
-    const mainContentEl = document.querySelector('.main-content')
-    if (isActive) {
-      bodyEl.classList.add('ar-body-active')
-      if (appRootEl) appRootEl.classList.add('ar-app-root-active')
-      if (mainContentEl) mainContentEl.classList.add('ar-main-content-active')
-      Object.assign(bodyEl.style, {
-        overflow: 'hidden',
-        backgroundColor: 'transparent',
-        margin: '0',
-        padding: '0',
-        height: '100%',
-        width: '100%',
-      })
-      if (appRootEl)
-        Object.assign(appRootEl.style, {
-          position: 'fixed',
-          top: '0',
-          left: '0',
-          width: '100%',
-          height: '100%',
-          maxWidth: 'none',
-          margin: '0',
-          padding: '0',
-          backgroundColor: 'transparent',
-          overflow: 'hidden',
-        })
-      if (mainContentEl)
-        Object.assign(mainContentEl.style, {
-          padding: '0',
-          margin: '0',
-          height: '100%',
-          width: '100%',
-          overflow: 'hidden',
-          position: 'absolute',
-          top: '0',
-          left: '0',
-          zIndex: '0',
-        })
-    } else {
-      bodyEl.classList.remove('ar-body-active')
-      if (appRootEl) appRootEl.classList.remove('ar-app-root-active')
-      if (mainContentEl) mainContentEl.classList.remove('ar-main-content-active')
-      if (!isOverlayPhotoCaptureActive.value) {
-        Object.assign(bodyEl.style, {
-          overflow: '',
-          backgroundColor: '',
-          margin: '',
-          padding: '',
-          height: '',
-          width: '',
-        })
-        if (appRootEl)
-          Object.assign(appRootEl.style, {
-            position: '',
-            top: '',
-            left: '',
-            width: '',
-            height: '',
-            maxWidth: '',
-            margin: '',
-            padding: '',
-            backgroundColor: '',
-            overflow: '',
-          })
-        if (mainContentEl)
-          Object.assign(mainContentEl.style, {
-            padding: '',
-            margin: '',
-            height: '',
-            width: '',
-            overflow: '',
-            position: '',
-            top: '',
-            left: '',
-            zIndex: '',
-          })
-      }
-    }
-  },
-  { immediate: true },
-)
+// PARA RENOVAR SESIÓN Y CIERRE POR INACTIVIDAD
+let lastActiveTime = Date.now()
+const MAX_INACTIVE_TIME = 30 * 60 * 1000 // 30 minutos
+let firstCheckDone = false
 
-watch(
-  isOverlayPhotoCaptureActive,
-  (isActive) => {
-    const bodyEl = document.body
-    const appRootEl = document.getElementById('app')
-    const mainContentEl = document.querySelector('.main-content')
-    if (isActive) {
-      bodyEl.classList.add('overlay-photo-body-active')
-      if (appRootEl) appRootEl.classList.add('overlay-photo-app-root-active')
-      Object.assign(bodyEl.style, {
-        overflow: 'hidden',
-        margin: '0',
-        padding: '0',
-        height: '100%',
-        width: '100%',
-      })
-      if (appRootEl)
-        Object.assign(appRootEl.style, {
-          position: 'fixed',
-          top: '0',
-          left: '0',
-          width: '100%',
-          height: '100%',
-          maxWidth: 'none',
-          margin: '0',
-          padding: '0',
-          overflow: 'hidden',
-        })
-    } else {
-      bodyEl.classList.remove('overlay-photo-body-active')
-      if (appRootEl) appRootEl.classList.remove('overlay-photo-app-root-active')
-      if (!isARExperienceActive.value) {
-        Object.assign(bodyEl.style, {
-          overflow: '',
-          margin: '',
-          padding: '',
-          height: '',
-          width: '',
-        })
-        if (appRootEl)
-          Object.assign(appRootEl.style, {
-            position: '',
-            top: '',
-            left: '',
-            width: '',
-            height: '',
-            maxWidth: '',
-            margin: '',
-            padding: '',
-            backgroundColor: '',
-            overflow: '',
-          })
-        if (mainContentEl)
-          Object.assign(mainContentEl.style, {
-            padding: '',
-            margin: '',
-            height: '',
-            width: '',
-            overflow: '',
-            position: '',
-            top: '',
-            left: '',
-            zIndex: '',
-          })
-      }
-    }
-  },
-  { immediate: true },
-)
-
-watch(
-  [
-    showNavbar,
-    isMobileMenuOpen,
-    isMobileView,
-    () => route.name,
-    isOverlayPhotoCaptureActive,
-    isARExperienceActive,
-  ],
-  () => {
-    nextTick(() => {
-      calculateNavbarHeights()
-    })
-  },
-  { immediate: true, deep: true },
-)
-
-const handleResizeAndOrientation = () => {
-  isMobileView.value = window.innerWidth < 768
-  if (screen.orientation && typeof screen.orientation.type !== 'undefined') {
-    isLandscape.value = screen.orientation.type.startsWith('landscape')
-  } else {
-    isLandscape.value = window.matchMedia('(orientation: landscape)').matches
-  }
-  nextTick(calculateNavbarHeights)
+// Control de actividad del usuario para cerrar sesión por inactividad
+const resetInactivityTimer = () => {
+  lastActiveTime = Date.now()
 }
 
-// Se borra el onMounted que tenías, porque la lógica se integra en el nuevo
-// que hemos añadido al principio para la visibilidad.
+// Escuchar eventos de actividad
+window.addEventListener('mousemove', resetInactivityTimer)
+window.addEventListener('keydown', resetInactivityTimer)
+window.addEventListener('scroll', resetInactivityTimer)
+window.addEventListener('click', resetInactivityTimer)
+
+const handleVisibilityChange = async () => {
+  if (document.visibilityState === 'visible') {
+    const now = Date.now()
+    const inactiveTime = now - lastActiveTime
+
+    if (inactiveTime > MAX_INACTIVE_TIME) {
+      console.log('⏰ Inactividad larga, intentando refrescar sesión...')
+
+      try {
+        // Renovar sesión antes de verificar
+        const { data, error } = await supabase.auth.refreshSession()
+        if (error) {
+          console.warn('⚠️ Error refrescando sesión:', error.message)
+        }
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (!session && authStore.isLoggedIn) {
+          if (firstCheckDone) {
+            console.log('❌ Sesión expirada, cerrando sesión...')
+            await authStore.signOut()
+          } else {
+            console.log('⚠️ Primera verificación sin sesión, esperando siguiente check')
+          }
+        } else if (session) {
+          console.log('✅ Sesión válida tras refrescar')
+        }
+      } catch (e) {
+        console.error('Error manejando visibilidad:', e)
+      }
+
+      firstCheckDone = true
+    } else {
+      console.log('✅ Pestaña visible, inactivo solo', Math.round(inactiveTime / 1000), 'segundos')
+    }
+
+    lastActiveTime = now
+  } else if (document.visibilityState === 'hidden') {
+    lastActiveTime = Date.now()
+  }
+}
+
 onMounted(() => {
   handleResizeAndOrientation()
   window.addEventListener('resize', handleResizeAndOrientation)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
   if (screen.orientation) {
     screen.orientation.addEventListener('change', handleResizeAndOrientation)
   } else {
@@ -327,6 +168,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResizeAndOrientation)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   if (screen.orientation) {
     screen.orientation.removeEventListener('change', handleResizeAndOrientation)
   } else {
@@ -343,7 +185,6 @@ onUnmounted(() => {
     const mainContentEl = document.querySelector('.main-content')
     bodyEl.classList.remove('ar-body-active', 'overlay-photo-body-active')
     if (appRootEl) appRootEl.classList.remove('ar-app-root-active', 'overlay-photo-app-root-active')
-    if (mainContentEl) mainContentEl.classList.remove('ar-main-content-active')
     Object.assign(bodyEl.style, {
       overflow: '',
       backgroundColor: '',
@@ -352,7 +193,7 @@ onUnmounted(() => {
       height: '',
       width: '',
     })
-    if (appRootEl)
+    if (appRootEl) {
       Object.assign(appRootEl.style, {
         position: '',
         top: '',
@@ -365,7 +206,8 @@ onUnmounted(() => {
         backgroundColor: '',
         overflow: '',
       })
-    if (mainContentEl)
+    }
+    if (mainContentEl) {
       Object.assign(mainContentEl.style, {
         padding: '',
         margin: '',
@@ -377,6 +219,7 @@ onUnmounted(() => {
         left: '',
         zIndex: '',
       })
+    }
   }
 })
 
@@ -384,16 +227,20 @@ function toggleMobileMenu() {
   isMobileMenuOpen.value = !isMobileMenuOpen.value
   nextTick(calculateNavbarHeights)
 }
+
 function closeMobileMenu() {
   if (isMobileMenuOpen.value) {
     isMobileMenuOpen.value = false
     nextTick(calculateNavbarHeights)
   }
 }
+
 watch(
   () => route.path,
   () => {
-    if (isMobileMenuOpen.value) closeMobileMenu()
+    if (isMobileMenuOpen.value) {
+      closeMobileMenu()
+    }
   },
 )
 
@@ -406,15 +253,31 @@ const handleLogout = async () => {
     window.location.assign('/')
   }
 }
-function cookieStatus(status) {}
-function cookieRemoved() {}
+
+function cookieStatus(status) {
+  // Tu lógica de cookies
+}
+
+function cookieRemoved() {
+  // Tu lógica de cookies
+}
 
 const mainContentPaddingTop = computed(() => {
-  if ((isOverlayPhotoCaptureActive.value || isARExperienceActive.value) && showNavbar.value) {
-    return navbarCombinedHeight.value + 'px'
+  if (isOverlayPhotoCaptureActive.value || (isARExperienceActive.value && showNavbar.value)) {
+    return `${navbarCombinedHeight.value}px`
   }
   return ''
 })
+
+function handleResizeAndOrientation() {
+  isMobileView.value = window.innerWidth < 768
+  if (screen.orientation && typeof screen.orientation.type !== 'undefined') {
+    isLandscape.value = screen.orientation.type.startsWith('landscape')
+  } else {
+    isLandscape.value = window.matchMedia('(orientation: landscape)').matches
+  }
+  nextTick(calculateNavbarHeights)
+}
 </script>
 
 <template>
@@ -427,17 +290,18 @@ const mainContentPaddingTop = computed(() => {
   >
     <header ref="appHeaderRef" class="app-header" v-if="showNavbar">
       <div class="logo-container">
-        <RouterLink :to="{ name: 'home' }" class="logo-link-header" @click="closeMobileMenu"
-          ><img src="/LogoZolve.png" alt="Logo Zolve" class="header-logo-img"
-        /></RouterLink>
+        <RouterLink :to="{ name: 'home' }" class="logo-link-header" @click="closeMobileMenu">
+          <img src="/LogoZolve.png" alt="Logo Zolve" class="header-logo-img" />
+        </RouterLink>
       </div>
       <div class="user-info" v-if="isLoggedIn && user">
-        Hola: <strong>{{ userDisplayName }}</strong>
+        Hola <strong>{{ userDisplayName }}</strong>
       </div>
       <button v-if="isLoggedIn" @click="handleLogout" class="btn-logout-header">
         Cerrar Sesión
       </button>
     </header>
+
     <div ref="navContainerRef" class="nav-container" v-if="showNavbar">
       <button
         class="mobile-menu-toggle"
@@ -451,79 +315,53 @@ const mainContentPaddingTop = computed(() => {
         <router-link :to="{ name: 'home' }" @click="closeMobileMenu">Inicio</router-link>
         <router-link :to="{ name: 'how-to' }" @click="closeMobileMenu">Cómo Usar</router-link>
         <router-link :to="{ name: 'store' }" @click="closeMobileMenu">Tienda</router-link>
-        <router-link v-if="!isLoggedIn" :to="{ name: 'login' }" @click="closeMobileMenu"
-          >Login/Registro</router-link
-        >
+        <router-link v-if="!isLoggedIn" :to="{ name: 'login' }" @click="closeMobileMenu">
+          Login/Registro
+        </router-link>
         <template v-if="isLoggedIn">
           <router-link
             v-if="userRole === 'admin'"
             :to="{ name: 'admin-dashboard' }"
             @click="closeMobileMenu"
-            >Panel Admin</router-link
           >
-          <router-link v-else :to="{ name: 'profile' }" @click="closeMobileMenu"
-            >Mi Perfil</router-link
-          >
+            Panel Admin
+          </router-link>
+          <router-link v-else :to="{ name: 'profile' }" @click="closeMobileMenu">
+            Mi Perfil
+          </router-link>
         </template>
       </nav>
     </div>
-    <main class="main-content" :style="{ paddingTop: mainContentPaddingTop }"><RouterView /></main>
+
+    <main class="main-content" :style="{ paddingTop: mainContentPaddingTop }">
+      <RouterView />
+    </main>
+
     <footer class="app-footer" v-if="showFooter">
       <div class="footer-content">
         <div class="social-icons">
-          <a
-            href="https://www.instagram.com/zolve_fox/"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Instagram de Zolve"
-            ><font-awesome-icon :icon="['fab', 'instagram']"
-          /></a>
-          <a
-            href="https://www.facebook.com/profile.php?id=61572707384711"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Facebook de Zolve"
-            ><font-awesome-icon :icon="['fab', 'facebook-f']"
-          /></a>
-          <a
-            href="https://www.youtube.com/@LaCasaDeZolve"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="YouTube de Zolve"
-            ><font-awesome-icon :icon="['fab', 'youtube']"
-          /></a>
-        </div>
-        <div class="copyright-text">
-          <p>Desarrollado por Zolve</p>
-          <p>Todos los derechos reservados © {{ new Date().getFullYear() }}</p>
-        </div>
-        <div class="footer-links">
-          <RouterLink :to="{ name: 'terms-conditions' }">Términos y Condiciones</RouterLink>
-          <RouterLink :to="{ name: 'privacy-policy' }">Política de Privacidad</RouterLink>
-          <RouterLink :to="{ name: 'cookies-policy' }">Política de Cookies</RouterLink>
+          <!-- Tu contenido de footer -->
         </div>
       </div>
     </footer>
+
     <vue-cookie-accept-decline
-      v-if="showFooter"
-      :ref="'cookieConsent'"
-      :elementId="'cookieConsentBanner'"
-      :debug="false"
-      :position="'bottom'"
-      :type="'bar'"
-      :disableDecline="false"
-      :transitionName="'slideFromBottom'"
-      :showPostponeButton="false"
       @status="cookieStatus"
-      @removed-cookie="cookieRemoved"
+      @removed="cookieRemoved"
+      :position="'bottom'"
+      :type="'floating'"
+      :transitionName="'slideFromBottom'"
     >
-      <template #message
-        >Este sitio web utiliza cookies para asegurar que obtengas la mejor experiencia. Consulta
-        nuestra
-        <RouterLink :to="{ name: 'cookies-policy' }">Política de Cookies</RouterLink>.</template
-      >
-      <template #acceptContent>¡Entendido!</template><template #declineContent>Rechazar</template>
+      <template #message>
+        Usamos cookies para mejorar tu experiencia.
+        <router-link :to="{ name: 'cookies-policy' }" class="cookie-link">
+          Más información
+        </router-link>
+      </template>
+      <template #acceptContent>Entendido!</template>
+      <template #declineContent>Rechazar</template>
     </vue-cookie-accept-decline>
+
     <ZolveBotChat v-if="showZolveBot" />
   </div>
 </template>

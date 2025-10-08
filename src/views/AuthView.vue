@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue' // Se añade 'computed'
+import { ref, watch, computed } from 'vue'
 import { supabase } from '@/lib/supabaseClient.js'
 import PasswordInput from '@/components/PasswordInput.vue'
 import { useAuthStore } from '@/stores/authStore'
@@ -21,12 +21,9 @@ const forgotPasswordLoading = ref(false)
 const forgotPasswordMessage = ref('')
 const forgotPasswordErrorMsg = ref('')
 
-// --- INICIO DE LA NUEVA LÓGICA DE VALIDACIÓN DE CONTRASEÑA ---
-
-// Aquí definimos las reglas que configuramos en Supabase.
-// Usamos 'computed' para que solo se apliquen en el modo de registro.
+// Lógica de validación de contraseña
 const passwordRequirements = computed(() => {
-  if (!isRegistering.value) return [] // No hay requisitos para el login
+  if (!isRegistering.value) return []
   return [
     { text: 'Al menos 8 caracteres', regex: /.{8,}/ },
     { text: 'Incluye una mayúscula (A-Z)', regex: /[A-Z]/ },
@@ -36,8 +33,6 @@ const passwordRequirements = computed(() => {
   ]
 })
 
-// Esta propiedad computada revisa la contraseña actual contra las reglas
-// y nos devuelve una lista con el estado de cada una (válida o no).
 const passwordValidation = computed(() => {
   const value = password.value
   return passwordRequirements.value.map((req) => ({
@@ -46,15 +41,11 @@ const passwordValidation = computed(() => {
   }))
 })
 
-// Esta propiedad computada es un simple 'true' o 'false'.
-// Será 'true' solo si TODAS las reglas en `passwordValidation` son válidas.
 const isPasswordValid = computed(() => {
-  if (!isRegistering.value) return true // Para el login, el botón siempre está habilitado
+  if (!isRegistering.value) return true
   if (passwordRequirements.value.length === 0) return true
   return passwordValidation.value.every((req) => req.valid)
 })
-
-// --- FIN DE LA NUEVA LÓGICA ---
 
 watch(
   () => authStore.isLoggedIn,
@@ -102,7 +93,6 @@ const handleLogin = async () => {
 }
 
 const handleRegister = async () => {
-  // Añadimos una comprobación extra aquí por si acaso
   if (!isPasswordValid.value) {
     errorMsg.value = 'La contraseña no cumple con todos los requisitos de seguridad.'
     return
@@ -128,17 +118,16 @@ const handleRegister = async () => {
   }
 }
 
+// Aquí redirigirás al método nuevo del store para login con Google usando la lógica centralizada
 const handleGoogleLogin = async () => {
   clearAllMessages()
   loading.value = true
   try {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-    })
-    if (error) throw error
+    await authStore.signInWithGoogle()
   } catch (error) {
     console.error('AuthView: Error con Google Login:', error.message)
     errorMsg.value = `Error con Google: ${error.message}`
+  } finally {
     loading.value = false
   }
 }
@@ -258,7 +247,6 @@ const switchToLoginRegister = () => {
           :required="true"
           placeholder="Tu contraseña segura"
         >
-          <!-- Este bloque de código se insertará en el 'slot' de PasswordInput.vue -->
           <template #requirements>
             <ul v-if="isRegistering && password.length > 0" class="requirements-list">
               <li
@@ -266,7 +254,6 @@ const switchToLoginRegister = () => {
                 :key="index"
                 :class="{ valid: req.valid }"
               >
-                <!-- Usamos un span para el icono para mejor estilo -->
                 <span class="requirement-icon">{{ req.valid ? '✓' : '✗' }}</span>
                 {{ req.text }}
               </li>
@@ -274,7 +261,6 @@ const switchToLoginRegister = () => {
           </template>
         </PasswordInput>
 
-        <!-- Modificamos la condición 'disabled' del botón -->
         <button
           type="submit"
           class="btn btn-primary"
@@ -282,7 +268,6 @@ const switchToLoginRegister = () => {
         >
           {{ loading ? 'Procesando...' : isRegistering ? 'Crear mi Cuenta' : 'Ingresar' }}
         </button>
-        <!-- FIN DE LA MODIFICACIÓN -->
       </form>
 
       <p v-if="!isRegistering" class="forgot-password">
