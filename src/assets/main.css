@@ -2,16 +2,17 @@
 
 /* Estilos para #app cuando NO está en modo AR */
 #app:not(.ar-app-root-active) {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  /* min-height: 100vh; // Esto puede ser manejado por #app-container si es necesario */
+  /* La 'caja' principal ahora solo se preocupa de ocupar toda la pantalla */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
-/* Estilos para #app CUANDO ESTÁ en modo AR 
-   (Principalmente manejado por JS en App.vue, pero esto puede ser un respaldo o para claridad) */
+/* Los estilos de 'caja' (max-width, padding, etc.) ya no van aquí */
+
+/* Estilos para #app CUANDO ESTÁ en modo AR (sin cambios) */
 #app.ar-app-root-active {
-  position: fixed; /* o absolute, para asegurar que ignore el flujo normal y tome el viewport */
+  position: fixed;
   top: 0;
   left: 0;
   width: 100% !important;
@@ -21,15 +22,15 @@
   padding: 0 !important;
   overflow: hidden !important;
   background-color: transparent !important;
-  z-index: 0; /* Asegurar que esté en la base del apilamiento */
+  z-index: 0;
 }
 
-/* Estilos para el body cuando está en modo AR */
+/* Estilos para el body cuando está en modo AR (sin cambios) */
 body.ar-body-active {
   overflow: hidden !important;
   background-color: transparent !important;
-  margin: 0 !important; /* Muy importante */
-  padding: 0 !important; /* Muy importante */
+  margin: 0 !important;
+  padding: 0 !important;
   width: 100% !important;
   height: 100% !important;
 }
@@ -67,7 +68,6 @@ h5 {
 h6 {
   font-size: 0.9rem;
 }
-
 a {
   text-decoration: none;
   color: var(--color-link);
@@ -76,29 +76,3 @@ a {
 a:hover {
   color: var(--color-link-hover);
 }
-
-.green {
-  text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
-}
-@media (hover: hover) {
-  .green:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
-}
-
-/*
-@media (min-width: 1024px) {
-// body {
-//   display: flex;
-//   place-items: center;
-// }
-// #app {
-//   display: grid;
-//   grid-template-columns: 1fr 1fr;
-//   padding: 0 2rem;
-// }
-}
-*/

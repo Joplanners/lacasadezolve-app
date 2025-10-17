@@ -7,12 +7,35 @@ import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons'
-import { faInstagram, faFacebookF, faYoutube } from '@fortawesome/free-brands-svg-icons'
+import {
+  faEye,
+  faEyeSlash,
+  faVolumeUp,
+  faVolumeMute,
+  faStore,
+} from '@fortawesome/free-solid-svg-icons'
+import {
+  faInstagram,
+  faFacebookF,
+  faYoutube,
+  faTiktok, // <-- 1. IMPORTAMOS EL ÍCONO DE TIKTOK
+} from '@fortawesome/free-brands-svg-icons'
 
-library.add(faEye, faEyeSlash, faInstagram, faFacebookF, faYoutube)
+// Añadimos TODOS los íconos que usamos a la biblioteca central
+library.add(
+  faEye,
+  faEyeSlash,
+  faVolumeUp,
+  faVolumeMute,
+  faStore,
+  faInstagram,
+  faFacebookF,
+  faYoutube,
+  faTiktok, // <-- 2. LO AÑADIMOS A LA BIBLIOTECA
+)
 
 const app = createApp(App)
+
 app.component('font-awesome-icon', FontAwesomeIcon)
 
 app.use(createPinia())
@@ -32,7 +55,6 @@ const toastOptions = {
   icon: true,
   rtl: false,
 }
-
 app.use(Toast, toastOptions)
 
 app.mount('#app')

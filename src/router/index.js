@@ -37,6 +37,13 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/producto/:id',
+      name: 'product-detail',
+      component: () => import('../views/ProductDetailView.vue'),
+      props: true, // Esto pasa el :id de la URL como un prop al componente
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/experiencia-ar/:markerId',
       name: 'ar-experience',
       component: () => import('../views/ARExperienceView.vue'),
@@ -140,7 +147,45 @@ const router = createRouter({
           component: () => import('../views/Admin/AdminOverlayImageFormView.vue'),
           props: { isEditMode: true },
         },
+        {
+          path: 'categorias',
+          name: 'admin-categories',
+          component: () => import('../views/Admin/AdminProductCategoriesView.vue'),
+        },
+        {
+          path: 'productos',
+          name: 'admin-products',
+          component: () => import('../views/Admin/AdminProductListView.vue'),
+        },
+        {
+          path: 'productos/nuevo',
+          name: 'admin-product-new',
+          component: () => import('../views/Admin/AdminProductFormView.vue'),
+          props: { isEditMode: false },
+        },
+        {
+          path: 'productos/editar/:id',
+          name: 'admin-product-edit',
+          component: () => import('../views/Admin/AdminProductFormView.vue'),
+          props: { isEditMode: true },
+        },
+        {
+          path: 'productos-destacados',
+          name: 'admin-featured-products',
+          component: () => import('@/views/Admin/AdminFeaturedProductsView.vue'),
+        },
+        {
+          path: 'banners',
+          name: 'admin-banners',
+          component: () => import('@/views/Admin/AdminBannersView.vue'),
+        },
       ],
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: () => import('../views/NotFoundView.vue'),
+      meta: { requiresAuth: false },
     },
   ],
 })

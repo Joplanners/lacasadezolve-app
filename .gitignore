@@ -34,3 +34,7 @@ supabase/.env.local
 
 # Local Netlify folder
 .netlify
+
+# Archivos personales y de notas
+estructura.txt
+estructura_proyecto.txt

@@ -7,9 +7,14 @@
       <router-link :to="{ name: 'admin-markers' }">Marcadores</router-link> |
       <router-link :to="{ name: 'admin-contents' }">Contenidos</router-link> |
       <!-- 👇 NUEVO ENLACE AÑADIDO AQUÍ 👇 -->
-      <router-link :to="{ name: 'admin-overlay-images' }">Fotos Mágicas</router-link>
-      <hr />
+      <router-link :to="{ name: 'admin-overlay-images' }">Fotos Mágicas</router-link> |
+      <!-- 👇 NUEVO ENLACE AÑADIDO AQUÍ 👇 -->
+      <router-link :to="{ name: 'admin-categories' }">Categorías</router-link> |
+      <router-link :to="{ name: 'admin-products' }">Productos</router-link> |
+      <router-link :to="{ name: 'admin-featured-products' }"> Productos Destacados </router-link> |
+      <router-link :to="{ name: 'admin-banners' }">Banners</router-link> |
     </nav>
+    <hr />
     <main>
       <RouterView />
     </main>

@@ -7,6 +7,7 @@ import VueCookieAcceptDecline from 'vue-cookie-accept-decline'
 import 'vue-cookie-accept-decline/dist/vue-cookie-accept-decline.css'
 import ZolveBotChat from './components/ZolveBotChat.vue'
 import { supabase } from '@/lib/supabaseClient'
+import AppFooter from './components/AppFooter.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -59,25 +60,19 @@ const calculateNavbarHeights = () => {
 }
 
 const showNavbar = computed(() => {
-  if (isPasswordRecoveryMode.value && route.name !== 'update-password') {
-    return false
-  }
-  if (!isLoggedIn.value) {
-    const publicRoutesWithNavbar = [
-      'home',
-      'login',
-      'how-to',
-      'store',
-      'terms-conditions',
-      'privacy-policy',
-      'cookies-policy',
-    ]
-    return publicRoutesWithNavbar.includes(route.name)
-  }
-  if (isARExperienceActive.value) {
-    if (!isMobileView.value) return true
-    return !isLandscape.value
-  }
+  if (isPasswordRecoveryMode.value && route.name !== 'update-password') return false
+  const publicRoutesWithNavbar = [
+    'home',
+    'login',
+    'how-to',
+    'store',
+    'terms-conditions',
+    'privacy-policy',
+    'cookies-policy',
+    'product-detail', // ¡No te olvides de este!
+  ]
+  if (!isLoggedIn.value) return publicRoutesWithNavbar.includes(route.name)
+  if (isARExperienceActive.value) return !isMobileView.value || !isLandscape.value
   return !isPasswordRecoveryMode.value
 })
 
@@ -89,17 +84,12 @@ const showZolveBot = computed(() => {
   return !isARExperienceActive.value && !isOverlayPhotoCaptureActive.value
 })
 
-// PARA RENOVAR SESIÓN Y CIERRE POR INACTIVIDAD
 let lastActiveTime = Date.now()
-const MAX_INACTIVE_TIME = 30 * 60 * 1000 // 30 minutos
-let firstCheckDone = false
+const MAX_INACTIVE_TIME = 30 * 60 * 1000
 
-// Control de actividad del usuario para cerrar sesión por inactividad
 const resetInactivityTimer = () => {
   lastActiveTime = Date.now()
 }
-
-// Escuchar eventos de actividad
 window.addEventListener('mousemove', resetInactivityTimer)
 window.addEventListener('keydown', resetInactivityTimer)
 window.addEventListener('scroll', resetInactivityTimer)
@@ -109,43 +99,20 @@ const handleVisibilityChange = async () => {
   if (document.visibilityState === 'visible') {
     const now = Date.now()
     const inactiveTime = now - lastActiveTime
-
     if (inactiveTime > MAX_INACTIVE_TIME) {
-      console.log('⏰ Inactividad larga, intentando refrescar sesión...')
-
       try {
-        // Renovar sesión antes de verificar
-        const { data, error } = await supabase.auth.refreshSession()
-        if (error) {
-          console.warn('⚠️ Error refrescando sesión:', error.message)
-        }
-
+        await supabase.auth.refreshSession()
         const {
           data: { session },
         } = await supabase.auth.getSession()
-
         if (!session && authStore.isLoggedIn) {
-          if (firstCheckDone) {
-            console.log('❌ Sesión expirada, cerrando sesión...')
-            await authStore.signOut()
-          } else {
-            console.log('⚠️ Primera verificación sin sesión, esperando siguiente check')
-          }
-        } else if (session) {
-          console.log('✅ Sesión válida tras refrescar')
+          await authStore.signOut()
         }
       } catch (e) {
         console.error('Error manejando visibilidad:', e)
       }
-
-      firstCheckDone = true
-    } else {
-      console.log('✅ Pestaña visible, inactivo solo', Math.round(inactiveTime / 1000), 'segundos')
     }
-
     lastActiveTime = now
-  } else if (document.visibilityState === 'hidden') {
-    lastActiveTime = Date.now()
   }
 }
 
@@ -179,48 +146,6 @@ onUnmounted(() => {
       mediaQuery.removeListener(handleResizeAndOrientation)
     }
   }
-  if (isARExperienceActive.value || isOverlayPhotoCaptureActive.value) {
-    const bodyEl = document.body
-    const appRootEl = document.getElementById('app')
-    const mainContentEl = document.querySelector('.main-content')
-    bodyEl.classList.remove('ar-body-active', 'overlay-photo-body-active')
-    if (appRootEl) appRootEl.classList.remove('ar-app-root-active', 'overlay-photo-app-root-active')
-    Object.assign(bodyEl.style, {
-      overflow: '',
-      backgroundColor: '',
-      margin: '',
-      padding: '',
-      height: '',
-      width: '',
-    })
-    if (appRootEl) {
-      Object.assign(appRootEl.style, {
-        position: '',
-        top: '',
-        left: '',
-        width: '',
-        height: '',
-        maxWidth: '',
-        margin: '',
-        padding: '',
-        backgroundColor: '',
-        overflow: '',
-      })
-    }
-    if (mainContentEl) {
-      Object.assign(mainContentEl.style, {
-        padding: '',
-        margin: '',
-        height: '',
-        width: '',
-        overflow: '',
-        position: '',
-        top: '',
-        left: '',
-        zIndex: '',
-      })
-    }
-  }
 })
 
 function toggleMobileMenu() {
@@ -238,29 +163,18 @@ function closeMobileMenu() {
 watch(
   () => route.path,
   () => {
-    if (isMobileMenuOpen.value) {
-      closeMobileMenu()
-    }
+    if (isMobileMenuOpen.value) closeMobileMenu()
   },
 )
 
 const handleLogout = async () => {
   closeMobileMenu()
-  try {
-    await authStore.signOut()
-    router.push({ name: 'home' })
-  } catch (error) {
-    window.location.assign('/')
-  }
+  await authStore.signOut()
+  router.push({ name: 'home' })
 }
 
-function cookieStatus(status) {
-  // Tu lógica de cookies
-}
-
-function cookieRemoved() {
-  // Tu lógica de cookies
-}
+function cookieStatus() {}
+function cookieRemoved() {}
 
 const mainContentPaddingTop = computed(() => {
   if (isOverlayPhotoCaptureActive.value || (isARExperienceActive.value && showNavbar.value)) {
@@ -315,20 +229,19 @@ function handleResizeAndOrientation() {
         <router-link :to="{ name: 'home' }" @click="closeMobileMenu">Inicio</router-link>
         <router-link :to="{ name: 'how-to' }" @click="closeMobileMenu">Cómo Usar</router-link>
         <router-link :to="{ name: 'store' }" @click="closeMobileMenu">Tienda</router-link>
-        <router-link v-if="!isLoggedIn" :to="{ name: 'login' }" @click="closeMobileMenu">
-          Login/Registro
-        </router-link>
+        <router-link v-if="!isLoggedIn" :to="{ name: 'login' }" @click="closeMobileMenu"
+          >Login/Registro</router-link
+        >
         <template v-if="isLoggedIn">
           <router-link
             v-if="userRole === 'admin'"
             :to="{ name: 'admin-dashboard' }"
             @click="closeMobileMenu"
+            >Panel Admin</router-link
           >
-            Panel Admin
-          </router-link>
-          <router-link v-else :to="{ name: 'profile' }" @click="closeMobileMenu">
-            Mi Perfil
-          </router-link>
+          <router-link v-else :to="{ name: 'profile' }" @click="closeMobileMenu"
+            >Mi Perfil</router-link
+          >
         </template>
       </nav>
     </div>
@@ -337,26 +250,21 @@ function handleResizeAndOrientation() {
       <RouterView />
     </main>
 
-    <footer class="app-footer" v-if="showFooter">
-      <div class="footer-content">
-        <div class="social-icons">
-          <!-- Tu contenido de footer -->
-        </div>
-      </div>
-    </footer>
+    <AppFooter v-if="showFooter" />
 
     <vue-cookie-accept-decline
+      :elementId="'cookieConsentBanner'"
       @status="cookieStatus"
       @removed="cookieRemoved"
-      :position="'bottom'"
-      :type="'floating'"
-      :transitionName="'slideFromBottom'"
+      position="bottom"
+      type="floating"
+      transitionName="slideFromBottom"
     >
       <template #message>
         Usamos cookies para mejorar tu experiencia.
-        <router-link :to="{ name: 'cookies-policy' }" class="cookie-link">
-          Más información
-        </router-link>
+        <router-link :to="{ name: 'cookies-policy' }" class="cookie-link"
+          >Más información</router-link
+        >
       </template>
       <template #acceptContent>Entendido!</template>
       <template #declineContent>Rechazar</template>
@@ -445,9 +353,6 @@ function handleResizeAndOrientation() {
 </style>
 
 <style scoped>
-:root {
-  --app-header-actual-height: 57px; /* Fallback, JS lo actualiza. Ajusta este valor a tu altura de header por defecto real */
-}
 #app-container {
   display: flex;
   flex-direction: column;
@@ -456,76 +361,28 @@ function handleResizeAndOrientation() {
   background-color: var(--color-background);
   color: var(--color-text);
 }
-#app-container.ar-mode-active,
-#app-container.overlay-photo-mode-active {
+
+.app-header,
+.nav-container {
   width: 100%;
-  height: 100vh;
-  padding: 0 !important;
-  margin: 0 !important;
-  overflow: hidden;
-  background-color: #000 !important;
+  flex-shrink: 0;
 }
-#app-container.ar-mode-active .main-content.ar-main-content-active,
-#app-container.overlay-photo-mode-active .main-content {
+
+.main-content {
   flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  height: 100%;
   width: 100%;
-  background-color: transparent;
-}
-#app-container.ar-mode-active .main-content.ar-main-content-active {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-}
-#app-container.ar-mode-active .app-header,
-#app-container.ar-mode-active .nav-container,
-#app-container.overlay-photo-mode-active .app-header,
-#app-container.overlay-photo-mode-active .nav-container {
-  position: fixed;
-  left: 0;
-  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
   box-sizing: border-box;
 }
-#app-container.ar-mode-active .app-header,
-#app-container.overlay-photo-mode-active .app-header {
-  top: 0;
-  z-index: 1010;
-  background-color: rgba(30, 30, 30, 0.85);
-  border-bottom: 1px solid rgba(70, 70, 70, 0.5);
-  color: #eee;
+
+@media (max-width: 767px) {
+  .main-content {
+    padding: 2rem 15px;
+  }
 }
-#app-container.ar-mode-active .app-header .user-info strong,
-#app-container.overlay-photo-mode-active .app-header .user-info strong {
-  color: #fff;
-}
-#app-container.ar-mode-active .hamburger-icon span,
-#app-container.overlay-photo-mode-active .hamburger-icon span {
-  background-color: #eee;
-}
-#app-container.ar-mode-active .nav-container,
-#app-container.overlay-photo-mode-active .nav-container {
-  top: var(--app-header-actual-height);
-  z-index: 1005;
-  background-color: rgba(40, 40, 40, 0.85);
-  border-bottom: 1px solid rgba(70, 70, 70, 0.5);
-}
-#app-container.ar-mode-active .main-nav a,
-#app-container.overlay-photo-mode-active .main-nav a {
-  color: #ccc;
-}
-#app-container.ar-mode-active .main-nav a:hover,
-#app-container.overlay-photo-mode-active .main-nav a:hover {
-  color: #fff;
-}
-#app-container.ar-mode-active .main-nav a.router-link-exact-active,
-#app-container.overlay-photo-mode-active .main-nav a.router-link-exact-active {
-  color: #fff;
-  border-bottom-color: #fff;
-}
+
 .app-header {
   display: flex;
   justify-content: space-between;
@@ -533,34 +390,17 @@ function handleResizeAndOrientation() {
   padding: 8px 20px;
   background-color: var(--color-background-soft);
   border-bottom: 1px solid var(--color-border);
-  font-size: 0.9em;
-  flex-shrink: 0;
-  height: var(--app-header-actual-height);
   box-sizing: border-box;
-}
-.logo-link-header {
-  display: inline-block;
-  vertical-align: middle;
 }
 .header-logo-img {
   width: 40px;
   height: 40px;
   border-radius: 50%;
   object-fit: cover;
-  display: block;
 }
 .user-info {
-  color: var(--color-text);
   margin-left: auto;
   margin-right: 15px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
-}
-.user-info strong {
-  color: var(--color-heading);
-  font-weight: var(--font-weight-medium);
 }
 .btn-logout-header {
   padding: 6px 14px;
@@ -569,14 +409,6 @@ function handleResizeAndOrientation() {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.9em;
-  font-family: var(--font-family-base);
-  font-weight: var(--font-weight-medium);
-  transition: background-color 0.2s ease;
-  flex-shrink: 0;
-}
-.btn-logout-header:hover {
-  background-color: var(--vt-c-black-soft);
 }
 .nav-container {
   background-color: var(--color-background-mute);
@@ -585,18 +417,16 @@ function handleResizeAndOrientation() {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
   position: relative;
   min-height: 50px;
   box-sizing: border-box;
 }
 .mobile-menu-toggle {
   display: none;
-  background: 0 0;
+  background: transparent;
   border: none;
   cursor: pointer;
   padding: 15px;
-  z-index: 1006;
 }
 .hamburger-icon {
   display: flex;
@@ -624,10 +454,8 @@ function handleResizeAndOrientation() {
   margin: 5px 15px;
   text-decoration: none;
   color: var(--color-link);
-  font-family: var(--font-family-base);
   font-weight: 700;
   padding: 8px 0;
-  transition: color 0.2s ease;
   border-bottom: 2px solid transparent;
 }
 .main-nav a:hover {
@@ -637,62 +465,8 @@ function handleResizeAndOrientation() {
   color: var(--color-link-hover);
   border-bottom-color: var(--color-link);
 }
-.main-content {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-}
-.app-footer {
-  background-color: var(--color-background-mute);
-  padding: 25px 20px;
-  text-align: center;
-  font-size: 0.85em;
-  border-top: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-.footer-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 15px;
-  max-width: 800px;
-  margin: 0 auto;
-}
-.social-icons {
-  display: flex;
-  gap: 20px;
-}
-.social-icons a {
-  color: var(--color-text);
-  font-size: 1.5em;
-  transition: color 0.2s ease;
-}
-.social-icons a:hover {
-  color: var(--brand-pink);
-}
-.copyright-text p {
-  margin: 2px 0;
-}
-.footer-links {
-  display: flex;
-  gap: 10px 20px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.footer-links a {
-  color: var(--color-link);
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-.footer-links a:hover {
-  color: var(--brand-pink);
-  text-decoration: underline;
-}
 
 @media (max-width: 767px) {
-  .app-header {
-    height: var(--app-header-actual-height);
-  }
   .user-info {
     display: none;
   }
@@ -702,13 +476,8 @@ function handleResizeAndOrientation() {
   .nav-container {
     justify-content: flex-start;
   }
-  #app-container.ar-mode-active .nav-container,
-  #app-container.overlay-photo-mode-active .nav-container {
-    top: var(--app-header-actual-height);
-  }
   .mobile-menu-toggle {
     display: flex;
-    margin-right: auto;
   }
   .main-nav {
     display: none;
@@ -720,14 +489,8 @@ function handleResizeAndOrientation() {
     background-color: var(--color-background-soft);
     border: 1px solid var(--color-border);
     border-top: none;
-    padding: 0;
     z-index: 1000;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
-  #app-container.ar-mode-active .main-nav.mobile-menu-active,
-  #app-container.overlay-photo-mode-active .main-nav.mobile-menu-active {
-    background-color: rgba(45, 45, 45, 0.98);
-    border-color: rgba(70, 70, 70, 0.7);
   }
   .main-nav.mobile-menu-active {
     display: flex;
@@ -735,12 +498,7 @@ function handleResizeAndOrientation() {
   .main-nav a {
     margin: 0;
     padding: 15px 20px;
-    width: 100%;
-    box-sizing: border-box;
     border-bottom: 1px solid var(--color-border);
-    text-align: left;
-    font-weight: 700;
-    color: var(--color-link);
   }
   .main-nav a:last-child {
     border-bottom: none;
@@ -748,7 +506,6 @@ function handleResizeAndOrientation() {
   .main-nav a.router-link-exact-active {
     border-bottom: 1px solid var(--color-border);
     background-color: var(--color-background-mute);
-    color: var(--color-link-hover);
   }
   .mobile-menu-toggle[aria-expanded='true'] .hamburger-icon span:nth-child(1) {
     transform: translateY(7px) rotate(45deg);
@@ -758,22 +515,6 @@ function handleResizeAndOrientation() {
   }
   .mobile-menu-toggle[aria-expanded='true'] .hamburger-icon span:nth-child(3) {
     transform: translateY(-7px) rotate(-45deg);
-  }
-  .app-footer {
-    padding: 20px 15px;
-    font-size: 0.8em;
-  }
-  .footer-content {
-    gap: 12px;
-  }
-  .social-icons {
-    gap: 15px;
-  }
-  .social-icons a {
-    font-size: 1.4em;
-  }
-  .footer-links {
-    gap: 8px 15px;
   }
 }
 </style>
