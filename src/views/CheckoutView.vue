@@ -298,6 +298,27 @@ async function handleCheckoutSubmit() {
     await cartStore.clearCart()
     toast.success('¡Pedido creado con éxito!')
 
+    // 👇 NUEVO: Enviar email de confirmación
+    try {
+      console.log('📧 Enviando email de confirmación para orden:', newOrderId)
+      const { data: emailData, error: emailError } = await supabase.functions.invoke(
+        'send-order-confirmation',
+        {
+          body: { orderData: { orderId: newOrderId } },
+        },
+      )
+
+      if (emailError) {
+        console.error('Error al enviar email:', emailError)
+        toast.warning('Tu pedido fue creado, pero no se pudo enviar el email de confirmación.')
+      } else {
+        console.log('✅ Email enviado exitosamente:', emailData)
+      }
+    } catch (emailCatchError) {
+      console.error('Error crítico enviando email:', emailCatchError)
+      // No mostramos error al usuario, el pedido ya se creó correctamente
+    }
+
     if (selectedPaymentMethod.value === 'transferencia') {
       router.push({ name: 'transfer-pending', params: { orderId: newOrderId } })
     } else if (selectedPaymentMethod.value === 'transbank') {
