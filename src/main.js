@@ -13,13 +13,9 @@ import {
   faVolumeUp,
   faVolumeMute,
   faStore,
+  faShoppingCart, // <-- 1. IMPORTAMOS EL ÍCONO DEL CARRITO
 } from '@fortawesome/free-solid-svg-icons'
-import {
-  faInstagram,
-  faFacebookF,
-  faYoutube,
-  faTiktok, // <-- 1. IMPORTAMOS EL ÍCONO DE TIKTOK
-} from '@fortawesome/free-brands-svg-icons'
+import { faInstagram, faFacebookF, faYoutube, faTiktok } from '@fortawesome/free-brands-svg-icons'
 
 // Añadimos TODOS los íconos que usamos a la biblioteca central
 library.add(
@@ -31,7 +27,8 @@ library.add(
   faInstagram,
   faFacebookF,
   faYoutube,
-  faTiktok, // <-- 2. LO AÑADIMOS A LA BIBLIOTECA
+  faTiktok,
+  faShoppingCart, // <-- 2. LO AÑADIMOS A LA BIBLIOTECA
 )
 
 const app = createApp(App)

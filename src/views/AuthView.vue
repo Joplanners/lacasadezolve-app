@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabaseClient.js'
 import PasswordInput from '@/components/PasswordInput.vue'
 import { useAuthStore } from '@/stores/authStore'
@@ -10,6 +10,9 @@ const router = useRouter()
 
 const email = ref('')
 const password = ref('')
+const passwordConfirm = ref('') // <-- NUEVO: Para la confirmación de contraseña
+const firstName = ref('')
+const lastName = ref('')
 const isRegistering = ref(false)
 const loading = ref(false)
 const message = ref('')
@@ -21,7 +24,7 @@ const forgotPasswordLoading = ref(false)
 const forgotPasswordMessage = ref('')
 const forgotPasswordErrorMsg = ref('')
 
-// Lógica de validación de contraseña
+// Lógica de validación de contraseña (sin cambios)
 const passwordRequirements = computed(() => {
   if (!isRegistering.value) return []
   return [
@@ -32,7 +35,6 @@ const passwordRequirements = computed(() => {
     { text: 'Incluye un símbolo (!@#$...)', regex: /[^A-Za-z0-9]/ },
   ]
 })
-
 const passwordValidation = computed(() => {
   const value = password.value
   return passwordRequirements.value.map((req) => ({
@@ -40,26 +42,29 @@ const passwordValidation = computed(() => {
     valid: req.regex.test(value),
   }))
 })
-
 const isPasswordValid = computed(() => {
   if (!isRegistering.value) return true
   if (passwordRequirements.value.length === 0) return true
   return passwordValidation.value.every((req) => req.valid)
 })
 
-watch(
-  () => authStore.isLoggedIn,
-  (newValue) => {
-    if (newValue) {
-      if (authStore.userRole === 'admin') {
-        router.push({ name: 'admin-dashboard' })
-      } else {
-        router.push({ name: 'profile' })
-      }
-    }
-  },
-  { immediate: true },
-)
+// <-- NUEVO: Computed property para verificar si las contraseñas coinciden -->
+const passwordsMatch = computed(() => {
+  if (!isRegistering.value) return true // No es relevante si no está en modo registro
+  return password.value === passwordConfirm.value
+})
+
+// <-- MODIFICADO: Centralizamos la lógica para deshabilitar el botón de registro -->
+const isRegisterButtonDisabled = computed(() => {
+  if (!isRegistering.value) return false
+  return (
+    loading.value ||
+    !isPasswordValid.value ||
+    !firstName.value ||
+    !lastName.value ||
+    !passwordsMatch.value
+  )
+})
 
 const clearAllMessages = () => {
   message.value = ''
@@ -68,11 +73,15 @@ const clearAllMessages = () => {
   forgotPasswordErrorMsg.value = ''
 }
 
+// <-- MODIFICADO: Limpiamos también el campo de confirmar contraseña -->
 const toggleAuthMode = () => {
   isRegistering.value = !isRegistering.value
   clearAllMessages()
   email.value = ''
   password.value = ''
+  passwordConfirm.value = '' // Limpiar
+  firstName.value = ''
+  lastName.value = ''
 }
 
 const handleLogin = async () => {
@@ -84,6 +93,7 @@ const handleLogin = async () => {
       password: password.value,
     })
     if (error) throw error
+    router.push({ name: 'welcome' })
   } catch (error) {
     console.error('AuthView: Error en inicio de sesión:', error.message)
     errorMsg.value = `Error al iniciar sesión: ${error.message}`
@@ -92,24 +102,52 @@ const handleLogin = async () => {
   }
 }
 
+// <-- REEMPLAZADO: Lógica de registro completamente nueva y mejorada -->
 const handleRegister = async () => {
+  clearAllMessages()
+
+  // 1. Validaciones previas
   if (!isPasswordValid.value) {
-    errorMsg.value = 'La contraseña no cumple con todos los requisitos de seguridad.'
+    errorMsg.value = 'La contraseña no cumple con todos los requisitos.'
+    return
+  }
+  if (!passwordsMatch.value) {
+    errorMsg.value = 'Las contraseñas no coinciden. Por favor, verifica.'
+    return
+  }
+  if (!firstName.value || !lastName.value) {
+    errorMsg.value = 'Por favor, ingresa tu nombre y apellido.'
     return
   }
 
-  clearAllMessages()
   loading.value = true
   try {
-    const { data, error } = await supabase.auth.signUp({
+    // 2. Registrar usuario en Supabase Auth, pasando los datos del perfil
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: email.value,
       password: password.value,
+      options: {
+        data: {
+          first_name: firstName.value,
+          last_name: lastName.value,
+        },
+      },
     })
-    if (error) throw error
-    message.value = '¡Registro exitoso! Revisa tu correo para confirmar tu cuenta.'
+
+    if (signUpError) throw signUpError
+    if (!signUpData?.user) throw new Error('No se pudo obtener el usuario después del registro.')
+
+    // 3. Mostrar mensaje de éxito (Ya no se necesita el UPDATE)
+    message.value =
+      '¡Registro exitoso! Revisa tu correo para confirmar tu cuenta antes de iniciar sesión.'
+
+    // 4. Limpiar formulario y cambiar de modo
     isRegistering.value = false
     email.value = ''
     password.value = ''
+    passwordConfirm.value = ''
+    firstName.value = ''
+    lastName.value = ''
   } catch (error) {
     console.error('AuthView: Error en registro:', error.message)
     errorMsg.value = `Error al registrar: ${error.message}`
@@ -118,12 +156,11 @@ const handleRegister = async () => {
   }
 }
 
-// Aquí redirigirás al método nuevo del store para login con Google usando la lógica centralizada
 const handleGoogleLogin = async () => {
   clearAllMessages()
   loading.value = true
   try {
-    await authStore.signInWithGoogle()
+    await authStore.signInWithGoogle('/bienvenida')
   } catch (error) {
     console.error('AuthView: Error con Google Login:', error.message)
     errorMsg.value = `Error con Google: ${error.message}`
@@ -132,6 +169,7 @@ const handleGoogleLogin = async () => {
   }
 }
 
+// Funciones de restablecimiento de contraseña (sin cambios)
 const handleForgotPasswordClick = () => {
   clearAllMessages()
   isForgotPasswordMode.value = true
@@ -173,7 +211,7 @@ const switchToLoginRegister = () => {
 
 <template>
   <div class="auth-container">
-    <!-- === FORMULARIO DE OLVIDÉ CONTRASEÑA (Sin cambios) === -->
+    <!-- Formulario de Restablecer Contraseña (sin cambios) -->
     <div v-if="isForgotPasswordMode">
       <h1>Restablecer Contraseña</h1>
       <div class="logo-image-container">
@@ -214,7 +252,7 @@ const switchToLoginRegister = () => {
       </p>
     </div>
 
-    <!-- === FORMULARIO DE LOGIN / REGISTRO === -->
+    <!-- Formulario Principal de Login/Registro -->
     <div v-else>
       <h1>{{ isRegistering ? 'Crear Cuenta Nueva' : 'Bienvenido a Zolve' }}</h1>
 
@@ -223,6 +261,34 @@ const switchToLoginRegister = () => {
       </div>
 
       <form @submit.prevent="isRegistering ? handleRegister() : handleLogin()">
+        <template v-if="isRegistering">
+          <div class="form-group">
+            <label for="firstName">Nombre:</label>
+            <input
+              type="text"
+              id="firstName"
+              v-model.trim="firstName"
+              required
+              autocomplete="given-name"
+              :disabled="loading"
+              placeholder="Tu nombre"
+              class="form-input"
+            />
+          </div>
+          <div class="form-group">
+            <label for="lastName">Apellido:</label>
+            <input
+              type="text"
+              id="lastName"
+              v-model.trim="lastName"
+              required
+              autocomplete="family-name"
+              :disabled="loading"
+              placeholder="Tu apellido"
+              class="form-input"
+            />
+          </div>
+        </template>
         <div class="form-group">
           <label for="email">Correo Electrónico:</label>
           <input
@@ -237,7 +303,6 @@ const switchToLoginRegister = () => {
           />
         </div>
 
-        <!-- INICIO DE LA MODIFICACIÓN -->
         <PasswordInput
           v-model="password"
           id="auth-password"
@@ -261,10 +326,30 @@ const switchToLoginRegister = () => {
           </template>
         </PasswordInput>
 
+        <!-- <-- NUEVO: Campo para confirmar contraseña, solo en modo registro -->
+        <template v-if="isRegistering">
+          <PasswordInput
+            v-model="passwordConfirm"
+            id="auth-password-confirm"
+            label="Confirma tu Contraseña:"
+            autocomplete="new-password"
+            :disabled="loading"
+            :required="true"
+            placeholder="Escribe la misma contraseña"
+          >
+            <template #requirements>
+              <p v-if="!passwordsMatch && passwordConfirm.length > 0" class="error-message-inline">
+                ✗ Las contraseñas no coinciden
+              </p>
+            </template>
+          </PasswordInput>
+        </template>
+        <!-- Fin del nuevo campo -->
+
         <button
           type="submit"
           class="btn btn-primary"
-          :disabled="loading || (isRegistering && !isPasswordValid)"
+          :disabled="isRegistering ? isRegisterButtonDisabled : loading"
         >
           {{ loading ? 'Procesando...' : isRegistering ? 'Crear mi Cuenta' : 'Ingresar' }}
         </button>
@@ -483,31 +568,35 @@ label {
   line-height: 1.5;
 }
 
-/* --- ESTILOS AÑADIDOS PARA LA LISTA DE REQUISITOS --- */
 .requirements-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  color: var(--color-text-muted, #6c757d); /* Color por defecto para requisitos no cumplidos */
+  color: var(--color-text-muted, #6c757d);
 }
-
 .requirements-list li {
   transition: color 0.3s ease;
   margin-bottom: 4px;
   display: flex;
   align-items: center;
 }
-
 .requirements-list li.valid {
-  color: var(--brand-green, #28a745); /* Color verde para requisitos cumplidos */
+  color: var(--brand-green, #28a745);
   font-weight: var(--font-weight-medium);
 }
-
 .requirement-icon {
   margin-right: 8px;
-  width: 1em; /* Asegura que los iconos tengan el mismo ancho */
+  width: 1em;
 }
-/* --- FIN DE ESTILOS AÑADIDOS --- */
+
+/* <-- NUEVO: Estilo para el mensaje de error de contraseñas que no coinciden --> */
+.error-message-inline {
+  font-size: 0.85em;
+  color: #c62828;
+  text-align: left;
+  margin: 5px 0 0 5px;
+  font-weight: var(--font-weight-medium);
+}
 
 @media (max-width: 480px) {
   .auth-container {
@@ -517,12 +606,10 @@ label {
     border: none;
     box-shadow: none;
   }
-
   h1 {
     font-size: 1.6rem;
     margin-bottom: 10px;
   }
-
   .auth-logo {
     width: 70px;
     height: 70px;
@@ -530,22 +617,18 @@ label {
   .logo-image-container {
     margin-bottom: 20px;
   }
-
   .form-input {
     padding: 10px 12px;
     font-size: 0.95rem;
   }
-
   .btn {
     padding: 12px 15px;
     font-size: 0.95rem;
   }
-
   .forgot-password,
   .toggle-auth {
     font-size: 0.9em;
   }
-
   .forgot-password-instructions {
     font-size: 0.9em;
   }

@@ -140,6 +140,74 @@ export const useProductsStore = defineStore('products', () => {
     }
   }
 
+  // --- OBTENER PRODUCTOS RELACIONADOS ---
+  const fetchRelatedProducts = async (categoryId, currentProductId) => {
+    try {
+      if (!categoryId || !currentProductId) {
+        console.warn('Falta categoryId o currentProductId para buscar relacionados.')
+        return []
+      }
+
+      const { data, error: fetchError } = await supabase
+        .from('products')
+        .select(
+          `
+          id, name, price, offer_price, discount_percentage,
+          discount_start_date, discount_end_date, image_urls,
+          category:product_categories ( name )
+        `,
+        )
+        .eq('is_active', true)
+        .eq('category_id', categoryId)
+        .neq('id', currentProductId)
+        .order('created_at', { ascending: false })
+        .limit(10) // Trae hasta 10 relacionados (MODIFICADO)
+
+      if (fetchError) throw fetchError
+
+      return data || []
+    } catch (err) {
+      console.error('Error obteniendo productos relacionados:', err)
+      return []
+    }
+  }
+
+  // --- NUEVA FUNCIÓN PARA EL CARRITO ---
+  const fetchProductsByIds = async (idArray) => {
+    try {
+      if (!idArray || idArray.length === 0) {
+        return [] // No hay nada que buscar
+      }
+
+      const { data, error: fetchError } = await supabase
+        .from('products')
+        .select(
+          `
+          id, name, price, offer_price, discount_percentage,
+          discount_start_date, discount_end_date, image_urls, stock
+        `,
+        ) // Traemos el stock también, ¡vital para el carrito!
+        .in('id', idArray) // Busca todos los productos EN el array
+
+      if (fetchError) throw fetchError
+
+      // Actualizamos el store interno si faltan productos
+      if (data) {
+        data.forEach((product) => {
+          const exists = products.value.some((p) => p.id === product.id)
+          if (!exists) {
+            products.value.push(product)
+          }
+        })
+      }
+
+      return data || []
+    } catch (err) {
+      console.error('Error obteniendo productos por IDs:', err)
+      return []
+    }
+  }
+
   // --- FUNCIONES DE ESCRITURA (CRUD PARA ADMIN) ---
 
   // Crear producto
@@ -221,5 +289,7 @@ export const useProductsStore = defineStore('products', () => {
     createProduct,
     updateProduct,
     deleteProduct,
+    fetchRelatedProducts,
+    fetchProductsByIds, // <-- AÑADIDA AQUÍ
   }
 })

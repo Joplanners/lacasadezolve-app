@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useCartStore } from './stores/storeCart'
 import { storeToRefs } from 'pinia'
 import VueCookieAcceptDecline from 'vue-cookie-accept-decline'
 import 'vue-cookie-accept-decline/dist/vue-cookie-accept-decline.css'
@@ -10,9 +11,17 @@ import { supabase } from '@/lib/supabaseClient'
 import AppFooter from './components/AppFooter.vue'
 
 const authStore = useAuthStore()
+const cartStore = useCartStore()
 const router = useRouter()
 const route = useRoute()
-const { isLoggedIn, user, isPasswordRecoveryMode, userRole } = storeToRefs(authStore)
+
+// =======================================================================
+// <-- ¡CAMBIO CLAVE AQUÍ! -->
+// Importamos el userDisplayName DIRECTAMENTE del store.
+const { isLoggedIn, isPasswordRecoveryMode, userRole, userDisplayName } = storeToRefs(authStore)
+// =======================================================================
+
+const cartItemCount = computed(() => cartStore.cartItemCount)
 
 const isMobileMenuOpen = ref(false)
 const isMobileView = ref(window.innerWidth < 768)
@@ -26,14 +35,10 @@ const navContainerRef = ref(null)
 const navbarCombinedHeight = ref(0)
 const appHeaderActualHeight = ref(0)
 
-const userDisplayName = computed(() => {
-  if (user.value?.email) {
-    const emailParts = user.value.email.split('@')
-    const namePart = emailParts[0]
-    return namePart.charAt(0).toUpperCase() + namePart.slice(1)
-  }
-  return 'Zolve'
-})
+// =======================================================================
+// <-- ¡HEMOS ELIMINADO EL userDisplayName LOCAL DE AQUÍ! -->
+// Ya no es necesario, porque lo traemos directamente del store.
+// =======================================================================
 
 const calculateNavbarHeights = () => {
   let totalCombinedH = 0
@@ -69,7 +74,8 @@ const showNavbar = computed(() => {
     'terms-conditions',
     'privacy-policy',
     'cookies-policy',
-    'product-detail', // ¡No te olvides de este!
+    'product-detail',
+    'cart',
   ]
   if (!isLoggedIn.value) return publicRoutesWithNavbar.includes(route.name)
   if (isARExperienceActive.value) return !isMobileView.value || !isLandscape.value
@@ -208,12 +214,23 @@ function handleResizeAndOrientation() {
           <img src="/LogoZolve.png" alt="Logo Zolve" class="header-logo-img" />
         </RouterLink>
       </div>
-      <div class="user-info" v-if="isLoggedIn && user">
-        Hola <strong>{{ userDisplayName }}</strong>
+
+      <div class="user-actions">
+        <!-- El template ya estaba bien, así que no se toca. -->
+        <!-- Usará el nuevo userDisplayName que importamos del store. -->
+        <div class="user-info" v-if="isLoggedIn">
+          Hola <strong>{{ userDisplayName }}</strong>
+        </div>
+
+        <router-link to="/carrito" class="cart-widget" aria-label="Ver carrito de compras">
+          <font-awesome-icon :icon="['fas', 'shopping-cart']" />
+          <span v-if="cartItemCount > 0" class="cart-count">{{ cartItemCount }}</span>
+        </router-link>
+
+        <button v-if="isLoggedIn" @click="handleLogout" class="btn-logout-header">
+          Cerrar Sesión
+        </button>
       </div>
-      <button v-if="isLoggedIn" @click="handleLogout" class="btn-logout-header">
-        Cerrar Sesión
-      </button>
     </header>
 
     <div ref="navContainerRef" class="nav-container" v-if="showNavbar">
@@ -377,12 +394,6 @@ function handleResizeAndOrientation() {
   box-sizing: border-box;
 }
 
-@media (max-width: 767px) {
-  .main-content {
-    padding: 2rem 15px;
-  }
-}
-
 .app-header {
   display: flex;
   justify-content: space-between;
@@ -397,10 +408,6 @@ function handleResizeAndOrientation() {
   height: 40px;
   border-radius: 50%;
   object-fit: cover;
-}
-.user-info {
-  margin-left: auto;
-  margin-right: 15px;
 }
 .btn-logout-header {
   padding: 6px 14px;
@@ -466,15 +473,75 @@ function handleResizeAndOrientation() {
   border-bottom-color: var(--color-link);
 }
 
+/* --- ESTILOS PARA LAS ACCIONES DE USUARIO Y CARRITO --- */
+.user-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px; /* Espacio entre saludo, carrito y logout */
+}
+
+.user-info {
+  color: var(--color-text);
+}
+.user-info strong {
+  color: var(--color-heading);
+  font-weight: var(--font-weight-medium);
+}
+
+.cart-widget {
+  position: relative;
+  font-size: 1.5rem;
+  color: var(--brand-pink);
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+.cart-widget:hover {
+  transform: scale(1.1);
+}
+
+.cart-count {
+  position: absolute;
+  top: -5px;
+  right: -10px;
+  background-color: var(--brand-turquoise);
+  color: white;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 2px solid var(--color-background-soft); /* Borde del color de fondo del header */
+}
+/* --- FIN DE ESTILOS NUEVOS --- */
+
+/* --- BLOQUE RESPONSIVE CORREGIDO --- */
 @media (max-width: 767px) {
+  .main-content {
+    padding: 2rem 15px;
+  }
+
+  /* El logo se queda a la izquierda, las acciones a la derecha */
+  .logo-container {
+    margin-left: 0;
+  }
+  .user-actions {
+    margin-right: 0;
+  }
   .user-info {
-    display: none;
+    display: none; /* Ocultamos saludo en móvil */
   }
+
+  /* Movemos el botón de logout al final dentro de las acciones */
   .btn-logout-header {
-    margin-left: auto;
+    order: 3; /* Le damos orden alto para que quede al final */
+    margin-left: 0; /* Reseteamos margen */
   }
+
   .nav-container {
-    justify-content: flex-start;
+    justify-content: flex-start; /* Alinea hamburguesa a la izquierda */
   }
   .mobile-menu-toggle {
     display: flex;
@@ -517,4 +584,5 @@ function handleResizeAndOrientation() {
     transform: translateY(-7px) rotate(-45deg);
   }
 }
+/* --- FIN DEL BLOQUE RESPONSIVE --- */
 </style>

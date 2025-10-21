@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import AuthView from '../views/AuthView.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
+import OrderDetail from '../views/OrderDetail.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -19,10 +20,22 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/bienvenida', // La URL que verá el usuario
+      name: 'welcome', // El nombre que usamos en router.push
+      component: () => import('../views/WelcomeView.vue'),
+      meta: { requiresAuth: true }, // Requiere estar logueado para verla
+    },
+    {
       path: '/actualizar-contrasena',
       name: 'update-password',
       component: () => import('../views/UpdatePasswordView.vue'),
       meta: { requiresAuth: false }, // Se manejará con la lógica del store
+    },
+    {
+      path: '/mi-perfil/pedido/:orderId',
+      name: 'order-detail',
+      component: OrderDetail,
+      meta: { requiresAuth: true }, // Opcional: si requiere inicio de sesión
     },
     {
       path: '/como-usar-ar',
@@ -42,6 +55,25 @@ const router = createRouter({
       component: () => import('../views/ProductDetailView.vue'),
       props: true, // Esto pasa el :id de la URL como un prop al componente
       meta: { requiresAuth: false },
+    },
+    {
+      path: '/carrito',
+      name: 'cart',
+      component: () => import('../views/CartView.vue'),
+      meta: { requiresAuth: false }, // Permitimos ver el carrito a invitados
+    },
+    {
+      path: '/finalizar-compra', // La URL que verá el usuario
+      name: 'checkout', // El nombre que usamos en router.push
+      component: () => import('../views/CheckoutView.vue'),
+      meta: { requiresAuth: false }, // Permitimos checkout a invitados
+    },
+    {
+      path: '/pedido-transferencia/:orderId', // La URL que verá el usuario
+      name: 'transfer-pending', // El nombre que usamos en router.push
+      component: () => import('../views/TransferPendingView.vue'),
+      props: true, // ¡Importante! Pasa :orderId como prop al componente
+      meta: { requiresAuth: false }, // Permitimos verla a invitados
     },
     {
       path: '/experiencia-ar/:markerId',
@@ -178,6 +210,23 @@ const router = createRouter({
           path: 'banners',
           name: 'admin-banners',
           component: () => import('@/views/Admin/AdminBannersView.vue'),
+        },
+        {
+          path: 'cupones',
+          name: 'admin-coupons',
+          component: () => import('../views/Admin/AdminCouponsView.vue'),
+        },
+        {
+          path: 'pedidos', // La URL será /admin/pedidos
+          name: 'admin-orders',
+          component: () => import('../views/Admin/AdminOrdersListView.vue'),
+        },
+        {
+          // Cambiamos :id por :orderId para que coincida con los componentes
+          path: 'pedidos/:orderId',
+          name: 'admin-order-detail',
+          component: () => import('../views/Admin/AdminOrderDetailView.vue'),
+          props: true,
         },
       ],
     },

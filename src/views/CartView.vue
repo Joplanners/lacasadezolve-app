@@ -1,0 +1,726 @@
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useCartStore } from '@/stores/storeCart'
+import { useProductsStore } from '@/stores/storeProducts'
+import { useRouter } from 'vue-router'
+import { useToast } from 'vue-toastification'
+import { useAuthStore } from '@/stores/authStore' // <-- Importamos AuthStore
+import { supabase } from '@/lib/supabaseClient' // <-- Importamos Supabase
+
+const cartStore = useCartStore()
+const productsStore = useProductsStore()
+const router = useRouter()
+const toast = useToast()
+const authStore = useAuthStore() // <-- Instancia de AuthStore
+
+// Estado local para los detalles completos de los productos del carrito
+const cartProductsDetails = ref([])
+const isLoadingDetails = ref(true)
+const errorLoadingDetails = ref(null)
+
+// --- INICIO: NUEVO ESTADO PARA CUPONES ---
+const couponCodeInput = ref('')
+const appliedCoupon = ref(null) // Guardará el objeto del cupón si es válido
+const couponDiscount = ref(0)
+const isLoadingCoupon = ref(false)
+const couponError = ref('')
+// --- FIN: NUEVO ESTADO PARA CUPONES ---
+
+async function loadCartProductDetails() {
+  isLoadingDetails.value = true
+  errorLoadingDetails.value = null
+  cartProductsDetails.value = []
+
+  const productIds = cartStore.items.map((item) => item.product_id)
+
+  if (productIds.length === 0) {
+    isLoadingDetails.value = false
+    return
+  }
+
+  try {
+    const productsData = await productsStore.fetchProductsByIds(productIds)
+    cartProductsDetails.value = cartStore.items
+      .map((cartItem) => {
+        const product = productsData.find((p) => p.id === cartItem.product_id)
+        return {
+          ...cartItem,
+          product: product || null,
+        }
+      })
+      .filter((item) => item.product !== null)
+
+    cartProductsDetails.value.forEach((item) => {
+      if (item.product.stock !== null && item.product.stock < item.quantity) {
+        toast.warning(
+          `Stock insuficiente para "${item.product.name}". Ajustado a ${item.product.stock} unidades.`,
+        )
+        cartStore.updateItemQuantity(item.product_id, item.product.stock)
+        item.quantity = item.product.stock
+      }
+    })
+    cartProductsDetails.value = cartProductsDetails.value.filter((item) => item.quantity > 0)
+  } catch (error) {
+    console.error('Error loading cart product details:', error)
+    errorLoadingDetails.value = 'Error al cargar los detalles de los productos.'
+    toast.error('Hubo un problema al cargar los detalles del carrito.')
+  } finally {
+    isLoadingDetails.value = false
+  }
+}
+
+onMounted(loadCartProductDetails)
+
+const subtotal = computed(() => {
+  return cartProductsDetails.value.reduce((total, item) => {
+    const price = typeof item.product.price === 'number' ? item.product.price : 0
+    return total + price * item.quantity
+  }, 0)
+})
+
+// ¡NUEVA COMPUTADA PARA EL TOTAL!
+const total = computed(() => {
+  const finalTotal = subtotal.value - couponDiscount.value
+  return Math.max(0, finalTotal) // Asegura que el total no sea negativo
+})
+
+const isCartEmpty = computed(
+  () =>
+    !isLoadingDetails.value &&
+    cartProductsDetails.value.length === 0 &&
+    cartStore.items.length === 0,
+)
+const hasItemsButLoading = computed(() => isLoadingDetails.value && cartStore.items.length > 0)
+const hasFailedToLoad = computed(
+  () => !isLoadingDetails.value && errorLoadingDetails.value && cartStore.items.length > 0,
+)
+
+// --- INICIO: NUEVA FUNCIÓN PARA APLICAR CUPÓN ---
+async function handleApplyCoupon() {
+  if (!couponCodeInput.value) return
+  isLoadingCoupon.value = true
+  couponError.value = ''
+  appliedCoupon.value = null
+  couponDiscount.value = 0
+
+  try {
+    const code = couponCodeInput.value.toUpperCase().trim()
+    const { data: coupon, error } = await supabase
+      .from('coupons')
+      .select('*')
+      .eq('code', code)
+      .single()
+
+    if (error || !coupon) {
+      throw new Error('El código del cupón no es válido.')
+    }
+    if (!coupon.is_active) {
+      throw new Error('Este cupón ya no está activo.')
+    }
+    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+      throw new Error('Este cupón ha expirado.')
+    }
+
+    if (coupon.coupon_type === 'FIRST_PURCHASE') {
+      if (!authStore.isLoggedIn) {
+        throw new Error('Debes iniciar sesión para usar este cupón.')
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('used_first_purchase_coupon')
+        .eq('id', authStore.user.id)
+        .single()
+
+      if (profileError) throw new Error('No se pudo verificar tu perfil.')
+      if (profile && profile.used_first_purchase_coupon) {
+        throw new Error('Este cupón solo es válido para tu primera compra.')
+      }
+    }
+
+    appliedCoupon.value = coupon
+    couponDiscount.value = (subtotal.value * coupon.discount_percent) / 100
+    cartStore.setAppliedCoupon(coupon) // Guardamos el cupón en el store del carrito
+    toast.success(`¡Cupón "${coupon.code}" aplicado!`)
+  } catch (err) {
+    couponError.value = err.message
+    toast.error(err.message)
+  } finally {
+    isLoadingCoupon.value = false
+  }
+}
+
+function removeCoupon() {
+  appliedCoupon.value = null
+  couponDiscount.value = 0
+  couponCodeInput.value = ''
+  couponError.value = ''
+  cartStore.clearAppliedCoupon() // Limpiamos el cupón del store del carrito
+  toast.info('Cupón eliminado.')
+}
+// --- FIN: NUEVA FUNCIÓN PARA APLICAR CUPÓN ---
+
+async function handleUpdateQuantity(productId, newQuantity) {
+  const item = cartProductsDetails.value.find((item) => item.product_id === productId)
+  if (!item) return
+
+  const stock = item.product.stock
+  let finalQuantity = Math.max(0, newQuantity)
+
+  if (stock !== null && finalQuantity > stock) {
+    toast.error(`Solo quedan ${stock} unidades de "${item.product.name}".`)
+    finalQuantity = stock
+  }
+
+  const originalQuantity = item.quantity
+  item.quantity = finalQuantity
+
+  try {
+    if (finalQuantity === 0) {
+      await cartStore.removeItem(productId)
+      cartProductsDetails.value = cartProductsDetails.value.filter(
+        (i) => i.product_id !== productId,
+      )
+      toast.info(`"${item.product.name}" eliminado del carrito.`)
+    } else {
+      await cartStore.updateItemQuantity(productId, finalQuantity)
+    }
+  } catch (error) {
+    console.error('Error updating cart item:', error)
+    toast.error('No se pudo actualizar el carrito. Intenta de nuevo.')
+    item.quantity = originalQuantity
+  }
+}
+
+async function handleRemoveItem(productId, productName) {
+  const originalItems = [...cartProductsDetails.value]
+  cartProductsDetails.value = cartProductsDetails.value.filter((i) => i.product_id !== productId)
+
+  try {
+    await cartStore.removeItem(productId)
+    toast.info(`"${productName}" eliminado del carrito.`)
+  } catch (error) {
+    console.error('Error removing cart item:', error)
+    toast.error('No se pudo eliminar el producto. Intenta de nuevo.')
+    cartProductsDetails.value = originalItems
+  }
+}
+
+function goToCheckout() {
+  router.push({ name: 'checkout' })
+}
+
+function formatPrice(value) {
+  if (typeof value !== 'number') return ''
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value)
+}
+</script>
+
+<template>
+  <div class="cart-view-container">
+    <div class="cart-header">
+      <h1>Tu Carrito de Compras 🛒</h1>
+    </div>
+
+    <div v-if="isCartEmpty && !isLoadingDetails" class="empty-cart">
+      <p class="empty-cart-emoji">🦊</p>
+      <h2>¡Tu carrito está vacío!</h2>
+      <p>Parece que aún no has añadido ningún producto. ¿Por qué no exploras nuestra tienda?</p>
+      <router-link :to="{ name: 'store' }" class="btn btn-primary">Ir a la Tienda</router-link>
+    </div>
+
+    <div v-else-if="hasItemsButLoading" class="loading-cart">
+      <div class="spinner"></div>
+      <p>Cargando productos del carrito...</p>
+    </div>
+
+    <div v-else-if="hasFailedToLoad" class="error-cart">
+      <p>❌ Hubo un error al cargar los detalles de tu carrito.</p>
+      <p>{{ errorLoadingDetails }}</p>
+      <button @click="loadCartProductDetails" class="btn btn-secondary">Intentar de Nuevo</button>
+    </div>
+
+    <div v-else class="cart-layout">
+      <div class="product-list">
+        <div v-for="item in cartProductsDetails" :key="item.product_id" class="cart-item">
+          <img
+            :src="
+              item.product.image_urls && item.product.image_urls.length > 0
+                ? item.product.image_urls[0]
+                : '/Zolve_Logo.png'
+            "
+            :alt="item.product.name"
+            class="item-image"
+          />
+          <div class="item-details">
+            <h3 class="item-name">{{ item.product.name }}</h3>
+            <p class="item-price">{{ formatPrice(item.product.price) }} c/u</p>
+            <p
+              v-if="
+                item.product.stock !== null && item.product.stock <= 10 && item.product.stock > 0
+              "
+              class="item-stock-warning"
+            >
+              ¡Solo quedan {{ item.product.stock }}!
+            </p>
+            <p v-else-if="item.product.stock === 0" class="item-stock-warning out-of-stock">
+              ¡Agotado! (Elimínalo)
+            </p>
+          </div>
+
+          <div class="item-quantity-selector">
+            <button
+              @click="handleUpdateQuantity(item.product_id, item.quantity - 1)"
+              :disabled="item.quantity <= 1"
+              class="quantity-btn"
+              aria-label="Disminuir cantidad"
+            >
+              -
+            </button>
+            <span class="quantity-display">{{ item.quantity }}</span>
+            <button
+              @click="handleUpdateQuantity(item.product_id, item.quantity + 1)"
+              :disabled="item.product.stock !== null && item.quantity >= item.product.stock"
+              class="quantity-btn"
+              aria-label="Aumentar cantidad"
+            >
+              +
+            </button>
+          </div>
+          <div class="item-total">
+            {{ formatPrice(item.product.price * item.quantity) }}
+          </div>
+          <button
+            @click="handleRemoveItem(item.product_id, item.product.name)"
+            class="remove-item-btn"
+            title="Eliminar producto"
+          >
+            &times;
+          </button>
+        </div>
+      </div>
+
+      <aside class="order-summary">
+        <h3>Resumen del Pedido</h3>
+        <div class="summary-row">
+          <span>Subtotal</span>
+          <span>{{ formatPrice(subtotal) }}</span>
+        </div>
+
+        <!-- INICIO: SECCIÓN DE CUPONES -->
+        <div class="coupon-section">
+          <div v-if="!appliedCoupon">
+            <label for="coupon-input">¿Tienes un cupón?</label>
+            <div class="coupon-input-group">
+              <input
+                type="text"
+                id="coupon-input"
+                v-model="couponCodeInput"
+                placeholder="Ingresa tu código"
+                :disabled="isLoadingCoupon"
+                @keyup.enter="handleApplyCoupon"
+              />
+              <button @click="handleApplyCoupon" :disabled="isLoadingCoupon">
+                {{ isLoadingCoupon ? '...' : 'Aplicar' }}
+              </button>
+            </div>
+            <p v-if="couponError" class="coupon-error">{{ couponError }}</p>
+          </div>
+
+          <div v-if="appliedCoupon" class="summary-row applied-coupon">
+            <span
+              >Descuento ({{ appliedCoupon.code }} - {{ appliedCoupon.discount_percent }}%)</span
+            >
+            <span>- {{ formatPrice(couponDiscount) }}</span>
+            <button @click="removeCoupon" class="remove-coupon-btn" title="Quitar cupón">
+              &times;
+            </button>
+          </div>
+        </div>
+        <!-- FIN: SECCIÓN DE CUPONES -->
+
+        <div class="summary-row">
+          <span>Envío</span>
+          <small>Se calculará en el siguiente paso</small>
+        </div>
+        <div class="summary-total">
+          <span>Total</span>
+          <span>{{ formatPrice(total) }}</span>
+        </div>
+        <button @click="goToCheckout" class="btn btn-primary btn-checkout">
+          Continuar con la Compra
+        </button>
+      </aside>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* Estilos generales y de header */
+.cart-view-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px 40px;
+}
+.cart-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+.cart-header h1 {
+  font-size: 2.5rem;
+  color: var(--color-heading);
+}
+
+/* Estilos Empty Cart */
+.empty-cart {
+  text-align: center;
+  padding: 60px 20px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+}
+.empty-cart-emoji {
+  font-size: 4rem;
+  margin: 0;
+}
+.empty-cart h2 {
+  font-size: 1.8rem;
+  margin-top: 10px;
+}
+.empty-cart p {
+  color: var(--color-text-soft);
+  margin-bottom: 30px;
+}
+
+/* Estilos Loading y Error Cart */
+.loading-cart,
+.error-cart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  text-align: center;
+}
+.loading-cart p,
+.error-cart p {
+  font-style: italic;
+  color: #555;
+  margin-top: 15px;
+}
+.error-cart p:first-of-type {
+  font-style: normal;
+  font-weight: bold;
+  color: var(--brand-pink);
+}
+.error-cart button {
+  margin-top: 20px;
+}
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-top: 4px solid var(--brand-turquoise);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Layout principal del carrito */
+.cart-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 40px;
+  align-items: flex-start;
+}
+.product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Estilos del Item */
+.cart-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-background-soft);
+}
+.item-image {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.item-details {
+  flex-grow: 1;
+}
+.item-name {
+  font-size: 1.1rem;
+  margin: 0 0 5px 0;
+  color: var(--color-heading);
+}
+.item-price {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0;
+}
+.item-stock-warning {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--brand-pink);
+  margin-top: 5px;
+}
+.item-stock-warning.out-of-stock {
+  color: #d93025;
+}
+
+/* Selector de cantidad +/- */
+.item-quantity-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.quantity-btn {
+  background-color: var(--color-background-mute);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  transition: background-color 0.2s;
+}
+.quantity-btn:hover:not(:disabled) {
+  background-color: var(--color-border-hover);
+}
+.quantity-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.quantity-display {
+  font-weight: 500;
+  min-width: 25px;
+  text-align: center;
+}
+
+/* Total del item y botón eliminar */
+.item-total {
+  font-weight: bold;
+  min-width: 90px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.remove-item-btn {
+  background: none;
+  border: none;
+  font-size: 1.6rem;
+  color: #aaa;
+  cursor: pointer;
+  padding: 0 5px;
+  line-height: 1;
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+}
+.remove-item-btn:hover:not(:disabled) {
+  color: var(--brand-pink);
+}
+
+/* Resumen del pedido */
+.order-summary {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 25px;
+  background-color: var(--color-background-soft);
+  position: sticky;
+  top: 20px;
+}
+.order-summary h3 {
+  margin-top: 0;
+  text-align: center;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+}
+.summary-row,
+.summary-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+.summary-row small {
+  font-style: italic;
+  color: var(--color-text-soft);
+}
+.summary-total {
+  font-size: 1.2rem;
+  font-weight: bold;
+  border-top: 1px solid var(--color-border);
+  padding-top: 15px;
+  margin-top: 20px;
+}
+
+/* --- INICIO: NUEVOS ESTILOS PARA CUPONES --- */
+.coupon-section {
+  border-top: 1px dashed var(--color-border);
+  border-bottom: 1px dashed var(--color-border);
+  padding: 15px 0;
+  margin: 15px 0;
+}
+.coupon-section label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  display: block;
+  margin-bottom: 8px;
+}
+.coupon-input-group {
+  display: flex;
+}
+.coupon-input-group input {
+  flex-grow: 1;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px 0 0 4px;
+}
+.coupon-input-group button {
+  padding: 8px 12px;
+  border: 1px solid var(--brand-turquoise);
+  background-color: var(--brand-turquoise);
+  color: white;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.coupon-error {
+  color: red;
+  font-size: 0.8rem;
+  margin-top: 5px;
+}
+.applied-coupon {
+  color: green;
+  font-weight: bold;
+  position: relative;
+  padding-right: 25px;
+  flex-wrap: wrap; /* Para que el texto se ajuste si es largo */
+}
+.applied-coupon span:first-child {
+  margin-right: auto; /* Empuja el precio a la derecha */
+}
+.remove-coupon-btn {
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #aaa;
+  cursor: pointer;
+}
+/* --- FIN: NUEVOS ESTILOS PARA CUPONES --- */
+
+/* Botones */
+.btn {
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
+  border: none;
+  border-radius: 5px;
+  padding: 12px 25px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-primary {
+  background-color: var(--brand-pink);
+  color: white;
+}
+.btn-primary:hover {
+  background-color: #e65c7a;
+  transform: translateY(-2px);
+}
+.btn-secondary {
+  background-color: var(--brand-turquoise);
+  color: white;
+}
+.btn-checkout {
+  width: 100%;
+  margin-top: 20px;
+  padding: 15px;
+  font-size: 1.1rem;
+}
+
+/* Media Queries */
+@media (max-width: 900px) {
+  .cart-layout {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+  .order-summary {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .cart-view-container {
+    padding: 20px 15px;
+  }
+  .cart-header h1 {
+    font-size: 1.8rem;
+  }
+  .cart-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 10px 15px;
+    align-items: center;
+  }
+  .item-image {
+    grid-row: 1 / 3;
+    width: 65px;
+    height: 65px;
+  }
+  .item-details {
+    grid-column: 2 / 3;
+    grid-row: 1 / 2;
+  }
+  .item-quantity-selector {
+    grid-column: 2 / 3;
+    grid-row: 2 / 3;
+    justify-self: start;
+  }
+  .item-total {
+    grid-column: 3 / 4;
+    grid-row: 2 / 3;
+    justify-self: end;
+    align-self: center;
+    min-width: unset;
+  }
+  .remove-item-btn {
+    grid-column: 3 / 4;
+    grid-row: 1 / 2;
+    justify-self: end;
+    align-self: start;
+  }
+}
+</style>

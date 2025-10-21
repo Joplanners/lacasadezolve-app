@@ -1,54 +1,76 @@
 <script setup>
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useToast } from 'vue-toastification'
+import PasswordInput from '@/components/PasswordInput.vue'
 
-const router = useRouter()
 const authStore = useAuthStore()
+const toast = useToast()
+
 const newPassword = ref('')
 const confirmPassword = ref('')
 const message = ref('')
 const errorMsg = ref('')
 const loading = ref(false)
-
 const showForm = ref(false)
 const verificationError = ref('')
 
-// Este 'watcher' es la solución. Se sienta a esperar pacientemente
-// a que el authStore le avise que el modo recuperación está activo.
+// Lógica de validación de contraseña
+const passwordRequirements = computed(() => [
+  { text: 'Al menos 8 caracteres', regex: /.{8,}/ },
+  { text: 'Incluye una mayúscula (A-Z)', regex: /[A-Z]/ },
+  { text: 'Incluye una minúscula (a-z)', regex: /[a-z]/ },
+  { text: 'Incluye un número (0-9)', regex: /[0-9]/ },
+  { text: 'Incluye un símbolo (!@#$...)', regex: /[^A-Za-z0-9]/ },
+])
+
+const passwordValidation = computed(() => {
+  const value = newPassword.value
+  return passwordRequirements.value.map((req) => ({
+    ...req,
+    valid: req.regex.test(value),
+  }))
+})
+
+const isPasswordValid = computed(() => {
+  if (passwordRequirements.value.length === 0) return true
+  return passwordValidation.value.every((req) => req.valid)
+})
+
+const passwordsMatch = computed(() => {
+  if (!newPassword.value || !confirmPassword.value) return true
+  return newPassword.value === confirmPassword.value
+})
+
+// Watcher que espera la señal del store
 const unwatch = watch(
   () => authStore.isPasswordRecoveryMode,
   (isRecovery) => {
     if (isRecovery) {
-      // Cuando el store se actualiza, mostramos el formulario.
       showForm.value = true
       verificationError.value = ''
     } else {
-      // Si por alguna razón el modo se desactiva, mostramos el error.
       showForm.value = false
       verificationError.value =
         'El enlace es inválido o ha expirado. Por favor, solicita uno nuevo.'
     }
   },
-  { immediate: true }, // Se ejecuta al cargar el componente para comprobar el estado inicial.
+  { immediate: true },
 )
 
 onUnmounted(() => {
-  unwatch() // Limpiamos el watcher.
-  authStore.exitPasswordRecoveryMode() // Limpiamos el estado al salir.
+  unwatch()
+  authStore.exitPasswordRecoveryMode()
 })
 
 const handleUpdatePassword = async () => {
-  if (newPassword.value !== confirmPassword.value) {
+  if (!passwordsMatch.value) {
     errorMsg.value = 'Las contraseñas no coinciden.'
     return
   }
-  // Validación de contraseña segura
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
-  if (!passwordRegex.test(newPassword.value)) {
-    errorMsg.value =
-      'La contraseña debe tener al menos 8 caracteres, mayúsculas, minúsculas, números y símbolos.'
+  if (!isPasswordValid.value) {
+    errorMsg.value = 'La nueva contraseña no cumple con todos los requisitos de seguridad.'
     return
   }
 
@@ -57,52 +79,84 @@ const handleUpdatePassword = async () => {
   message.value = ''
 
   try {
+    // 1. Actualizar la contraseña
     const { error } = await supabase.auth.updateUser({
       password: newPassword.value,
     })
     if (error) throw error
 
-    message.value = '¡Contraseña actualizada con éxito! Redirigiendo...'
+    message.value = '¡Contraseña actualizada! Redirigiendo...'
+    toast.success('¡Contraseña cambiada!', { timeout: 1000 })
+
+    // 2. Limpiar modo INMEDIATAMENTE (antes de cualquier otra cosa)
     authStore.exitPasswordRecoveryMode()
 
+    // 3. Cerrar sesión de forma asíncrona sin esperar
+    supabase.auth.signOut().catch((err) => console.error('Error signOut:', err))
+
+    // 4. Forzar redirección INMEDIATAMENTE
     setTimeout(() => {
-      router.replace({ name: 'login' })
-    }, 3000)
+      console.log('🚀 Forzando navegación con window.location')
+      window.location.href = '/ingreso'
+    }, 500)
   } catch (error) {
-    errorMsg.value = `Error al actualizar: ${error.message}`
-  } finally {
+    errorMsg.value = `Error: ${error.message}`
+    toast.error(errorMsg.value)
     loading.value = false
   }
+  // NO hay finally - dejamos loading en true hasta que redirija
 }
 </script>
 
 <template>
   <div class="update-password-container">
     <h1>Establecer Nueva Contraseña</h1>
+
     <div v-if="showForm">
-      <p>Ingresa tu nueva contraseña a continuación.</p>
+      <p>Ingresa tu nueva contraseña. Asegúrate de que cumpla los requisitos.</p>
       <form @submit.prevent="handleUpdatePassword">
-        <div class="form-group">
-          <label for="newPassword">Nueva Contraseña:</label>
-          <input
-            type="password"
-            id="newPassword"
-            v-model="newPassword"
-            required
-            autocomplete="new-password"
-          />
-        </div>
-        <div class="form-group">
-          <label for="confirmPassword">Confirmar Nueva Contraseña:</label>
-          <input
-            type="password"
-            id="confirmPassword"
-            v-model="confirmPassword"
-            required
-            autocomplete="new-password"
-          />
-        </div>
-        <button type="submit" class="btn-primary" :disabled="loading">
+        <PasswordInput
+          v-model="newPassword"
+          id="new-password"
+          label="Nueva Contraseña:"
+          autocomplete="new-password"
+          :disabled="loading || !!message"
+          :required="true"
+        >
+          <template #requirements>
+            <ul v-if="newPassword.length > 0" class="requirements-list">
+              <li
+                v-for="(req, index) in passwordValidation"
+                :key="index"
+                :class="{ valid: req.valid }"
+              >
+                <span class="requirement-icon">{{ req.valid ? '✓' : '✗' }}</span>
+                {{ req.text }}
+              </li>
+            </ul>
+          </template>
+        </PasswordInput>
+
+        <PasswordInput
+          v-model="confirmPassword"
+          id="confirm-password"
+          label="Confirmar Nueva Contraseña:"
+          autocomplete="new-password"
+          :disabled="loading || !!message"
+          :required="true"
+        >
+          <template #requirements>
+            <p v-if="!passwordsMatch && confirmPassword.length > 0" class="error-message-inline">
+              ✗ Las contraseñas no coinciden
+            </p>
+          </template>
+        </PasswordInput>
+
+        <button
+          type="submit"
+          class="btn-primary"
+          :disabled="loading || !!message || !isPasswordValid || !passwordsMatch"
+        >
           {{ loading ? 'Actualizando...' : 'Actualizar Contraseña' }}
         </button>
       </form>
@@ -112,7 +166,7 @@ const handleUpdatePassword = async () => {
       <p v-if="verificationError" class="error-message">{{ verificationError }}</p>
       <p v-else>Verificando enlace...</p>
       <div v-if="!verificationError" class="spinner"></div>
-      <p><router-link :to="{ name: 'auth' }">Volver al Login</router-link></p>
+      <p><router-link :to="{ name: 'login' }">Volver al Login</router-link></p>
     </div>
 
     <p v-if="message" class="success-message">{{ message }}</p>
@@ -134,20 +188,8 @@ const handleUpdatePassword = async () => {
 h1 {
   margin-bottom: 20px;
 }
-.form-group {
+p {
   margin-bottom: 15px;
-  text-align: left;
-}
-label {
-  display: block;
-  margin-bottom: 5px;
-}
-input[type='password'] {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
 }
 button {
   padding: 10px 15px;
@@ -180,54 +222,30 @@ button {
   margin-top: 15px;
   font-weight: bold;
 }
-
-/* Estilos para el spinner */
 .spinner {
-  border: 4px solid rgba(0, 0, 0, 0.1); /* Color más visible sobre fondo blanco */
+  border: 4px solid rgba(0, 0, 0, 0.1);
   border-radius: 50%;
-  border-top: 4px solid #3498db; /* Color azul */
+  border-top: 4px solid #3498db;
   width: 40px;
   height: 40px;
   animation: spin 1s linear infinite;
-  margin: 20px auto; /* Centrar spinner */
+  margin: 20px auto;
 }
 @keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
   100% {
     transform: rotate(360deg);
   }
 }
-
-/* === AÑADE ESTO AL FINAL DE TU <style scoped> EN UpdatePasswordView.vue === */
-
-/* Primero, unifica con tus variables globales si lo deseas */
 .update-password-container {
-  font-family: var(--font-family-base); /* Usa tu fuente base */
-  background-color: var(--color-background-soft); /* Fondo consistente */
-  border-color: var(--color-border); /* Borde consistente */
-}
-h1 {
-  color: var(--color-heading); /* Color de encabezado consistente */
-}
-label {
-  color: var(--color-text);
-  font-weight: var(--font-weight-medium);
-}
-input[type='password'] {
   font-family: var(--font-family-base);
-  font-size: 1rem;
+  background-color: var(--color-background-soft);
   border-color: var(--color-border);
 }
-input[type='password']:focus {
-  outline: none;
-  border-color: var(--brand-pink); /* Consistente con otros formularios */
-  box-shadow: 0 0 0 2px rgba(255, 107, 135, 0.2);
+h1 {
+  color: var(--color-heading);
 }
 button.btn-primary {
-  /* Asumiendo que este es el botón principal */
-  background-color: var(--brand-pink); /* Usa tu color primario */
+  background-color: var(--brand-pink);
   color: var(--vt-c-white);
   font-weight: var(--font-weight-medium);
   transition:
@@ -235,14 +253,40 @@ button.btn-primary {
     transform 0.1s ease;
 }
 button.btn-primary:hover:not(:disabled) {
-  background-color: #e65c7a; /* Hover de tu primario */
+  background-color: #e65c7a;
   transform: translateY(-1px);
 }
 button.btn-primary:disabled {
-  background-color: #cccccc; /* Estilo deshabilitado consistente */
+  background-color: #cccccc;
   opacity: 0.7;
 }
-
+.requirements-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  color: var(--color-text-muted, #6c757d);
+  text-align: left;
+}
+.requirements-list li {
+  transition: color 0.3s ease;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+}
+.requirements-list li.valid {
+  color: var(--brand-green, #28a745);
+  font-weight: var(--font-weight-medium);
+}
+.requirement-icon {
+  margin-right: 8px;
+  width: 1em;
+}
+.error-message-inline {
+  font-size: 0.85em;
+  color: #c62828;
+  text-align: left;
+  margin: 5px 0 0 5px;
+}
 @media (max-width: 480px) {
   .update-password-container {
     width: 90%;
@@ -252,12 +296,8 @@ button.btn-primary:disabled {
     box-shadow: none;
   }
   h1 {
-    font-size: 1.5rem; /* Título un poco más pequeño */
+    font-size: 1.5rem;
     margin-bottom: 15px;
-  }
-  input[type='password'] {
-    padding: 12px; /* Más padding para tocar fácil */
-    font-size: 0.95rem;
   }
   button {
     padding: 12px;

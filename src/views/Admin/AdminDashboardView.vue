@@ -219,7 +219,7 @@ async function fetchData() {
       latestOverlayImages.value = latestOverlayImagesRes.data || [] // Asignar datos
     }
     loadingLatest.value = false
-  } catch (error) {
+  } catch {
     const errorText = 'Error inesperado cargando dashboard.'
     if (!errorStats.value) errorStats.value = errorText
     if (!errorLatest.value) errorLatest.value = errorText

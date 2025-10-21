@@ -11,8 +11,10 @@
       <!-- 👇 NUEVO ENLACE AÑADIDO AQUÍ 👇 -->
       <router-link :to="{ name: 'admin-categories' }">Categorías</router-link> |
       <router-link :to="{ name: 'admin-products' }">Productos</router-link> |
+      <router-link :to="{ name: 'admin-orders' }">Pedidos</router-link> |
       <router-link :to="{ name: 'admin-featured-products' }"> Productos Destacados </router-link> |
       <router-link :to="{ name: 'admin-banners' }">Banners</router-link> |
+      <router-link :to="{ name: 'admin-coupons' }">Cupones</router-link> |
     </nav>
     <hr />
     <main>

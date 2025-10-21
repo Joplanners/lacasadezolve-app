@@ -123,7 +123,7 @@ async function handleContactSubmit() {
               Después de mucho trabajo, por fin puedes comprar todo lo que siempre has soñado de
               forma más fácil.
             </p>
-            <router-link :to="{ name: 'store' }" class="btn btn-secondary">
+            <router-link :to="{ name: 'login' }" class="btn btn-secondary">
               ¡Quiero mi descuento!
             </router-link>
           </div>
