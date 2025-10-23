@@ -542,11 +542,7 @@ onUnmounted(() => {
           Asignado a: {{ assignedUser.name }} ({{ assignedUser.email }})
           <button
             type="button"
-            @click="
-              assignedUser = null
-              formData.user_id = null
-              userSearchTerm = ''
-            "
+            @click="((assignedUser = null), (formData.user_id = null), (userSearchTerm = ''))"
             class="btn-clear-user"
             title="Quitar"
           >
