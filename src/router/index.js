@@ -254,7 +254,8 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
+// 🔥 GUARD CORREGIDO: Ahora espera a que la auth esté lista
+router.beforeEach(async (to, from, next) => {
   console.log('🚦 Router Guard - Navegando a:', to.name, to.path)
   console.log('🚦 Router Guard - Desde:', from.name, from.path)
 
@@ -266,6 +267,9 @@ router.beforeEach((to, from, next) => {
   }
 
   const authStore = useAuthStore()
+
+  // 🔥 CAMBIO CRÍTICO: Esperar a que la auth esté lista antes de verificar
+  await authStore.authReadyPromise
 
   console.log('👤 isLoggedIn:', authStore.isLoggedIn)
   console.log('👤 userRole:', authStore.userRole)

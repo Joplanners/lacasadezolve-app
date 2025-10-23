@@ -16,12 +16,12 @@ export const useAuthStore = defineStore('auth', () => {
     resolveAuthReady = resolve
   })
 
-  // --- GETTERS COMPUTEDS ---
+  // --- GETTERS (COMPUTEDS) ---
   const user = computed(() => session.value?.user ?? null)
   const isLoggedIn = computed(() => !!user.value)
-  const userRole = computed(() => userProfile.value?.role || null)
+  const userRole = computed(() => userProfile.value?.role ?? null)
 
-  // 👇 COMPUTED PARA MOSTRAR EL NOMBRE EN EL NAVBAR
+  // COMPUTED PARA MOSTRAR EL NOMBRE EN EL NAVBAR
   const userDisplayName = computed(() => {
     if (!userProfile.value) return 'Usuario'
 
@@ -29,24 +29,13 @@ export const useAuthStore = defineStore('auth', () => {
     const lastName = userProfile.value.last_name
 
     // Si tiene nombre completo
-    if (firstName && lastName) {
-      return `${firstName} ${lastName}`
-    }
-
+    if (firstName && lastName) return `${firstName} ${lastName}`
     // Si solo tiene nombre
-    if (firstName) {
-      return firstName
-    }
-
+    if (firstName) return firstName
     // Si solo tiene apellido
-    if (lastName) {
-      return lastName
-    }
-
+    if (lastName) return lastName
     // Si tiene email del user de Supabase
-    if (user.value?.email) {
-      return user.value.email.split('@')[0]
-    }
+    if (user.value?.email) return user.value.email.split('@')[0]
 
     // Fallback
     return 'Usuario'
@@ -54,7 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // --- ACCIONES ---
 
-  // --- FUNCIÓN: fetchUserProfile ---
+  // --- FUNCIÓN fetchUserProfile ---
   async function fetchUserProfile(userId) {
     if (!userId) {
       userProfile.value = null
@@ -67,12 +56,9 @@ export const useAuthStore = defineStore('auth', () => {
         .eq('id', userId)
         .single()
 
-      if (error && error.code !== 'PGRST116') {
-        throw error
-      }
+      if (error && error.code !== 'PGRST116') throw error
 
-      userProfile.value = data || null
-
+      userProfile.value = data ?? null
       if (!userProfile.value) {
         console.warn(
           `No se encontró perfil para el usuario ${userId}, asignando rol 'user' por defecto.`,
@@ -91,7 +77,6 @@ export const useAuthStore = defineStore('auth', () => {
   let lastSessionToken = null
   supabase.auth.onAuthStateChange(async (event, newSession) => {
     const cartStore = useCartStore()
-
     console.log('🔔 Auth event:', event, 'Session:', !!newSession)
 
     // PASSWORD_RECOVERY debe procesar y SALIR INMEDIATAMENTE
@@ -99,25 +84,22 @@ export const useAuthStore = defineStore('auth', () => {
       isPasswordRecoveryMode.value = true
       session.value = newSession
       await fetchUserProfile(newSession?.user?.id)
-
       if (resolveAuthReady) {
         resolveAuthReady()
         resolveAuthReady = null
       }
-      return // 👈 SALIDA TEMPRANA
+      return // SALIDA TEMPRANA CRÍTICO
     }
 
-    // 👇 CRÍTICO: Ignorar INITIAL_SESSION y USER_UPDATED durante PASSWORD_RECOVERY
+    // Ignorar INITIAL_SESSION y USER_UPDATED durante PASSWORD_RECOVERY
     if (isPasswordRecoveryMode.value && (event === 'INITIAL_SESSION' || event === 'USER_UPDATED')) {
-      console.log(`⚠️ Ignorando ${event} durante PASSWORD_RECOVERY`)
-      return // 👈 SALIDA TEMPRANA para evitar conflictos
+      console.log('⏭️ Ignorando', event, 'durante PASSWORD_RECOVERY')
+      return // SALIDA TEMPRANA para evitar conflictos
     }
 
     // Manejo de token duplicado
     if (event === 'SIGNED_IN' && newSession?.access_token) {
-      if (lastSessionToken === newSession.access_token) {
-        return
-      }
+      if (lastSessionToken === newSession.access_token) return
       lastSessionToken = newSession.access_token
     }
 
@@ -144,20 +126,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   })
 
-  // Acción signOut (con redirección)
+  // Acción signOut con redirección
   async function signOut() {
     const cartStore = useCartStore()
     lastSessionToken = null
-
     const { error } = await supabase.auth.signOut()
-    if (error) {
-      console.error('Error al cerrar sesión en Supabase:', error)
-    }
-
+    if (error) console.error('Error al cerrar sesión en Supabase:', error)
     cartStore.clearCart()
     session.value = null
     userProfile.value = null
-
     router.push({ name: 'login' })
   }
 
@@ -165,38 +142,34 @@ export const useAuthStore = defineStore('auth', () => {
   async function signOutWithoutRedirect() {
     const cartStore = useCartStore()
     lastSessionToken = null
-
     const { error } = await supabase.auth.signOut()
-    if (error) {
-      console.error('Error al cerrar sesión en Supabase:', error)
-    }
-
+    if (error) console.error('Error al cerrar sesión en Supabase:', error)
     cartStore.clearCart()
     session.value = null
     userProfile.value = null
     isPasswordRecoveryMode.value = false
-
     // NO hacemos router.push aquí
   }
 
-  // Acción signInWithGoogle
+  // 🔥 FUNCIÓN CORREGIDA PARA GOOGLE AUTH
   async function signInWithGoogle(redirectPath = '/bienvenida') {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + redirectPath,
+          redirectTo: `${window.location.origin}${redirectPath}`, // ✅ SIN barra extra
         },
       })
       if (error) {
         console.error('Error en login con Google:', error.message)
+        throw error
       }
     } catch (err) {
       console.error('Error inesperado en login Google:', err)
+      throw err
     }
   }
 
-  // exitPasswordRecoveryMode
   function exitPasswordRecoveryMode() {
     isPasswordRecoveryMode.value = false
   }
@@ -207,7 +180,7 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     userProfile: readonly(userProfile),
     userRole,
-    userDisplayName, // 👈 AQUÍ ESTÁ EL NOMBRE PARA EL NAVBAR
+    userDisplayName, // ✅ Exportamos el nombre para el navbar
     isLoggedIn,
     isPasswordRecoveryMode: readonly(isPasswordRecoveryMode),
     authReadyPromise,
