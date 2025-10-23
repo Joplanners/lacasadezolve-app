@@ -20,22 +20,22 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
-      path: '/bienvenida', // La URL que verá el usuario
-      name: 'welcome', // El nombre que usamos en router.push
+      path: '/bienvenida',
+      name: 'welcome',
       component: () => import('../views/WelcomeView.vue'),
-      meta: { requiresAuth: true }, // Requiere estar logueado para verla
+      meta: { requiresAuth: true },
     },
     {
       path: '/actualizar-contrasena',
       name: 'update-password',
       component: () => import('../views/UpdatePasswordView.vue'),
-      meta: { requiresAuth: false }, // Se manejará con la lógica del store
+      meta: { requiresAuth: false },
     },
     {
       path: '/mi-perfil/pedido/:orderId',
       name: 'order-detail',
       component: OrderDetail,
-      meta: { requiresAuth: true }, // Opcional: si requiere inicio de sesión
+      meta: { requiresAuth: true },
     },
     {
       path: '/como-usar-ar',
@@ -53,27 +53,43 @@ const router = createRouter({
       path: '/producto/:id',
       name: 'product-detail',
       component: () => import('../views/ProductDetailView.vue'),
-      props: true, // Esto pasa el :id de la URL como un prop al componente
+      props: true,
       meta: { requiresAuth: false },
     },
     {
       path: '/carrito',
       name: 'cart',
       component: () => import('../views/CartView.vue'),
-      meta: { requiresAuth: false }, // Permitimos ver el carrito a invitados
+      meta: { requiresAuth: false },
     },
     {
-      path: '/finalizar-compra', // La URL que verá el usuario
-      name: 'checkout', // El nombre que usamos en router.push
+      path: '/finalizar-compra',
+      name: 'checkout',
       component: () => import('../views/CheckoutView.vue'),
-      meta: { requiresAuth: false }, // Permitimos checkout a invitados
+      meta: { requiresAuth: false },
     },
     {
-      path: '/pedido-transferencia/:orderId', // La URL que verá el usuario
-      name: 'transfer-pending', // El nombre que usamos en router.push
+      path: '/pedido-transferencia/:orderId',
+      name: 'transfer-pending',
       component: () => import('../views/TransferPendingView.vue'),
-      props: true, // ¡Importante! Pasa :orderId como prop al componente
-      meta: { requiresAuth: false }, // Permitimos verla a invitados
+      props: true,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: '/orden-confirmada/:orderId',
+      name: 'order-confirmation',
+      component: () => import('../views/OrderConfirmationView.vue'),
+      props: true,
+      meta: { requiresAuth: false },
+    },
+    {
+      path: '/payment/return',
+      name: 'payment-return',
+      component: () => import('@/views/PaymentReturnView.vue'),
+      meta: {
+        requiresAuth: false,
+        skipAuthCheck: true,
+      },
     },
     {
       path: '/experiencia-ar/:markerId',
@@ -217,12 +233,11 @@ const router = createRouter({
           component: () => import('../views/Admin/AdminCouponsView.vue'),
         },
         {
-          path: 'pedidos', // La URL será /admin/pedidos
+          path: 'pedidos',
           name: 'admin-orders',
           component: () => import('../views/Admin/AdminOrdersListView.vue'),
         },
         {
-          // Cambiamos :id por :orderId para que coincida con los componentes
           path: 'pedidos/:orderId',
           name: 'admin-order-detail',
           component: () => import('../views/Admin/AdminOrderDetailView.vue'),
@@ -239,43 +254,40 @@ const router = createRouter({
   ],
 })
 
-// Guardia de Navegación Global
-router.beforeEach(async (to, from, next) => {
+router.beforeEach((to, from, next) => {
+  console.log('🚦 Router Guard - Navegando a:', to.name, to.path)
+  console.log('🚦 Router Guard - Desde:', from.name, from.path)
+
+  // Si es payment-return, salta la verificación de auth
+  if (to.meta.skipAuthCheck) {
+    console.log('⏭️ Saltando verificación de auth para payment-return')
+    next()
+    return
+  }
+
   const authStore = useAuthStore()
 
-  // Esperamos a que la promesa 'authReady' se resuelva. Esto asegura que
-  // el primer chequeo de onAuthStateChange de Supabase se ha completado.
-  await authStore.authReadyPromise
+  console.log('👤 isLoggedIn:', authStore.isLoggedIn)
+  console.log('👤 userRole:', authStore.userRole)
 
-  // Obtenemos el estado de autenticación DESPUÉS de que la promesa se resolvió.
-  const isLoggedIn = authStore.isLoggedIn
-  const userRole = authStore.userRole
-
-  // Obtenemos los requisitos de la ruta a la que se intenta navegar.
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
   const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin)
 
-  // REGLA 1: Si la ruta requiere ser admin y el usuario no lo es...
-  if (requiresAdmin && userRole !== 'admin') {
-    // Lo redirigimos a su perfil. No tiene permiso.
-    return next({ name: 'profile' })
-  }
+  console.log('🔐 requiresAuth:', requiresAuth)
+  console.log('🔐 requiresAdmin:', requiresAdmin)
 
-  // REGLA 2: Si la ruta requiere estar logueado y el usuario no lo está...
-  if (requiresAuth && !isLoggedIn) {
-    // Lo redirigimos a la página de login.
-    return next({ name: 'login', query: { redirect: to.fullPath } })
+  if (requiresAuth && !authStore.isLoggedIn) {
+    console.warn('⚠️ Acceso denegado: No autenticado')
+    console.log('🔄 Redirigiendo a /ingreso')
+    next({ name: 'login' })
+  } else if (requiresAdmin && authStore.userRole !== 'admin') {
+    console.warn('⚠️ Acceso denegado: No es admin')
+    console.log('🔄 Redirigiendo a /')
+    next({ name: 'home' })
+  } else {
+    console.log('✅ Navegación permitida')
+    next()
   }
-
-  // REGLA 3: Si el usuario intenta ir a la página de login pero ya está logueado...
-  if (to.name === 'login' && isLoggedIn) {
-    // Lo redirigimos a la página apropiada según su rol.
-    if (userRole === 'admin') return next({ name: 'admin-dashboard' })
-    return next({ name: 'profile' })
-  }
-
-  // Si ninguna de las reglas anteriores detuvo la navegación, permitimos el paso.
-  next()
 })
 
 export default router

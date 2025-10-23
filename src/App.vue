@@ -76,6 +76,7 @@ const showNavbar = computed(() => {
     'cookies-policy',
     'product-detail',
     'cart',
+    'payment-return',
   ]
   if (!isLoggedIn.value) return publicRoutesWithNavbar.includes(route.name)
   if (isARExperienceActive.value) return !isMobileView.value || !isLandscape.value

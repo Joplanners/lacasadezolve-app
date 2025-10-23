@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/storeCart'
 import { useProductsStore } from '@/stores/storeProducts'
@@ -31,6 +31,7 @@ const customerData = ref({
   addressNumber: '',
   addressDetail: '',
 })
+
 const regions = ref(regionesComunasData)
 const communes = ref([])
 const selectedRegionObject = ref(null)
@@ -42,6 +43,10 @@ const loadingProfile = ref(false)
 const useSavedAddress = ref(true)
 const cartProductDetails = ref([])
 const loadingCartDetails = ref(true)
+
+const pagoPopup = ref(null)
+const isProcessingPayment = ref(false)
+let paymentCompleted = false
 
 const hasSavedAddress = computed(() => {
   return (
@@ -97,6 +102,46 @@ const formatRut = () => {
     rut = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + dv
   }
   customerData.value.rut = rut
+}
+
+// 🔥 FUNCIÓN CORREGIDA PARA MANEJAR MENSAJES DEL POPUP
+const handlePaymentMessage = (event) => {
+  if (event.origin !== window.location.origin) {
+    console.warn('❌ Mensaje de origen no confiable:', event.origin)
+    return
+  }
+  console.log('📨 Mensaje recibido del popup:', event.data)
+
+  // 🔥 CAMBIO PRINCIPAL: Escuchar 'PAYMENT_SUCCESS' (con mayúsculas)
+  if (event.data.type === 'PAYMENT_SUCCESS') {
+    console.log('✅ Pago completado exitosamente')
+    paymentCompleted = true
+    isProcessingPayment.value = false
+    isSubmitting.value = false
+
+    if (pagoPopup.value && !pagoPopup.value.closed) {
+      pagoPopup.value.close()
+    }
+
+    const { orderId } = event.data
+    cartStore.clearCart()
+    toast.success('¡Pago exitoso! Redirigiendo...')
+
+    setTimeout(() => {
+      router.push({ name: 'order-confirmation', params: { orderId } })
+    }, 1000)
+  } else if (event.data.type === 'payment-error') {
+    const errorMessage = event.data.message || 'Error desconocido durante el pago.'
+    console.error('❌ Error en el pago:', errorMessage)
+
+    isProcessingPayment.value = false
+    isSubmitting.value = false
+
+    if (pagoPopup.value && !pagoPopup.value.closed) {
+      pagoPopup.value.close()
+    }
+    toast.error('Error en el pago: ' + errorMessage)
+  }
 }
 
 async function loadUserProfile() {
@@ -217,6 +262,7 @@ async function handleCheckoutSubmit() {
   }
 
   isSubmitting.value = true
+  paymentCompleted = false
   toast.info('Procesando tu pedido...')
 
   try {
@@ -267,11 +313,13 @@ async function handleCheckoutSubmit() {
       .insert(orderData)
       .select('id')
       .single()
+
     if (orderError) throw orderError
     const newOrderId = orderResult.id
 
     const orderItemsWithOrderId = orderItemsData.map((item) => ({ ...item, order_id: newOrderId }))
     const { error: itemsError } = await supabase.from('order_items').insert(orderItemsWithOrderId)
+
     if (itemsError) {
       await supabase.from('orders').delete().eq('id', newOrderId)
       throw itemsError
@@ -295,40 +343,73 @@ async function handleCheckoutSubmit() {
       }
     }
 
-    await cartStore.clearCart()
-    toast.success('¡Pedido creado con éxito!')
-
-    // 👇 NUEVO: Enviar email de confirmación
-    try {
-      console.log('📧 Enviando email de confirmación para orden:', newOrderId)
-      const { data: emailData, error: emailError } = await supabase.functions.invoke(
-        'send-order-confirmation',
-        {
-          body: { orderData: { orderId: newOrderId } },
-        },
-      )
-
-      if (emailError) {
-        console.error('Error al enviar email:', emailError)
-        toast.warning('Tu pedido fue creado, pero no se pudo enviar el email de confirmación.')
-      } else {
-        console.log('✅ Email enviado exitosamente:', emailData)
-      }
-    } catch (emailCatchError) {
-      console.error('Error crítico enviando email:', emailCatchError)
-      // No mostramos error al usuario, el pedido ya se creó correctamente
-    }
-
     if (selectedPaymentMethod.value === 'transferencia') {
+      try {
+        const { error: emailError } = await supabase.functions.invoke('send-order-confirmation', {
+          body: { orderData: { orderId: newOrderId } },
+        })
+        if (emailError) {
+          toast.warning('Tu pedido fue creado, pero no se pudo enviar el email de confirmación.')
+        }
+      } catch (e) {
+        console.error('Error invocando función de email:', e)
+      }
+
+      await cartStore.clearCart()
+      toast.success('¡Pedido creado con éxito!')
       router.push({ name: 'transfer-pending', params: { orderId: newOrderId } })
     } else if (selectedPaymentMethod.value === 'transbank') {
-      console.log('REDIRECCIÓN A TRANSBANK - Order ID:', newOrderId, 'Monto:', finalTotal.value)
-      router.push({ name: 'home' })
+      try {
+        isProcessingPayment.value = true
+        toast.info('Abriendo pasarela de pago...')
+
+        const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
+          'create-transbank-payment',
+          {
+            body: { orderId: newOrderId },
+          },
+        )
+
+        if (paymentError || !paymentData.success) {
+          throw new Error(paymentError?.message || 'Error al iniciar el pago con Transbank')
+        }
+
+        const transbankUrl = `${paymentData.url}?token_ws=${paymentData.token}`
+        const width = 800,
+          height = 600
+        const left = (window.screen.width - width) / 2
+        const top = (window.screen.height - height) / 2
+
+        pagoPopup.value = window.open(
+          transbankUrl,
+          'TransbankPayment',
+          `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
+        )
+
+        if (!pagoPopup.value || pagoPopup.value.closed) {
+          throw new Error('El popup fue bloqueado. Por favor habilita los popups para este sitio.')
+        }
+
+        const checkPopupClosed = setInterval(() => {
+          if (pagoPopup.value && pagoPopup.value.closed) {
+            clearInterval(checkPopupClosed)
+            if (!paymentCompleted) {
+              isProcessingPayment.value = false
+              isSubmitting.value = false
+              toast.warning('Pago cancelado. Puedes intentar nuevamente desde tus órdenes.')
+            }
+          }
+        }, 1000)
+      } catch (transbankError) {
+        toast.error(transbankError.message || 'No se pudo iniciar el pago. Intenta nuevamente.')
+        isProcessingPayment.value = false
+        isSubmitting.value = false
+        await supabase.from('orders').delete().eq('id', newOrderId)
+      }
     }
   } catch (error) {
     console.error('Error en handleCheckoutSubmit:', error)
     toast.error(error.message || 'Ocurrió un error inesperado al procesar el pedido.')
-  } finally {
     isSubmitting.value = false
   }
 }
@@ -343,16 +424,32 @@ onMounted(() => {
   if (authStore.isLoggedIn) {
     loadUserProfile()
   }
+  window.addEventListener('message', handlePaymentMessage)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('message', handlePaymentMessage)
 })
 </script>
 
 <template>
   <div class="checkout-view-container">
     <h1>Finalizar Compra</h1>
+
+    <div v-if="isProcessingPayment" class="processing-overlay">
+      <div class="processing-content">
+        <div class="spinner-large"></div>
+        <h2>Procesando tu pago...</h2>
+        <p>Por favor completa el pago en la ventana emergente.</p>
+        <p><strong>No cierres esta ventana.</strong></p>
+      </div>
+    </div>
+
     <div v-if="loadingProfile" class="loading-indicator profile-loader">
       <div class="spinner"></div>
       <p>Cargando tus datos...</p>
     </div>
+
     <div v-else class="checkout-layout">
       <form @submit.prevent="handleCheckoutSubmit" class="checkout-form">
         <fieldset class="form-section">
@@ -415,6 +512,7 @@ onMounted(() => {
             </div>
           </div>
         </fieldset>
+
         <fieldset
           v-if="authStore.isLoggedIn && hasSavedAddress"
           class="form-section address-selection"
@@ -452,6 +550,7 @@ onMounted(() => {
             </label>
           </div>
         </fieldset>
+
         <fieldset class="form-section">
           <legend>
             {{
@@ -537,6 +636,7 @@ onMounted(() => {
             </p>
           </div>
         </fieldset>
+
         <fieldset class="form-section">
           <legend>
             {{
@@ -577,6 +677,7 @@ onMounted(() => {
             </label>
           </div>
         </fieldset>
+
         <fieldset class="form-section">
           <legend>
             {{
@@ -618,10 +719,16 @@ onMounted(() => {
             </label>
           </div>
         </fieldset>
-        <button type="submit" class="btn btn-primary btn-confirm-order" :disabled="isSubmitting">
+
+        <button
+          type="submit"
+          class="btn btn-primary btn-confirm-order"
+          :disabled="isSubmitting || isProcessingPayment"
+        >
           {{ isSubmitting ? 'Procesando...' : 'Confirmar Datos y Pagar' }}
         </button>
       </form>
+
       <aside class="order-summary-checkout">
         <h4>Resumen de tu Compra</h4>
         <div v-if="loadingCartDetails" class="loading-indicator">
@@ -681,6 +788,49 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* Estilos completos */
+.processing-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  backdrop-filter: blur(5px);
+}
+.processing-content {
+  background: white;
+  padding: 40px;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 400px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+.processing-content h2 {
+  margin: 20px 0 10px;
+  color: var(--color-heading);
+}
+.processing-content p {
+  margin: 10px 0;
+  color: var(--color-text-soft);
+  line-height: 1.5;
+}
+.processing-content p strong {
+  color: var(--brand-pink);
+}
+.spinner-large {
+  border: 6px solid rgba(0, 0, 0, 0.1);
+  border-top: 6px solid var(--brand-turquoise);
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
 .checkout-view-container {
   max-width: 1000px;
   margin: 20px auto;
@@ -926,9 +1076,13 @@ h1 {
   background-color: var(--brand-pink);
   color: white;
 }
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background-color: #e65c7a;
   transform: translateY(-2px);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .checkout-layout {
   display: grid;
