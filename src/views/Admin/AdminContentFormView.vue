@@ -22,11 +22,10 @@ const formData = ref({
   user_id: null,
   is_public: true,
 })
-// --- CAMBIO: De selectedFile (singular) a selectedFiles (plural, array) ---
-const selectedFiles = ref([]) // Ahora es un array
+const selectedFiles = ref([])
 const fileInputKey = ref(Date.now())
 
-// --- Estado para Búsqueda de Usuario (sin cambios) ---
+// --- Estado para Búsqueda de Usuario ---
 const userSearchTerm = ref('')
 const userSearchResults = ref([])
 const loadingUsers = ref(false)
@@ -38,38 +37,31 @@ const loadingData = ref(false)
 const saving = ref(false)
 const errorMsg = ref('')
 const formTitle = computed(() => (props.isEditMode ? 'Editar Contenido' : 'Añadir Nuevo Contenido'))
-// --- NUEVO ESTADO para progreso de subida múltiple ---
 const uploadProgress = ref({ total: 0, current: 0, errors: 0 })
 
 // --- Funciones ---
 
-// --- CAMBIO: handleFileChange ahora maneja múltiples archivos ---
 const handleFileChange = (event) => {
   const files = event.target.files
   if (files && files.length > 0) {
-    // Convertir FileList a Array y añadir a nuestro estado
     selectedFiles.value = Array.from(files)
     console.log(
       'Archivos seleccionados:',
       selectedFiles.value.map((f) => f.name),
     )
   } else {
-    selectedFiles.value = [] // Limpiar si no se seleccionan archivos
+    selectedFiles.value = []
   }
 }
 
-// --- Función para inferir tipo basado en MIME type ---
 const getFileType = (mimeType) => {
-  if (!mimeType) return 'other' // Tipo por defecto si no hay MIME type
+  if (!mimeType) return 'other'
   if (mimeType.startsWith('image/')) return 'image'
   if (mimeType.startsWith('video/')) return 'video'
-  if (mimeType.startsWith('text/')) return 'text' // Añadido para texto
-  // Puedes añadir más tipos si es necesario (audio, pdf, etc.)
+  if (mimeType.startsWith('text/')) return 'text'
   return 'other'
 }
 
-// --- Función fetchContentData (Sin cambios relevantes para la subida múltiple, solo carga datos para edición) ---
-// (El código de fetchContentData permanece igual que en tu versión original)
 async function fetchContentData(contentId) {
   loadingData.value = true
   errorMsg.value = ''
@@ -133,7 +125,6 @@ async function fetchContentData(contentId) {
   }
 }
 
-// --- Lógica de Búsqueda de Usuarios (sin cambios) ---
 const searchUsers = async () => {
   if (
     assignedUser.value &&
@@ -169,7 +160,9 @@ const searchUsers = async () => {
     loadingUsers.value = false
   }
 }
+
 const debouncedSearchUsers = debounce(searchUsers, 400)
+
 const selectUser = (user) => {
   assignedUser.value = {
     id: user.user_id,
@@ -181,6 +174,14 @@ const selectUser = (user) => {
   userSearchResults.value = []
   showUserDropdown.value = false
 }
+
+// 🔥 NUEVA FUNCIÓN: Limpiar usuario asignado
+function clearAssignedUser() {
+  assignedUser.value = null
+  formData.value.user_id = null
+  userSearchTerm.value = ''
+}
+
 const handleClickOutside = (event) => {
   const searchContainer = document.getElementById('user-search-container')
   if (showUserDropdown.value && searchContainer && !searchContainer.contains(event.target)) {
@@ -188,34 +189,29 @@ const handleClickOutside = (event) => {
   }
 }
 
-// --- CAMBIO RADICAL: saveContent ahora maneja múltiples archivos o uno solo (en edición) ---
 async function saveContent() {
   saving.value = true
   errorMsg.value = ''
-  uploadProgress.value = { total: 0, current: 0, errors: 0 } // Reset progress
+  uploadProgress.value = { total: 0, current: 0, errors: 0 }
 
-  // --- CASO 1: MODO EDICIÓN (Un solo archivo/registro) ---
   if (props.isEditMode) {
-    // Validación básica para edición
     if (!formData.value.name || !formData.value.type) {
       toast.error('Nombre y tipo son obligatorios en modo edición.')
       saving.value = false
       return
     }
-    // Si se seleccionó un NUEVO archivo en modo edición (reemplazo)
     const singleFileToUpload = selectedFiles.value.length > 0 ? selectedFiles.value[0] : null
 
     let finalUserId = formData.value.is_public
       ? null
       : assignedUser.value?.id || formData.value.user_id || authStore.user?.id || null
-    let finalContentUrl = formData.value.content_url // Usar URL existente por defecto
+    let finalContentUrl = formData.value.content_url
 
     try {
-      // Subir el NUEVO archivo si existe
       if (singleFileToUpload) {
         console.log(`Editando: Preparando para subir reemplazo: ${singleFileToUpload.name}`)
         errorMsg.value = `Subiendo reemplazo ${singleFileToUpload.name}...`
-        uploadProgress.value = { total: 1, current: 1, errors: 0 } // Mostrar progreso para uno
+        uploadProgress.value = { total: 1, current: 1, errors: 0 }
 
         const workerUrl = 'https://r2-presigner-worker.jodiabunos.workers.dev'
         const formDataBody = new FormData()
@@ -236,13 +232,12 @@ async function saveContent() {
         }
         const result = await response.json()
         if (!result || !result.publicUrl) throw new Error('El Worker no devolvió una URL pública.')
-        finalContentUrl = result.publicUrl // Actualizar URL
+        finalContentUrl = result.publicUrl
         toast.info(`Archivo ${singleFileToUpload.name} subido como reemplazo.`)
         errorMsg.value = ''
       }
 
-      // Actualizar registro en la DB
-      if (!finalContentUrl) throw new Error('No hay URL de contenido para guardar.') // Seguridad
+      if (!finalContentUrl) throw new Error('No hay URL de contenido para guardar.')
 
       console.log(
         `Actualizando en DB: ID=${formData.value.id}, URL=${finalContentUrl}, UserID=${finalUserId}, Public=${formData.value.is_public}`,
@@ -267,17 +262,14 @@ async function saveContent() {
       const saveErrorText = `Error al actualizar contenido: ${error.message}`
       errorMsg.value = saveErrorText
       toast.error(saveErrorText)
-      uploadProgress.value.errors++ // Marcar error en progreso
+      uploadProgress.value.errors++
     } finally {
       saving.value = false
-      // Limpiar input si se subió archivo
       if (singleFileToUpload) {
         selectedFiles.value = []
         fileInputKey.value = Date.now()
       }
     }
-
-    // --- CASO 2: MODO CREACIÓN (Posiblemente múltiples archivos) ---
   } else {
     if (selectedFiles.value.length === 0) {
       toast.error('Debes seleccionar al menos un archivo.')
@@ -285,13 +277,12 @@ async function saveContent() {
       return
     }
 
-    // Determinar visibilidad y dueño (común para todos los archivos del lote)
     let finalUserId = null
     if (!formData.value.is_public) {
       if (assignedUser.value) {
         finalUserId = assignedUser.value.id
       } else {
-        finalUserId = authStore.user?.id || null // Asignar al admin actual por defecto
+        finalUserId = authStore.user?.id || null
         if (!finalUserId) {
           toast.error('No se pudo determinar el usuario admin para asignar contenido privado.')
           saving.value = false
@@ -304,15 +295,14 @@ async function saveContent() {
       finalUserId = null
     }
 
-    // Preparar subida/inserción para cada archivo
     uploadProgress.value.total = selectedFiles.value.length
     uploadProgress.value.current = 0
     uploadProgress.value.errors = 0
-    errorMsg.value = `Procesando ${uploadProgress.value.total} archivos...` // Mensaje inicial
+    errorMsg.value = `Procesando ${uploadProgress.value.total} archivos...`
 
     const workerUrl = 'https://r2-presigner-worker.jodiabunos.workers.dev'
     const uploadPromises = selectedFiles.value.map(async (file, index) => {
-      uploadProgress.value.current = index + 1 // Actualizar contador UI
+      uploadProgress.value.current = index + 1
       errorMsg.value = `Subiendo ${index + 1}/${uploadProgress.value.total}: ${file.name}...`
       console.log(`Procesando archivo ${index + 1}: ${file.name}`)
 
@@ -320,7 +310,6 @@ async function saveContent() {
         throw new Error(`Archivo "${file.name}" está vacío o es inválido.`)
       }
 
-      // 1. Subir archivo al Worker
       const formDataBody = new FormData()
       formDataBody.append('file', file, file.name)
       const response = await fetch(workerUrl, { method: 'POST', body: formDataBody })
@@ -340,14 +329,13 @@ async function saveContent() {
         throw new Error(`El Worker no devolvió URL para ${file.name}.`)
       }
       const fileUrl = result.publicUrl
-      const fileType = getFileType(file.type) // Inferir tipo
+      const fileType = getFileType(file.type)
 
       console.log(`Archivo ${file.name} subido OK. URL: ${fileUrl}, Tipo: ${fileType}`)
 
-      // 2. Insertar registro en Supabase
       const contentDataToInsert = {
-        name: file.name, // Usar nombre del archivo
-        type: fileType, // Usar tipo inferido
+        name: file.name,
+        type: fileType,
         content_url: fileUrl,
         is_public: formData.value.is_public,
         user_id: finalUserId,
@@ -360,52 +348,44 @@ async function saveContent() {
       }
 
       console.log(`Registro para ${file.name} creado con éxito.`)
-      return { fileName: file.name, status: 'success' } // Devolver éxito
+      return { fileName: file.name, status: 'success' }
     })
 
-    // Ejecutar todas las promesas y esperar resultados
     const results = await Promise.allSettled(uploadPromises)
 
-    // Procesar resultados
     let successCount = 0
     let errorCount = 0
     results.forEach((result, index) => {
-      const fileName = selectedFiles.value[index].name // Obtener nombre para logs/errores
+      const fileName = selectedFiles.value[index].name
       if (result.status === 'fulfilled') {
         successCount++
         console.log(`Éxito procesando: ${fileName}`)
       } else {
         errorCount++
         console.error(`Error procesando ${fileName}:`, result.reason?.message || result.reason)
-        // Mostrar un toast por cada error individual podría ser mucho, mejor un resumen
       }
     })
 
-    uploadProgress.value.errors = errorCount // Actualizar contador de errores final
+    uploadProgress.value.errors = errorCount
 
-    // Mostrar resumen
     if (errorCount === 0) {
       toast.success(`¡${successCount} archivos subidos y guardados con éxito!`)
-      router.push({ name: 'admin-contents' }) // Redirigir solo si todo OK
+      router.push({ name: 'admin-contents' })
     } else {
       const summaryMsg = `${successCount} archivos procesados correctamente. ${errorCount} archivos fallaron. Revise la consola para detalles.`
-      errorMsg.value = summaryMsg // Mostrar error persistente en la UI
+      errorMsg.value = summaryMsg
       toast.warning(summaryMsg)
-      // No redirigir si hubo errores, para que el usuario vea el mensaje/consola
     }
 
-    // Limpiar estado después de procesar
     selectedFiles.value = []
-    fileInputKey.value = Date.now() // Resetear input
+    fileInputKey.value = Date.now()
     saving.value = false
-    // Limpiar mensaje de progreso si no hubo errores persistentes
     if (errorCount === 0) {
       errorMsg.value = ''
     }
   }
 }
 
-// --- Ciclo de Vida (sin cambios) ---
 onMounted(() => {
   if (props.isEditMode) {
     const contentId = route.params.id
@@ -419,6 +399,7 @@ onMounted(() => {
   }
   document.addEventListener('click', handleClickOutside)
 })
+
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
@@ -428,25 +409,20 @@ onUnmounted(() => {
   <div class="admin-content-form">
     <h3>{{ formTitle }}</h3>
     <div v-if="loadingData" class="loading-indicator"><p>Cargando datos...</p></div>
-    <!-- Mensaje de error general O de resumen de errores post-subida -->
     <div
       v-if="(errorMsg && !saving) || (errorMsg && saving && uploadProgress.errors > 0)"
       class="error-message"
     >
       <p>{{ errorMsg }}</p>
     </div>
-    <!-- Mensaje de progreso durante la subida -->
     <div
       v-if="saving && uploadProgress.total > 0 && uploadProgress.errors === 0"
       class="saving-message"
     >
       <p>{{ errorMsg }} ({{ uploadProgress.current }}/{{ uploadProgress.total }})</p>
-      <!-- Opcional: Barra de progreso -->
-      <!-- <progress :value="uploadProgress.current" :max="uploadProgress.total" style="width: 100%;"></progress> -->
     </div>
 
     <form v-if="!loadingData" @submit.prevent="saveContent">
-      <!-- Campos Nombre y Tipo: Solo visibles/editables en MODO EDICIÓN -->
       <div class="form-group" v-if="props.isEditMode">
         <label for="contentName">Nombre:</label>
         <input type="text" id="contentName" v-model="formData.name" required />
@@ -461,7 +437,6 @@ onUnmounted(() => {
           <option value="other">Otro</option>
         </select>
       </div>
-      <!-- Info para modo creación -->
       <div v-if="!props.isEditMode" class="info-box">
         <p>
           El <strong>nombre</strong> y el <strong>tipo</strong> de cada contenido se tomarán
@@ -480,7 +455,6 @@ onUnmounted(() => {
           :required="!props.isEditMode && selectedFiles.length === 0"
           :multiple="!props.isEditMode"
         />
-        <!-- Mensajes de ayuda condicionales -->
         <small v-if="!props.isEditMode"
           >Selecciona uno o más archivos (imagen, video, texto).</small
         >
@@ -491,7 +465,6 @@ onUnmounted(() => {
           >No hay archivo asociado. Selecciona uno.</small
         >
 
-        <!-- Lista de archivos seleccionados (para modo creación y edición si se selecciona nuevo) -->
         <ul v-if="selectedFiles.length > 0" class="file-list">
           <li v-for="(file, index) in selectedFiles" :key="index" class="file-info">
             {{ file.name }} ({{ (file.size / 1024 / 1024).toFixed(2) }} MB) - Tipo:
@@ -500,7 +473,6 @@ onUnmounted(() => {
         </ul>
       </div>
 
-      <!-- Checkbox Público/Privado (sin cambios) -->
       <div class="form-group checkbox-group">
         <input type="checkbox" id="isPublic" v-model="formData.is_public" />
         <label for="isPublic">¿Es Público?</label>
@@ -510,7 +482,6 @@ onUnmounted(() => {
         >
       </div>
 
-      <!-- Búsqueda/Asignación de Usuario (sin cambios) -->
       <div class="form-group" id="user-search-container" v-if="!formData.is_public">
         <label for="userSearch">Asignar a Usuario Específico (Opcional):</label>
         <input
@@ -540,18 +511,12 @@ onUnmounted(() => {
         </ul>
         <p v-if="assignedUser" class="assigned-user-info">
           Asignado a: {{ assignedUser.name }} ({{ assignedUser.email }})
-          <button
-            type="button"
-            @click="((assignedUser = null), (formData.user_id = null), (userSearchTerm = ''))"
-            class="btn-clear-user"
-            title="Quitar"
-          >
+          <button type="button" @click="clearAssignedUser" class="btn-clear-user" title="Quitar">
             X
           </button>
         </p>
       </div>
 
-      <!-- Botones de Acción -->
       <div class="form-actions">
         <button
           type="submit"
@@ -584,7 +549,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Estilos existentes... */
 .admin-content-form {
   max-width: 600px;
   margin: 20px auto;
@@ -760,7 +724,6 @@ h3 {
   vertical-align: middle;
 }
 
-/* --- NUEVOS ESTILOS / AJUSTES --- */
 .info-box {
   background-color: #e7f3ff;
   border-left: 4px solid #007bff;
@@ -777,7 +740,7 @@ h3 {
   list-style: none;
   padding: 0;
   margin-top: 10px;
-  max-height: 150px; /* Para evitar listas muy largas */
+  max-height: 150px;
   overflow-y: auto;
   border: 1px solid #eee;
   padding: 5px;
@@ -796,7 +759,6 @@ h3 {
   border-bottom: none;
 }
 
-/* Ajuste para deshabilitar apariencia */
 .form-group input:disabled,
 .form-group select:disabled {
   background-color: #e9ecef;
