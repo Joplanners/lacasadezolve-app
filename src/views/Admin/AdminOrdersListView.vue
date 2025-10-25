@@ -9,7 +9,8 @@ const loading = ref(true)
 const error = ref('')
 const toast = useToast()
 
-const activeFilter = ref('pendientes')
+// 🔥 CAMBIO: Iniciamos con 'todos' en lugar de 'pendientes'
+const activeFilter = ref('todos')
 
 // Lógica para la Búsqueda
 const searchQuery = ref('')
@@ -24,7 +25,6 @@ const totalPages = computed(() => {
   return Math.ceil(totalOrders.value / ordersPerPage.value)
 })
 
-// --- fetchOrders COMPLETAMENTE CORREGIDA ---
 async function fetchOrders() {
   loading.value = true
   error.value = ''
@@ -45,20 +45,18 @@ async function fetchOrders() {
       .order('created_at', { ascending: false })
       .range(from, to)
 
-    // Si hay un término de búsqueda, lo aplicamos a los campos de texto
     if (searchQuery.value.trim()) {
       const searchTerm = `%${searchQuery.value.trim()}%`
-      // CORRECCIÓN: Quitamos la búsqueda por 'id::text' que causaba el error
       query = query.or(`customer_name.ilike.${searchTerm},customer_email.ilike.${searchTerm}`)
     }
 
-    // AHORA el filtro de pestañas se aplica DIRECTAMENTE en la consulta a la BD
     if (activeFilter.value === 'pendientes') {
       query = query.eq('status', 'pending_verification')
     }
     if (activeFilter.value === 'listos') {
       query = query.in('status', ['paid', 'processing'])
     }
+    // Si activeFilter === 'todos', no aplicamos ningún filtro de status
 
     const { data, error: fetchError, count } = await query
 
@@ -76,7 +74,6 @@ async function fetchOrders() {
   }
 }
 
-// Watcher para la búsqueda (sin cambios, ya estaba bien)
 watch(searchQuery, () => {
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
@@ -85,21 +82,18 @@ watch(searchQuery, () => {
   }, 500)
 })
 
-// --- NUEVO Y MUY IMPORTANTE: Watcher para los filtros de pestañas ---
-// Esto asegura que al hacer clic en "Listos para Preparar", se haga una nueva
-// consulta a la base de datos con ese filtro aplicado.
 watch(activeFilter, () => {
-  currentPage.value = 1 // Reseteamos a la página 1
+  currentPage.value = 1
   fetchOrders()
 })
 
-// Funciones para cambiar de página (sin cambios)
 function nextPage() {
   if (currentPage.value < totalPages.value) {
     currentPage.value++
     fetchOrders()
   }
 }
+
 function prevPage() {
   if (currentPage.value > 1) {
     currentPage.value--
@@ -109,7 +103,6 @@ function prevPage() {
 
 onMounted(fetchOrders)
 
-// ... (El resto de tus funciones: formatDate, formatPrice, etc. se mantienen igual)
 function formatDate(dateTimeString) {
   if (!dateTimeString) return '-'
   try {
@@ -125,11 +118,13 @@ function formatDate(dateTimeString) {
     return 'Fecha inválida'
   }
 }
+
 function formatPrice(value) {
   const numValue = Number(value)
   if (isNaN(numValue)) return '$ -'
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(numValue)
 }
+
 async function updateOrderStatus(orderId, newStatus) {
   if (!orderId || !newStatus) return
   const orderIndex = orders.value.findIndex((o) => o.id === orderId)
@@ -146,12 +141,13 @@ async function updateOrderStatus(orderId, newStatus) {
       .eq('id', orderId)
     if (updateError) throw updateError
     toast.success(`Pedido actualizado a ${newStatus}.`)
-    fetchOrders() // Recargamos para que el pedido desaparezca si ya no cumple el filtro
+    fetchOrders()
   } catch (err) {
     toast.error(`Error al actualizar pedido: ${err.message}`)
     orders.value[orderIndex].status = oldStatus
   }
 }
+
 function viewProof(urlPath) {
   if (!urlPath) {
     toast.warning('Este pedido no tiene comprobante adjunto.')
@@ -168,6 +164,7 @@ function viewProof(urlPath) {
     toast.error('No se pudo abrir el comprobante.')
   }
 }
+
 function statusClass(status) {
   const safeStatus = String(status || 'unknown')
     .toLowerCase()
@@ -181,7 +178,6 @@ function statusClass(status) {
     <div class="header-section">
       <h3>Gestión de Pedidos</h3>
 
-      <!-- NUEVO: Campo de Búsqueda -->
       <div class="search-bar">
         <input type="text" v-model="searchQuery" placeholder="Buscar por ID, nombre o email..." />
       </div>
@@ -214,8 +210,6 @@ function statusClass(status) {
 
     <div v-else>
       <div class="orders-card-list">
-        <!-- El v-for ahora usa 'orders' directamente, no 'filteredOrders',
-             porque el filtrado de pestañas es más para la vista que para la data cruda -->
         <div
           v-for="order in orders"
           :key="order.id"
@@ -283,7 +277,6 @@ function statusClass(status) {
         </div>
       </div>
 
-      <!-- NUEVO: Controles de Paginación -->
       <div v-if="totalPages > 1" class="pagination-controls">
         <button @click="prevPage" :disabled="currentPage === 1" class="btn">Anterior</button>
         <span>Página {{ currentPage }} de {{ totalPages }}</span>
@@ -315,7 +308,6 @@ h3 {
   font-size: 1.8rem;
 }
 
-/* NUEVO: Estilos para la barra de búsqueda */
 .search-bar {
   width: 100%;
   max-width: 400px;
@@ -448,7 +440,6 @@ h3 {
   background-color: #138496;
 }
 
-/* NUEVO: Estilos para la paginación */
 .pagination-controls {
   display: flex;
   justify-content: center;
