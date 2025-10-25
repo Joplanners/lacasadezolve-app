@@ -9,14 +9,11 @@ const loading = ref(true)
 const error = ref('')
 const toast = useToast()
 
-// 🔥 CAMBIO: Iniciamos con 'todos' en lugar de 'pendientes'
 const activeFilter = ref('todos')
 
-// Lógica para la Búsqueda
 const searchQuery = ref('')
 let debounceTimer = null
 
-// Lógica para la Paginación
 const currentPage = ref(1)
 const ordersPerPage = ref(10)
 const totalOrders = ref(0)
@@ -56,9 +53,17 @@ async function fetchOrders() {
     if (activeFilter.value === 'listos') {
       query = query.in('status', ['paid', 'processing'])
     }
-    // Si activeFilter === 'todos', no aplicamos ningún filtro de status
 
     const { data, error: fetchError, count } = await query
+
+    // 🔥 LOGS DE DEBUG
+    console.log('=== DEBUG ORDERS ===')
+    console.log('Total count:', count)
+    console.log('Orders data:', data)
+    console.log('JSON Orders:', JSON.stringify(data, null, 2))
+    console.log('Active filter:', activeFilter.value)
+    console.log('Search query:', searchQuery.value)
+    console.log('====================')
 
     if (fetchError) throw fetchError
 

@@ -104,15 +104,18 @@ const formatRut = () => {
   customerData.value.rut = rut
 }
 
-// 🔥 FUNCIÓN CORREGIDA PARA MANEJAR MENSAJES DEL POPUP
-const handlePaymentMessage = (event) => {
+// 🔥 FUNCIÓN MEJORADA PARA MANEJAR MENSAJES DEL POPUP
+const handlePaymentMessage = async (event) => {
   if (event.origin !== window.location.origin) {
     console.warn('❌ Mensaje de origen no confiable:', event.origin)
     return
   }
   console.log('📨 Mensaje recibido del popup:', event.data)
 
-  // 🔥 CAMBIO PRINCIPAL: Escuchar 'PAYMENT_SUCCESS' (con mayúsculas)
+  // ✅ RE-VERIFICAR SESIÓN ANTES DE PROCESAR
+  console.log('🔄 Re-verificando sesión después del popup...')
+  await authStore.refreshSessionManually()
+
   if (event.data.type === 'PAYMENT_SUCCESS') {
     console.log('✅ Pago completado exitosamente')
     paymentCompleted = true
@@ -390,9 +393,15 @@ async function handleCheckoutSubmit() {
           throw new Error('El popup fue bloqueado. Por favor habilita los popups para este sitio.')
         }
 
-        const checkPopupClosed = setInterval(() => {
+        // ✅ MEJORADO: Verificar sesión cuando el popup se cierra
+        const checkPopupClosed = setInterval(async () => {
           if (pagoPopup.value && pagoPopup.value.closed) {
             clearInterval(checkPopupClosed)
+
+            // ✅ RE-VERIFICAR SESIÓN cuando se cierra el popup
+            console.log('🔄 Popup cerrado, verificando sesión...')
+            await authStore.refreshSessionManually()
+
             if (!paymentCompleted) {
               isProcessingPayment.value = false
               isSubmitting.value = false

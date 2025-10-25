@@ -73,6 +73,40 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // --- ✅ NUEVA FUNCIÓN: RE-VERIFICACIÓN MANUAL DE SESIÓN ---
+  async function refreshSessionManually() {
+    console.log('🔄 Verificando sesión manualmente...')
+    try {
+      const {
+        data: { session: currentSession },
+        error,
+      } = await supabase.auth.getSession()
+
+      if (error) throw error
+
+      if (currentSession) {
+        console.log('✅ Sesión recuperada:', currentSession.user.email)
+        session.value = currentSession
+        await fetchUserProfile(currentSession.user.id)
+
+        // Sincronizar carrito si hay sesión
+        const cartStore = useCartStore()
+        await cartStore.syncCartOnLogin()
+        await cartStore.fetchUserCart()
+
+        return true
+      } else {
+        console.warn('⚠️ No hay sesión activa')
+        session.value = null
+        userProfile.value = null
+        return false
+      }
+    } catch (err) {
+      console.error('❌ Error al verificar sesión:', err)
+      return false
+    }
+  }
+
   // --- Listener de Supabase (CORREGIDO PARA IGNORAR USER_UPDATED TAMBIÉN) ---
   let lastSessionToken = null
   supabase.auth.onAuthStateChange(async (event, newSession) => {
@@ -180,7 +214,7 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     userProfile: readonly(userProfile),
     userRole,
-    userDisplayName, // ✅ Exportamos el nombre para el navbar
+    userDisplayName,
     isLoggedIn,
     isPasswordRecoveryMode: readonly(isPasswordRecoveryMode),
     authReadyPromise,
@@ -188,5 +222,6 @@ export const useAuthStore = defineStore('auth', () => {
     signOutWithoutRedirect,
     exitPasswordRecoveryMode,
     signInWithGoogle,
+    refreshSessionManually, // ✅ NUEVA FUNCIÓN EXPORTADA
   }
 })
