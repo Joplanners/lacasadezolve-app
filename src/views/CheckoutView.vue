@@ -6,7 +6,8 @@ import { useProductsStore } from '@/stores/storeProducts'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabaseClient'
 import regionesComunasData from '@/data/regiones_comunas.json'
-import { FontAwesomeIcon } from '@fortawesome/fontawesome-svg-fontawesome'
+// ASÍ ESTÁ CORRECTO:
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faUniversity, faTruck, faHandshake } from '@fortawesome/free-solid-svg-icons'
 import { useToast } from 'vue-toastification'
 import { isValidRut } from '@/utils/validation.js'
@@ -100,7 +101,9 @@ const formatRut = () => {
   }
   customerData.value.rut = rut
 }
-watch(userProfileData, (profile) => {
+watch(
+  userProfileData,
+  (profile) => {
     if (profile && !loadingProfile.value) {
       customerData.value.fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
       customerData.value.rut = profile.rut || ''
@@ -123,7 +126,9 @@ watch(userProfileData, (profile) => {
     } else if (!authStore.isLoggedIn) {
       Object.keys(customerData.value).forEach((key) => (customerData.value[key] = ''))
     }
-  }, { immediate: true })
+  },
+  { immediate: true },
+)
 watch(useSavedAddress, (useSaved) => {
   if (!userProfileData.value) return
   if (useSaved && hasSavedAddress.value) {
@@ -169,19 +174,18 @@ const handlePaymentMessage = async (event) => {
     setTimeout(() => {
       router.push({ name: 'order-confirmation', params: { orderId } })
     }, 1000)
-
   } else if (event.data.type === 'payment-error') {
     const errorMessage = event.data.message || 'Error desconocido durante el pago.'
     console.error('❌ Error en el pago:', errorMessage)
 
     // 🔥 ¡¡LA LÍNEA QUE FALTABA!! 🔥
-    isProcessingPayment.value = false; // <-- Oculta modal
-    isSubmitting.value = false;        // <-- Por si acaso
+    isProcessingPayment.value = false // <-- Oculta modal
+    isSubmitting.value = false // <-- Por si acaso
 
     if (pagoPopup.value && !pagoPopup.value.closed) {
       pagoPopup.value.close()
     }
-    
+
     toast.error('Pago rechazado: ' + errorMessage + '. Intenta nuevamente.')
   }
 }
@@ -322,7 +326,6 @@ async function handleCheckoutSubmit() {
 
     if (selectedPaymentMethod.value === 'transferencia') {
       // ... (lógica de transferencia, está bien) ...
-      
     } else if (selectedPaymentMethod.value === 'transbank') {
       try {
         isProcessingPayment.value = true // <-- MUESTRA MODAL
@@ -339,7 +342,8 @@ async function handleCheckoutSubmit() {
 
         const transbankUrl = `${paymentData.url}?token_ws=${paymentData.token}`
         // ... (lógica de abrir popup) ...
-        const width = 800, height = 600
+        const width = 800,
+          height = 600
         const left = (window.screen.width - width) / 2
         const top = (window.screen.height - height) / 2
         pagoPopup.value = window.open(
