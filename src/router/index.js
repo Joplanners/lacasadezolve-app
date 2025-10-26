@@ -89,6 +89,7 @@ const router = createRouter({
       meta: {
         requiresAuth: false,
         skipAuthCheck: true,
+        blankLayout: true,
       },
     },
     {

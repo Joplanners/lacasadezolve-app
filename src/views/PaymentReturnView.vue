@@ -3,29 +3,44 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
-const router = useRouter() // <-- Usaremos el router para navegar
+const router = useRouter()
 
 const loading = ref(true)
 const error = ref(null)
 const success = ref(false)
 const orderId = ref(null)
 
-// 🔥 NUEVA FUNCIÓN: El botón de error ahora nos lleva a la tienda
-function goToStore() {
-  console.log('Navegando a la tienda...')
-  router.push({ name: 'store' })
+// 🔥 Función para enviar mensaje al padre y cerrar
+const notifyAndClose = (type, data = {}) => {
+  if (window.opener) {
+    console.log(`📨 Enviando mensaje al padre: ${type}`, data)
+    window.opener.postMessage({ type, ...data }, window.location.origin)
+
+    // Damos un pequeño delay para que el mensaje se envíe antes de cerrar
+    setTimeout(() => {
+      window.close()
+    }, 500) // 0.5 segundos
+  } else {
+    // Si no es un popup, redirigimos (Plan B de emergencia)
+    console.warn('❌ window.opener no detectado. Redirigiendo...')
+    if (type === 'PAYMENT_SUCCESS') {
+      router.push({ name: 'order-confirmation', params: { orderId: data.orderId } })
+    } else {
+      router.push({ name: 'store' })
+    }
+  }
 }
 
 onMounted(async () => {
-  console.log('🎬 PaymentReturnView montado (Modo Redirección)')
-
+  console.log('🎬 PaymentReturnView montado (Modo Mensajero)')
   const token_ws = route.query.token_ws
 
   if (!token_ws) {
     const msg = 'No se recibió información de pago válida (sin token_ws)'
     console.error('❌', msg)
     loading.value = false
-    error.value = msg // <-- Solo muestra el error
+    error.value = msg
+    notifyAndClose('payment-error', { message: msg }) // <-- AVISA Y CIERRA
     return
   }
 
@@ -36,7 +51,6 @@ onMounted(async () => {
     const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
     console.log('📞 Invocando confirm-transbank-payment...')
-
     const response = await fetch(`${SUPABASE_URL}/functions/v1/confirm-transbank-payment`, {
       method: 'POST',
       headers: {
@@ -50,9 +64,7 @@ onMounted(async () => {
     const data = await response.json()
     console.log('📦 Respuesta recibida:', data)
 
-    // El error 400 entra aquí
     if (!response.ok) {
-      console.error('❌ Error en la respuesta:', data)
       throw new Error(data.error || 'Error al confirmar el pago')
     }
 
@@ -60,22 +72,15 @@ onMounted(async () => {
       success.value = true
       orderId.value = data.orderId
       console.log('✅ Pago confirmado, orden:', orderId.value)
-
-      // 🔥 FIX: En vez de cerrar, REDIRIGIMOS a la confirmación
-      setTimeout(() => {
-        router.push({
-          name: 'order-confirmation',
-          params: { orderId: orderId.value },
-        })
-      }, 2000) // Damos 2 segundos para que el usuario lea "Pago exitoso"
+      notifyAndClose('PAYMENT_SUCCESS', { orderId: orderId.value }) // <-- AVISA Y CIERRA
     } else {
       throw new Error(data?.error || 'No se pudo confirmar el pago')
     }
   } catch (err) {
-    // Aquí es donde estás cayendo por el error 400
     const msg = err.message || 'Error al procesar el pago'
     console.error('💥 Error en el proceso:', msg)
-    error.value = msg // <-- Solo muestra el error
+    error.value = msg
+    notifyAndClose('payment-error', { message: msg }) // <-- AVISA Y CIERRA
   } finally {
     loading.value = false
   }
@@ -86,24 +91,18 @@ onMounted(async () => {
   <div class="payment-return-container">
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
-      <h2>Procesando tu pago...</h2>
-      <p>Por favor espera mientras confirmamos tu transacción con Transbank</p>
+      <h2>Procesando...</h2>
     </div>
-
     <div v-else-if="success" class="success-state">
       <div class="success-icon">✅</div>
       <h2>¡Pago exitoso!</h2>
-      <p>Tu orden ha sido confirmada correctamente</p>
-      <p v-if="orderId" class="order-id">Número de orden: {{ orderId }}</p>
-      <p class="redirect-message">Serás redirigido en un momento...</p>
+      <p>Cerrando...</p>
     </div>
-
     <div v-else-if="error" class="error-state">
       <div class="error-icon">❌</div>
       <h2>Hubo un problema</h2>
       <p>{{ error }}</p>
-
-      <button @click="goToStore" class="btn-home">Volver a la tienda</button>
+      <p>Cerrando...</p>
     </div>
   </div>
 </template>

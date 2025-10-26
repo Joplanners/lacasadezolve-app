@@ -13,7 +13,7 @@ import AppFooter from './components/AppFooter.vue'
 const authStore = useAuthStore()
 const cartStore = useCartStore()
 const router = useRouter()
-const route = useRoute()
+const route = useRoute() // <-- ¡Perfecto que ya lo tenías!
 
 // =======================================================================
 // <-- ¡CAMBIO CLAVE AQUÍ! -->
@@ -65,6 +65,12 @@ const calculateNavbarHeights = () => {
 }
 
 const showNavbar = computed(() => {
+  // 🔥 =================== ¡AQUÍ ESTÁ EL CAMBIO! =================== 🔥
+  // Si la ruta pide un layout "en blanco" (como payment-return),
+  // ocultamos el navbar y no seguimos revisando.
+  if (route.meta.blankLayout) return false
+  // 🔥 ============================================================= 🔥
+
   if (isPasswordRecoveryMode.value && route.name !== 'update-password') return false
   const publicRoutesWithNavbar = [
     'home',
@@ -76,7 +82,7 @@ const showNavbar = computed(() => {
     'cookies-policy',
     'product-detail',
     'cart',
-    'payment-return',
+    // 'payment-return', // <-- Lo quitamos de aquí, ahora lo maneja blankLayout
   ]
   if (!isLoggedIn.value) return publicRoutesWithNavbar.includes(route.name)
   if (isARExperienceActive.value) return !isMobileView.value || !isLandscape.value
@@ -84,10 +90,18 @@ const showNavbar = computed(() => {
 })
 
 const showFooter = computed(() => {
+  // 🔥 =================== ¡AQUÍ ESTÁ EL CAMBIO! =================== 🔥
+  if (route.meta.blankLayout) return false
+  // 🔥 ============================================================= 🔥
+
   return !isARExperienceActive.value && !isOverlayPhotoCaptureActive.value
 })
 
 const showZolveBot = computed(() => {
+  // 🔥 =================== ¡AQUÍ ESTÁ EL CAMBIO! =================== 🔥
+  if (route.meta.blankLayout) return false
+  // 🔥 ============================================================= 🔥
+
   return !isARExperienceActive.value && !isOverlayPhotoCaptureActive.value
 })
 
@@ -217,8 +231,6 @@ function handleResizeAndOrientation() {
       </div>
 
       <div class="user-actions">
-        <!-- El template ya estaba bien, así que no se toca. -->
-        <!-- Usará el nuevo userDisplayName que importamos del store. -->
         <div class="user-info" v-if="isLoggedIn">
           Hola <strong>{{ userDisplayName }}</strong>
         </div>
