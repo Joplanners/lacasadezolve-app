@@ -86,13 +86,17 @@ async function handleContactSubmit() {
             <div class="video-container">
               <video
                 ref="videoRef"
-                src="/videos/FelixAR.mp4"
                 autoplay
                 loop
                 muted
                 playsinline
+                preload="metadata"
                 class="news-video"
-              ></video>
+              >
+                <source src="/videos/FelixAR.webm" type="video/webm" />
+                <source src="/videos/FelixAR_optimized.mp4" type="video/mp4" />
+                Tu navegador no soporta la etiqueta de video.
+              </video>
               <button
                 @click="toggleVideoSound"
                 class="sound-toggle-btn"
