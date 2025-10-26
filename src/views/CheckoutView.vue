@@ -6,7 +6,7 @@ import { useProductsStore } from '@/stores/storeProducts'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabaseClient'
 import regionesComunasData from '@/data/regiones_comunas.json'
-// ASÍ ESTÁ CORRECTO:
+// ¡OJO! Corregimos el typo que encontramos antes
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faUniversity, faTruck, faHandshake } from '@fortawesome/free-solid-svg-icons'
 import { useToast } from 'vue-toastification'
@@ -49,7 +49,10 @@ const pagoPopup = ref(null)
 const isProcessingPayment = ref(false)
 let paymentCompleted = false
 
-// ... (todas tus computeds: hasSavedAddress, subtotal, etc. van aquí... no cambian) ...
+// 🔥 =================== ¡NUEVA LÍNEA! =================== 🔥
+const paymentHasFailed = ref(false) // Para mostrar el botón de error
+// 🔥 ======================================================= 🔥
+
 const hasSavedAddress = computed(() => {
   return (
     !!userProfileData.value?.shipping_address &&
@@ -57,20 +60,23 @@ const hasSavedAddress = computed(() => {
     Object.values(userProfileData.value.shipping_address).some((v) => v)
   )
 })
+
 const subtotal = computed(() => {
   return cartProductDetails.value.reduce((total, item) => {
     const price = item.product?.price || 0
     return total + price * item.quantity
   }, 0)
 })
+
 const discountAmount = computed(() => {
   if (!appliedCoupon.value || !appliedCoupon.value.discount_percent) return 0
   return (subtotal.value * appliedCoupon.value.discount_percent) / 100
 })
+
 const finalTotal = computed(() => {
   return Math.max(0, subtotal.value - discountAmount.value)
 })
-// ... (todos tus watchers y formatRut van aquí... no cambian) ...
+
 watch(
   () => customerData.value.region,
   (newRegionName) => {
@@ -92,6 +98,7 @@ watch(
   },
   { immediate: true },
 )
+
 const formatRut = () => {
   let rut = customerData.value.rut.replace(/[^0-9kK]/g, '')
   if (rut.length > 1) {
@@ -101,53 +108,6 @@ const formatRut = () => {
   }
   customerData.value.rut = rut
 }
-watch(
-  userProfileData,
-  (profile) => {
-    if (profile && !loadingProfile.value) {
-      customerData.value.fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-      customerData.value.rut = profile.rut || ''
-      customerData.value.email = authStore.user?.email || ''
-      customerData.value.phone = profile.phone || ''
-      if (useSavedAddress.value && hasSavedAddress.value) {
-        const addr = profile.shipping_address
-        customerData.value.region = addr.region || ''
-        customerData.value.commune = addr.commune || ''
-        customerData.value.addressStreet = addr.street || ''
-        customerData.value.addressNumber = addr.number || ''
-        customerData.value.addressDetail = addr.details || ''
-      } else {
-        customerData.value.region = ''
-        customerData.value.commune = ''
-        customerData.value.addressStreet = ''
-        customerData.value.addressNumber = ''
-        customerData.value.addressDetail = ''
-      }
-    } else if (!authStore.isLoggedIn) {
-      Object.keys(customerData.value).forEach((key) => (customerData.value[key] = ''))
-    }
-  },
-  { immediate: true },
-)
-watch(useSavedAddress, (useSaved) => {
-  if (!userProfileData.value) return
-  if (useSaved && hasSavedAddress.value) {
-    const addr = userProfileData.value.shipping_address
-    customerData.value.region = addr.region || ''
-    customerData.value.commune = addr.commune || ''
-    customerData.value.addressStreet = addr.street || ''
-    customerData.value.addressNumber = addr.number || ''
-    customerData.value.addressDetail = addr.details || ''
-  } else {
-    if (hasSavedAddress.value) {
-      customerData.value.region = ''
-      customerData.value.commune = ''
-      customerData.value.addressStreet = ''
-      customerData.value.addressNumber = ''
-      customerData.value.addressDetail = ''
-    }
-  }
-})
 
 // 🔥 FUNCIÓN handlePaymentMessage CORREGIDA 🔥
 const handlePaymentMessage = async (event) => {
@@ -178,9 +138,12 @@ const handlePaymentMessage = async (event) => {
     const errorMessage = event.data.message || 'Error desconocido durante el pago.'
     console.error('❌ Error en el pago:', errorMessage)
 
-    // 🔥 ¡¡LA LÍNEA QUE FALTABA!! 🔥
     isProcessingPayment.value = false // <-- Oculta modal
-    isSubmitting.value = false // <-- Por si acaso
+    isSubmitting.value = false
+
+    // 🔥 =================== ¡NUEVA LÍNEA! =================== 🔥
+    paymentHasFailed.value = true // <-- ¡Aquí está!
+    // 🔥 ======================================================= 🔥
 
     if (pagoPopup.value && !pagoPopup.value.closed) {
       pagoPopup.value.close()
@@ -212,6 +175,55 @@ async function loadUserProfile() {
   }
 }
 
+watch(
+  userProfileData,
+  (profile) => {
+    if (profile && !loadingProfile.value) {
+      customerData.value.fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+      customerData.value.rut = profile.rut || ''
+      customerData.value.email = authStore.user?.email || ''
+      customerData.value.phone = profile.phone || ''
+      if (useSavedAddress.value && hasSavedAddress.value) {
+        const addr = profile.shipping_address
+        customerData.value.region = addr.region || ''
+        customerData.value.commune = addr.commune || ''
+        customerData.value.addressStreet = addr.street || ''
+        customerData.value.addressNumber = addr.number || ''
+        customerData.value.addressDetail = addr.details || ''
+      } else {
+        customerData.value.region = ''
+        customerData.value.commune = ''
+        customerData.value.addressStreet = ''
+        customerData.value.addressNumber = ''
+        customerData.value.addressDetail = ''
+      }
+    } else if (!authStore.isLoggedIn) {
+      Object.keys(customerData.value).forEach((key) => (customerData.value[key] = ''))
+    }
+  },
+  { immediate: true },
+)
+
+watch(useSavedAddress, (useSaved) => {
+  if (!userProfileData.value) return
+  if (useSaved && hasSavedAddress.value) {
+    const addr = userProfileData.value.shipping_address
+    customerData.value.region = addr.region || ''
+    customerData.value.commune = addr.commune || ''
+    customerData.value.addressStreet = addr.street || ''
+    customerData.value.addressNumber = addr.number || ''
+    customerData.value.addressDetail = addr.details || ''
+  } else {
+    if (hasSavedAddress.value) {
+      customerData.value.region = ''
+      customerData.value.commune = ''
+      customerData.value.addressStreet = ''
+      customerData.value.addressNumber = ''
+      customerData.value.addressDetail = ''
+    }
+  }
+})
+
 async function loadCartDetailsForSummary() {
   loadingCartDetails.value = true
   const productIds = cartStore.items.map((item) => item.product_id)
@@ -229,8 +241,10 @@ async function loadCartDetailsForSummary() {
   loadingCartDetails.value = false
 }
 
-// 🔥 handleCheckoutSubmit CORREGIDO (sin refresh manual) 🔥
 async function handleCheckoutSubmit() {
+  // Cuando el usuario intenta de nuevo, reseteamos el estado de error
+  paymentHasFailed.value = false
+
   if (!selectedShippingMethod.value) {
     toast.error('Por favor, selecciona un método de envío.')
     return
@@ -243,7 +257,6 @@ async function handleCheckoutSubmit() {
     toast.error('El RUT ingresado no es válido. Por favor, corrígelo.')
     return
   }
-  // ... (tu validación de campos) ...
   const requiredFields = {
     fullName: 'Nombre Completo',
     email: 'Correo Electrónico',
@@ -265,7 +278,6 @@ async function handleCheckoutSubmit() {
   toast.info('Procesando tu pedido...')
 
   try {
-    // ... (tu lógica de crear la orden y los items... eso está perfecto) ...
     let finalShippingAddress = {}
     if (authStore.isLoggedIn && useSavedAddress.value && hasSavedAddress.value) {
       finalShippingAddress = userProfileData.value.shipping_address
@@ -278,7 +290,9 @@ async function handleCheckoutSubmit() {
         details: customerData.value.addressDetail || null,
       }
     }
+
     if (cartStore.items.length === 0) throw new Error('Tu carrito está vacío.')
+
     for (const item of cartProductDetails.value) {
       if (item.product.stock !== null && item.quantity > item.product.stock) {
         throw new Error(
@@ -286,11 +300,13 @@ async function handleCheckoutSubmit() {
         )
       }
     }
+
     const orderItemsData = cartProductDetails.value.map((item) => ({
       product_id: item.product_id,
       quantity: item.quantity,
       price_at_purchase: item.product.price,
     }))
+
     const orderData = {
       user_id: authStore.user?.id || null,
       total_amount: finalTotal.value,
@@ -303,37 +319,67 @@ async function handleCheckoutSubmit() {
       applied_coupon_code: appliedCoupon.value ? appliedCoupon.value.code : null,
       discount_amount: discountAmount.value > 0 ? discountAmount.value : null,
     }
+
     const { data: orderResult, error: orderError } = await supabase
       .from('orders')
       .insert(orderData)
       .select('id')
       .single()
+
     if (orderError) throw orderError
     const newOrderId = orderResult.id
+
     const orderItemsWithOrderId = orderItemsData.map((item) => ({ ...item, order_id: newOrderId }))
     const { error: itemsError } = await supabase.from('order_items').insert(orderItemsWithOrderId)
+
     if (itemsError) {
       await supabase.from('orders').delete().eq('id', newOrderId)
       throw itemsError
     }
+
     if (
       appliedCoupon.value &&
       appliedCoupon.value.coupon_type === 'FIRST_PURCHASE' &&
       authStore.isLoggedIn
     ) {
-      // ... (lógica de cupón, está bien) ...
+      const { error: profileUpdateError } = await supabase
+        .from('profiles')
+        .update({ used_first_purchase_coupon: true })
+        .eq('id', authStore.user.id)
+      if (profileUpdateError) {
+        console.error(
+          'ALERTA: No se pudo actualizar el perfil para el cupón de primera compra.',
+          profileUpdateError,
+        )
+        toast.warning('Tu orden fue creada, pero hubo un problema al registrar el uso de tu cupón.')
+      }
     }
 
     if (selectedPaymentMethod.value === 'transferencia') {
-      // ... (lógica de transferencia, está bien) ...
+      try {
+        const { error: emailError } = await supabase.functions.invoke('send-order-confirmation', {
+          body: { orderData: { orderId: newOrderId } },
+        })
+        if (emailError) {
+          toast.warning('Tu pedido fue creado, pero no se pudo enviar el email de confirmación.')
+        }
+      } catch (e) {
+        console.error('Error invocando función de email:', e)
+      }
+
+      await cartStore.clearCart()
+      toast.success('¡Pedido creado con éxito!')
+      router.push({ name: 'transfer-pending', params: { orderId: newOrderId } })
     } else if (selectedPaymentMethod.value === 'transbank') {
       try {
-        isProcessingPayment.value = true // <-- MUESTRA MODAL
+        isProcessingPayment.value = true
         toast.info('Abriendo pasarela de pago...')
 
         const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
           'create-transbank-payment',
-          { body: { orderId: newOrderId } },
+          {
+            body: { orderId: newOrderId },
+          },
         )
 
         if (paymentError || !paymentData.success) {
@@ -341,11 +387,11 @@ async function handleCheckoutSubmit() {
         }
 
         const transbankUrl = `${paymentData.url}?token_ws=${paymentData.token}`
-        // ... (lógica de abrir popup) ...
         const width = 800,
           height = 600
         const left = (window.screen.width - width) / 2
         const top = (window.screen.height - height) / 2
+
         pagoPopup.value = window.open(
           transbankUrl,
           'TransbankPayment',
@@ -356,32 +402,33 @@ async function handleCheckoutSubmit() {
           throw new Error('El popup fue bloqueado. Por favor habilita los popups para este sitio.')
         }
 
-        // ✅ MEJORADO: Verificar sesión cuando el popup se cierra (SIN REFRESH MANUAL)
         const checkPopupClosed = setInterval(async () => {
           if (pagoPopup.value && pagoPopup.value.closed) {
             clearInterval(checkPopupClosed)
 
-            // ✅ Re-verificar sesión YA NO ES NECESARIO.
-
             if (!paymentCompleted) {
-              isProcessingPayment.value = false // <-- Oculta modal si se cierra
+              isProcessingPayment.value = false
               isSubmitting.value = false
               toast.warning('Pago cancelado. Puedes intentar nuevamente desde tus órdenes.')
+              // 🔥 Si el pago fue cancelado (no fallido), también mostramos los botones
+              paymentHasFailed.value = true
             }
           }
         }, 1000)
       } catch (transbankError) {
         toast.error(transbankError.message || 'No se pudo iniciar el pago. Intenta nuevamente.')
-        isProcessingPayment.value = false // <-- Oculta modal si falla
+        isProcessingPayment.value = false
         isSubmitting.value = false
+        paymentHasFailed.value = true // <-- Si falla al iniciar, también mostramos botones
         await supabase.from('orders').delete().eq('id', newOrderId)
       }
     }
   } catch (error) {
     console.error('Error en handleCheckoutSubmit:', error)
     toast.error(error.message || 'Ocurrió un error inesperado al procesar el pedido.')
-    isProcessingPayment.value = false // <-- Oculta modal si falla
+    isProcessingPayment.value = false
     isSubmitting.value = false
+    paymentHasFailed.value = true // <-- Si falla en cualquier otro lado, también
   }
 }
 
@@ -692,12 +739,23 @@ onUnmounted(() => {
         </fieldset>
 
         <button
+          v-if="!paymentHasFailed"
           type="submit"
           class="btn btn-primary btn-confirm-order"
           :disabled="isSubmitting || isProcessingPayment"
         >
           {{ isSubmitting ? 'Procesando...' : 'Confirmar Datos y Pagar' }}
         </button>
+
+        <div v-else class="payment-failed-options">
+          <p class="failed-text">Tu pago no pudo ser procesado. ¿Qué deseas hacer?</p>
+          <button @click="handleCheckoutSubmit" type="button" class="btn btn-primary">
+            Intentar de nuevo
+          </button>
+          <router-link :to="{ name: 'store' }" class="btn btn-secondary">
+            Volver a la tienda
+          </router-link>
+        </div>
       </form>
 
       <aside class="order-summary-checkout">
@@ -1167,6 +1225,52 @@ h1 {
   color: var(--color-text-soft);
   line-height: 1.4;
 }
+
+/* 🔥 ESTILOS NUEVOS (AHORA FUERA DEL MEDIA QUERY) 🔥 */
+.payment-failed-options {
+  margin-top: 20px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 20px;
+  text-align: center;
+}
+.payment-failed-options .failed-text {
+  margin-bottom: 20px;
+  font-weight: 500;
+  color: var(--color-text-soft);
+}
+.payment-failed-options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+/* Reutilizamos las clases .btn que ya definiste antes */
+.btn.btn-primary,
+.btn.btn-secondary {
+  padding: 15px;
+  font-size: 1.1rem;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.btn.btn-primary {
+  background-color: var(--brand-pink);
+  color: white;
+  border: none;
+}
+.btn.btn-primary:hover {
+  background-color: #e65c7a;
+}
+.btn.btn-secondary {
+  background-color: var(--color-background);
+  color: var(--brand-pink);
+  border: 2px solid var(--brand-pink);
+}
+.btn.btn-secondary:hover {
+  background-color: #fdeaf0;
+}
+/* 🔥 FIN ESTILOS NUEVOS 🔥 */
+
 @media (min-width: 601px) {
   .address-options,
   .payment-options,
@@ -1210,5 +1314,7 @@ h1 {
   .form-section legend {
     font-size: 1.1rem;
   }
+  /* Los estilos de payment-failed-options ya no necesitan estar aquí */
+  /* Los movimos afuera para que apliquen a todos los tamaños */
 }
 </style>
