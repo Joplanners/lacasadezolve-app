@@ -13,11 +13,11 @@ import {
   faVolumeUp,
   faVolumeMute,
   faStore,
-  faShoppingCart, // <-- 1. IMPORTAMOS EL ÍCONO DEL CARRITO
+  faShoppingCart,
 } from '@fortawesome/free-solid-svg-icons'
 import { faInstagram, faFacebookF, faYoutube, faTiktok } from '@fortawesome/free-brands-svg-icons'
+import { useAuthStore } from '@/stores/authStore' // <-- ¡Importante añadir esto!
 
-// Añadimos TODOS los íconos que usamos a la biblioteca central
 library.add(
   faEye,
   faEyeSlash,
@@ -28,15 +28,8 @@ library.add(
   faFacebookF,
   faYoutube,
   faTiktok,
-  faShoppingCart, // <-- 2. LO AÑADIMOS A LA BIBLIOTECA
+  faShoppingCart,
 )
-
-const app = createApp(App)
-
-app.component('font-awesome-icon', FontAwesomeIcon)
-
-app.use(createPinia())
-app.use(router)
 
 const toastOptions = {
   position: 'top-right',
@@ -52,6 +45,32 @@ const toastOptions = {
   icon: true,
   rtl: false,
 }
-app.use(Toast, toastOptions)
 
-app.mount('#app')
+// --- 🔥 INICIALIZACIÓN ASÍNCRONA DE LA APP 🔥 ---
+async function initializeApp() {
+  const app = createApp(App)
+
+  app.component('font-awesome-icon', FontAwesomeIcon)
+
+  // 1. Crear e instalar Pinia PRIMERO
+  app.use(createPinia())
+
+  // 2. Obtener el store de Auth y LLAMAR A LA INICIALIZACIÓN
+  //    (Esto debe pasar DESPUÉS de app.use(createPinia()))
+  const authStore = useAuthStore()
+  await authStore.initializeAuth() // <-- ¡La magia está aquí!
+
+  // 3. Ahora que la sesión está lista, usar el router.
+  //    El router guard (beforeEach) se ejecutará y encontrará
+  //    la 'authReadyPromise' ya resuelta.
+  app.use(router)
+
+  // 4. Usar el resto de plugins
+  app.use(Toast, toastOptions)
+
+  // 5. Montar la app
+  app.mount('#app')
+}
+
+// Llamar a la función asíncrona para iniciar todo
+initializeApp()

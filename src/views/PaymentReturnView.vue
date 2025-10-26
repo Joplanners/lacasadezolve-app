@@ -3,22 +3,29 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
-const router = useRouter()
+const router = useRouter() // <-- Usaremos el router para navegar
 
 const loading = ref(true)
 const error = ref(null)
 const success = ref(false)
 const orderId = ref(null)
 
+// 🔥 NUEVA FUNCIÓN: El botón de error ahora nos lleva a la tienda
+function goToStore() {
+  console.log('Navegando a la tienda...')
+  router.push({ name: 'store' })
+}
+
 onMounted(async () => {
-  console.log('🎬 PaymentReturnView montado')
+  console.log('🎬 PaymentReturnView montado (Modo Redirección)')
 
   const token_ws = route.query.token_ws
 
   if (!token_ws) {
-    console.error('❌ No se encontró token_ws en la URL')
-    error.value = 'No se recibió información de pago válida'
+    const msg = 'No se recibió información de pago válida (sin token_ws)'
+    console.error('❌', msg)
     loading.value = false
+    error.value = msg // <-- Solo muestra el error
     return
   }
 
@@ -41,9 +48,9 @@ onMounted(async () => {
     })
 
     const data = await response.json()
-
     console.log('📦 Respuesta recibida:', data)
 
+    // El error 400 entra aquí
     if (!response.ok) {
       console.error('❌ Error en la respuesta:', data)
       throw new Error(data.error || 'Error al confirmar el pago')
@@ -52,38 +59,23 @@ onMounted(async () => {
     if (data && data.success) {
       success.value = true
       orderId.value = data.orderId
-
       console.log('✅ Pago confirmado, orden:', orderId.value)
 
-      // 🔥 CERRAR EL POPUP Y REDIRIGIR
+      // 🔥 FIX: En vez de cerrar, REDIRIGIMOS a la confirmación
       setTimeout(() => {
-        // Si es un popup, cerrar la ventana
-        if (window.opener) {
-          // Enviar mensaje al padre
-          window.opener.postMessage(
-            {
-              type: 'PAYMENT_SUCCESS',
-              orderId: orderId.value,
-            },
-            window.location.origin,
-          )
-
-          // Cerrar el popup
-          window.close()
-        } else {
-          // Si NO es popup, redirigir normalmente
-          router.push({
-            name: 'order-confirmation',
-            params: { orderId: orderId.value },
-          })
-        }
-      }, 2000)
+        router.push({
+          name: 'order-confirmation',
+          params: { orderId: orderId.value },
+        })
+      }, 2000) // Damos 2 segundos para que el usuario lea "Pago exitoso"
     } else {
       throw new Error(data?.error || 'No se pudo confirmar el pago')
     }
   } catch (err) {
-    console.error('💥 Error en el proceso:', err)
-    error.value = err.message || 'Error al procesar el pago'
+    // Aquí es donde estás cayendo por el error 400
+    const msg = err.message || 'Error al procesar el pago'
+    console.error('💥 Error en el proceso:', msg)
+    error.value = msg // <-- Solo muestra el error
   } finally {
     loading.value = false
   }
@@ -103,20 +95,21 @@ onMounted(async () => {
       <h2>¡Pago exitoso!</h2>
       <p>Tu orden ha sido confirmada correctamente</p>
       <p v-if="orderId" class="order-id">Número de orden: {{ orderId }}</p>
-      <p class="redirect-message">Esta ventana se cerrará automáticamente...</p>
+      <p class="redirect-message">Serás redirigido en un momento...</p>
     </div>
 
     <div v-else-if="error" class="error-state">
       <div class="error-icon">❌</div>
       <h2>Hubo un problema</h2>
       <p>{{ error }}</p>
-      <button @click="window.close()" class="btn-home">Cerrar ventana</button>
+
+      <button @click="goToStore" class="btn-home">Volver a la tienda</button>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* (tu mismo CSS de antes) */
+/* (Tu CSS está perfecto, lo pego igual para que sea completo) */
 .payment-return-container {
   display: flex;
   justify-content: center;

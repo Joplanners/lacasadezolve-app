@@ -16,39 +16,50 @@ export const useAuthStore = defineStore('auth', () => {
     resolveAuthReady = resolve
   })
 
+  let isInitialLoad = true
+
   // --- GETTERS (COMPUTEDS) ---
   const user = computed(() => session.value?.user ?? null)
   const isLoggedIn = computed(() => !!user.value)
-  const userRole = computed(() => userProfile.value?.role ?? null)
 
-  // COMPUTED PARA MOSTRAR EL NOMBRE EN EL NAVBAR
+  // ✅ COMPUTED CON CACHE
+  const userRole = computed(() => {
+    if (userProfile.value?.role) {
+      return userProfile.value.role
+    }
+
+    const cachedRole = localStorage.getItem('cached_user_role')
+    if (cachedRole && isLoggedIn.value) {
+      console.log('📦 Usando rol cacheado:', cachedRole)
+      return cachedRole
+    }
+
+    return null
+  })
+
   const userDisplayName = computed(() => {
     if (!userProfile.value) return 'Usuario'
 
     const firstName = userProfile.value.first_name
     const lastName = userProfile.value.last_name
 
-    // Si tiene nombre completo
     if (firstName && lastName) return `${firstName} ${lastName}`
-    // Si solo tiene nombre
     if (firstName) return firstName
-    // Si solo tiene apellido
     if (lastName) return lastName
-    // Si tiene email del user de Supabase
     if (user.value?.email) return user.value.email.split('@')[0]
 
-    // Fallback
     return 'Usuario'
   })
 
   // --- ACCIONES ---
 
-  // --- FUNCIÓN fetchUserProfile ---
   async function fetchUserProfile(userId) {
     if (!userId) {
       userProfile.value = null
+      localStorage.removeItem('cached_user_role')
       return
     }
+
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -67,131 +78,158 @@ export const useAuthStore = defineStore('auth', () => {
       } else if (!userProfile.value.role) {
         userProfile.value.role = 'user'
       }
+
+      if (userProfile.value?.role) {
+        localStorage.setItem('cached_user_role', userProfile.value.role)
+        console.log('💾 Rol guardado en cache:', userProfile.value.role)
+      }
     } catch (catchError) {
       console.error('Error al obtener el perfil del usuario:', catchError)
       userProfile.value = { role: 'user', first_name: null, last_name: null, avatar_url: null }
     }
   }
 
-  // --- ✅ NUEVA FUNCIÓN: RE-VERIFICACIÓN MANUAL DE SESIÓN ---
   async function refreshSessionManually() {
     console.log('🔄 Verificando sesión manualmente...')
+    isInitialLoad = true // Forzamos a que se rehaga la inicialización
+    await initializeAuth()
+    return isLoggedIn.value
+  }
+
+  // --- ACCIÓN DE INICIALIZACIÓN (Llamada desde main.js) ---
+  async function initializeAuth() {
+    console.log('🚀 [initializeAuth] Iniciando comprobación manual de sesión...')
     try {
       const {
         data: { session: currentSession },
         error,
       } = await supabase.auth.getSession()
-
       if (error) throw error
 
       if (currentSession) {
-        console.log('✅ Sesión recuperada:', currentSession.user.email)
+        console.log(
+          `🚀 [initializeAuth] Sesión encontrada (${currentSession.user.email}). Obteniendo perfil...`,
+        )
         session.value = currentSession
         await fetchUserProfile(currentSession.user.id)
-
-        // Sincronizar carrito si hay sesión
-        const cartStore = useCartStore()
-        await cartStore.syncCartOnLogin()
-        await cartStore.fetchUserCart()
-
-        return true
+        console.log('🚀 [initializeAuth] Perfil cargado.')
       } else {
-        console.warn('⚠️ No hay sesión activa')
+        console.log('🚀 [initializeAuth] No hay sesión.')
         session.value = null
         userProfile.value = null
-        return false
       }
     } catch (err) {
-      console.error('❌ Error al verificar sesión:', err)
-      return false
-    }
-  }
-
-  // --- Listener de Supabase (CORREGIDO PARA IGNORAR USER_UPDATED TAMBIÉN) ---
-  let lastSessionToken = null
-  supabase.auth.onAuthStateChange(async (event, newSession) => {
-    const cartStore = useCartStore()
-    console.log('🔔 Auth event:', event, 'Session:', !!newSession)
-
-    // PASSWORD_RECOVERY debe procesar y SALIR INMEDIATAMENTE
-    if (event === 'PASSWORD_RECOVERY') {
-      isPasswordRecoveryMode.value = true
-      session.value = newSession
-      await fetchUserProfile(newSession?.user?.id)
+      console.error('❌ Error en initializeAuth:', err)
+    } finally {
+      console.log('🚀 [initializeAuth] Comprobación finalizada. Resolviendo authReadyPromise.')
       if (resolveAuthReady) {
         resolveAuthReady()
         resolveAuthReady = null
       }
-      return // SALIDA TEMPRANA CRÍTICO
+      isInitialLoad = false
+      console.log('🚀 [initializeAuth] isInitialLoad ahora es false.')
+    }
+  }
+
+  // --- Listener de Supabase (AJUSTADO) ---
+  supabase.auth.onAuthStateChange(async (event, newSession) => {
+    const cartStore = useCartStore()
+    console.log(
+      '🔔 Auth event (post-init):',
+      event,
+      'Session:',
+      !!newSession,
+      'isInitialLoad:',
+      isInitialLoad,
+    )
+
+    // Si isInitialLoad es true, initializeAuth() tiene el control. IGNORAMOS.
+    if (isInitialLoad && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
+      console.log('⏭️ [Listener] Ignorando evento inicial. initializeAuth() está al mando.')
+      return
     }
 
-    // Ignorar INITIAL_SESSION y USER_UPDATED durante PASSWORD_RECOVERY
-    if (isPasswordRecoveryMode.value && (event === 'INITIAL_SESSION' || event === 'USER_UPDATED')) {
-      console.log('⏭️ Ignorando', event, 'durante PASSWORD_RECOVERY')
-      return // SALIDA TEMPRANA para evitar conflictos
+    // PASSWORD_RECOVERY
+    if (event === 'PASSWORD_RECOVERY') {
+      console.log('✅ [Listener] Procesando PASSWORD_RECOVERY.')
+      isPasswordRecoveryMode.value = true
+      session.value = newSession
+      await fetchUserProfile(newSession?.user?.id)
+      return
     }
 
-    // Manejo de token duplicado
-    if (event === 'SIGNED_IN' && newSession?.access_token) {
-      if (lastSessionToken === newSession.access_token) return
-      lastSessionToken = newSession.access_token
+    // SIGNED_IN (Login real del usuario, o background refresh)
+    if (event === 'SIGNED_IN') {
+      // 🔥 LA MAGIA FINAL ESTÁ AQUÍ 🔥
+      // 'session.value' es el estado *antes* de este evento.
+      // Si era 'null', es un login real. Si ya tenía datos, es un refresh.
+      const isRealLogin = !session.value
+
+      session.value = newSession // Actualizamos la sesión siempre
+
+      if (isRealLogin) {
+        // Solo si es un login REAL (de null a tener sesión) recargamos todo
+        console.log('✅ [Listener] Procesando SIGNED_IN (login de usuario REAL).')
+        await fetchUserProfile(newSession?.user?.id)
+        await cartStore.syncCartOnLogin()
+        await cartStore.fetchUserCart()
+      } else {
+        // Si ya estábamos logueados, solo es un refresh de token.
+        console.log(
+          '✅ [Listener] Procesando SIGNED_IN (background token refresh). No se recarga el perfil.',
+        )
+      }
     }
 
-    if (event === 'SIGNED_OUT' || !newSession) {
-      lastSessionToken = null
+    // SIGNED_OUT
+    if (event === 'SIGNED_OUT') {
+      console.log('✅ [Listener] Procesando SIGNED_OUT.')
+      isInitialLoad = true // Listo para la próxima recarga de página
       isPasswordRecoveryMode.value = false
+      session.value = null
+      userProfile.value = null
+      localStorage.removeItem('cached_user_role')
+      cartStore.clearCart()
+      router.push({ name: 'login' })
     }
 
-    session.value = newSession
-    await fetchUserProfile(newSession?.user?.id)
+    // USER_UPDATED
+    if (event === 'USER_UPDATED') {
+      console.log('✅ [Listener] Procesando USER_UPDATED.')
+      await fetchUserProfile(newSession.user.id)
+    }
 
-    // Lógica del carrito - Solo si NO estamos en PASSWORD_RECOVERY
-    if (newSession && !isPasswordRecoveryMode.value) {
-      await cartStore.syncCartOnLogin()
-      await cartStore.fetchUserCart()
-    } else if (!newSession) {
+    // Cargar carrito de invitado
+    if (!newSession && event !== 'SIGNED_OUT') {
       cartStore.loadGuestCart()
-    }
-
-    // Auth Ready
-    if (resolveAuthReady) {
-      resolveAuthReady()
-      resolveAuthReady = null
     }
   })
 
-  // Acción signOut con redirección
   async function signOut() {
-    const cartStore = useCartStore()
-    lastSessionToken = null
     const { error } = await supabase.auth.signOut()
     if (error) console.error('Error al cerrar sesión en Supabase:', error)
-    cartStore.clearCart()
-    session.value = null
-    userProfile.value = null
-    router.push({ name: 'login' })
+    // El listener onAuthStateChange se encargará del resto
   }
 
-  // Acción signOut SIN redirección (para password reset)
   async function signOutWithoutRedirect() {
     const cartStore = useCartStore()
-    lastSessionToken = null
     const { error } = await supabase.auth.signOut()
     if (error) console.error('Error al cerrar sesión en Supabase:', error)
-    cartStore.clearCart()
+
+    isInitialLoad = true
+    isPasswordRecoveryMode.value = false
     session.value = null
     userProfile.value = null
-    isPasswordRecoveryMode.value = false
-    // NO hacemos router.push aquí
+    localStorage.removeItem('cached_user_role')
+    cartStore.clearCart()
   }
 
-  // 🔥 FUNCIÓN CORREGIDA PARA GOOGLE AUTH
   async function signInWithGoogle(redirectPath = '/bienvenida') {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}${redirectPath}`, // ✅ SIN barra extra
+          redirectTo: `${window.location.origin}${redirectPath}`,
         },
       })
       if (error) {
@@ -208,7 +246,6 @@ export const useAuthStore = defineStore('auth', () => {
     isPasswordRecoveryMode.value = false
   }
 
-  // Lo que exponemos
   return {
     session: readonly(session),
     user,
@@ -218,10 +255,11 @@ export const useAuthStore = defineStore('auth', () => {
     isLoggedIn,
     isPasswordRecoveryMode: readonly(isPasswordRecoveryMode),
     authReadyPromise,
+    initializeAuth,
     signOut,
     signOutWithoutRedirect,
     exitPasswordRecoveryMode,
     signInWithGoogle,
-    refreshSessionManually, // ✅ NUEVA FUNCIÓN EXPORTADA
+    refreshSessionManually,
   }
 })

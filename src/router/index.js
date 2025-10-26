@@ -256,42 +256,45 @@ const router = createRouter({
 
 // 🔥 GUARD CORREGIDO: Ahora espera a que la auth esté lista
 router.beforeEach(async (to, from, next) => {
-  console.log('🚦 Router Guard - Navegando a:', to.name, to.path)
-  console.log('🚦 Router Guard - Desde:', from.name, from.path)
-
-  // Si es payment-return, salta la verificación de auth
-  if (to.meta.skipAuthCheck) {
-    console.log('⏭️ Saltando verificación de auth para payment-return')
-    next()
-    return
-  }
-
   const authStore = useAuthStore()
 
-  // 🔥 CAMBIO CRÍTICO: Esperar a que la auth esté lista antes de verificar
+  console.log('🚦 Router Guard - Navegando a:', to.name, to.path)
+
+  // 🔥 LA SOLUCIÓN:
+  // Esperamos la promesa 'authReadyPromise' del store.
+  // El listener 'onAuthStateChange' (dentro del store) se encarga
+  // de resolver esta promesa cuando termina de cargar la sesión Y el perfil.
+  console.log('⏳ Esperando a que authReadyPromise se resuelva...')
   await authStore.authReadyPromise
+  console.log('✅ authReadyPromise resuelta. authStore.userRole:', authStore.userRole)
 
-  console.log('👤 isLoggedIn:', authStore.isLoggedIn)
-  console.log('👤 userRole:', authStore.userRole)
+  // A partir de aquí, podemos confiar 100% en el estado del store.
+  const isLoggedIn = authStore.isLoggedIn
+  const userRole = authStore.userRole // Ahora SÍ tiene el valor correcto
 
-  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
-  const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin)
+  console.log('👤 isLoggedIn:', isLoggedIn)
+  console.log('👤 userRole:', userRole)
+
+  const requiresAuth = to.meta.requiresAuth
+  const requiresAdmin = to.meta.requiresAdmin
 
   console.log('🔐 requiresAuth:', requiresAuth)
   console.log('🔐 requiresAdmin:', requiresAdmin)
 
-  if (requiresAuth && !authStore.isLoggedIn) {
-    console.warn('⚠️ Acceso denegado: No autenticado')
-    console.log('🔄 Redirigiendo a /ingreso')
-    next({ name: 'login' })
-  } else if (requiresAdmin && authStore.userRole !== 'admin') {
-    console.warn('⚠️ Acceso denegado: No es admin')
-    console.log('🔄 Redirigiendo a /')
-    next({ name: 'home' })
-  } else {
-    console.log('✅ Navegación permitida')
-    next()
+  // Autenticación requerida
+  if (requiresAuth && !isLoggedIn) {
+    console.log('❌ No autenticado, redirigiendo a login')
+    return next({ name: 'login', query: { redirect: to.fullPath } })
   }
+
+  // Rol admin requerido
+  if (requiresAdmin && userRole !== 'admin') {
+    console.log('❌ No es admin, redirigiendo a home')
+    return next({ name: 'home' })
+  }
+
+  console.log('✅ Navegación permitida')
+  next()
 })
 
 export default router

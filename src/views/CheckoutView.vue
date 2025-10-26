@@ -104,7 +104,7 @@ const formatRut = () => {
   customerData.value.rut = rut
 }
 
-// 🔥 FUNCIÓN MEJORADA PARA MANEJAR MENSAJES DEL POPUP
+// 🔥 FUNCIÓN MEJORADA PARA MANEJAR MENSAJES DEL POPUP (SIN REFRESH MANUAL)
 const handlePaymentMessage = async (event) => {
   if (event.origin !== window.location.origin) {
     console.warn('❌ Mensaje de origen no confiable:', event.origin)
@@ -112,9 +112,7 @@ const handlePaymentMessage = async (event) => {
   }
   console.log('📨 Mensaje recibido del popup:', event.data)
 
-  // ✅ RE-VERIFICAR SESIÓN ANTES DE PROCESAR
-  console.log('🔄 Re-verificando sesión después del popup...')
-  await authStore.refreshSessionManually()
+  // ✅ Re-verificar sesión YA NO ES NECESARIO, el listener del authStore lo hace solo.
 
   if (event.data.type === 'PAYMENT_SUCCESS') {
     console.log('✅ Pago completado exitosamente')
@@ -143,7 +141,9 @@ const handlePaymentMessage = async (event) => {
     if (pagoPopup.value && !pagoPopup.value.closed) {
       pagoPopup.value.close()
     }
-    toast.error('Error en el pago: ' + errorMessage)
+
+    // Aquí puedes poner el mensaje que querías
+    toast.error('Pago rechazado: ' + errorMessage + '. Intenta nuevamente.')
   }
 }
 
@@ -393,14 +393,12 @@ async function handleCheckoutSubmit() {
           throw new Error('El popup fue bloqueado. Por favor habilita los popups para este sitio.')
         }
 
-        // ✅ MEJORADO: Verificar sesión cuando el popup se cierra
+        // ✅ MEJORADO: Verificar sesión cuando el popup se cierra (SIN REFRESH MANUAL)
         const checkPopupClosed = setInterval(async () => {
           if (pagoPopup.value && pagoPopup.value.closed) {
             clearInterval(checkPopupClosed)
 
-            // ✅ RE-VERIFICAR SESIÓN cuando se cierra el popup
-            console.log('🔄 Popup cerrado, verificando sesión...')
-            await authStore.refreshSessionManually()
+            // ✅ Re-verificar sesión YA NO ES NECESARIO.
 
             if (!paymentCompleted) {
               isProcessingPayment.value = false
