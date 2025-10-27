@@ -117,11 +117,10 @@ async function handleContactSubmit() {
           <div class="news-column">
             <h3>¡Inauguramos nuestro E-commerce!</h3>
             <div class="gif-container">
-              <img
-                src="/SoExcited~GIF.gif"
-                alt="Meme de Jimmy Fallon emocionado"
-                class="news-gif"
-              />
+              <video autoplay loop muted playsinline class="news-gif">
+                <source src="/videos/SoExcited.mp4" type="video/mp4" />
+                Tu navegador no soporta video.
+              </video>
             </div>
             <p>
               Después de mucho trabajo, por fin puedes comprar todo lo que siempre has soñado de
