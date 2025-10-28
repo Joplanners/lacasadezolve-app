@@ -123,8 +123,8 @@ async function handleContactSubmit() {
               </video>
             </div>
             <p>
-              Después de mucho trabajo, por fin puedes comprar todo lo que siempre has soñado de
-              forma más fácil.
+              Después de mucho trabajo, tenemos un e-commerce 🥳 registrate y obtendrás un 10% de
+              descuento en tu primera compra.
             </p>
             <router-link :to="{ name: 'login' }" class="btn btn-secondary">
               ¡Quiero mi descuento!
