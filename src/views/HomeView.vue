@@ -68,8 +68,8 @@ async function handleContactSubmit() {
         </div>
         <h1>Bienvenida a La Casa de Zolve</h1>
         <p class="subtitle">
-          Tu espacio K-Pop en Chile: productos de papelería, experiencias AR y comunidad en un solo
-          lugar.
+          Tu espacio de personalización y K-Pop en Chile: productos de papelería, experiencias AR y
+          comunidad en un solo lugar.
         </p>
         <div class="features-icons">
           <div class="feature-item">🛍️<span>E-commerce</span></div>
