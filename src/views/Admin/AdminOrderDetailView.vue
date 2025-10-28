@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { supabase } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabaseClient' // Lo usaremos para llamar a la función
 import { useToast } from 'vue-toastification'
 
 const route = useRoute()
@@ -11,15 +11,56 @@ const toast = useToast()
 const order = ref(null)
 const loading = ref(true)
 const error = ref('')
+const isApproving = ref(false) // Estado para el botón
 
 const orderId = computed(() => route.params.orderId)
 
-// --- NUEVO: Propiedad computada para el subtotal ---
 const subtotal = computed(() => {
   if (!order.value) return 0
-  // El subtotal es el total final MÁS el descuento que se aplicó.
   return (order.value.total_amount || 0) + (order.value.discount_amount || 0)
 })
+
+// Función para aprobar la orden
+async function approveOrder() {
+  // 🔥🔥🔥 NUESTRO "CHIVATO" 🔥🔥🔥
+  console.log('🖱️ ¡Clic detectado! Intentando aprobar la orden...')
+
+  if (
+    !order.value ||
+    !confirm(
+      '¿Estás segura de que quieres marcar esta orden como PAGADA y descontar el stock? Esta acción no se puede deshacer.',
+    )
+  ) {
+    return
+  }
+
+  isApproving.value = true
+  try {
+    toast.info('Procesando aprobación...')
+
+    // Llamamos a la Edge Function
+    const { data, error: funcError } = await supabase.functions.invoke('approve-transfer-payment', {
+      body: { orderId: order.value.id },
+    })
+
+    if (funcError) throw funcError
+
+    // Si la función nos da un error (ej: "ya estaba pagada"), lo mostramos
+    if (data.success === false) {
+      throw new Error(data.error || 'La función reportó un error.')
+    }
+
+    toast.success('¡Orden aprobada! El stock ha sido descontado.')
+
+    // Volvemos a cargar los datos para ver el estado "paid"
+    await fetchOrderDetail()
+  } catch (err) {
+    console.error('Error al aprobar la orden:', err)
+    toast.error(`Error al aprobar: ${err.message}`)
+  } finally {
+    isApproving.value = false
+  }
+}
 
 async function fetchOrderDetail() {
   loading.value = true
@@ -33,7 +74,6 @@ async function fetchOrderDetail() {
   }
 
   try {
-    // --- QUERY ACTUALIZADA: Pedimos los campos del cupón ---
     const { data, error: fetchError } = await supabase
       .from('orders')
       .select(
@@ -42,9 +82,9 @@ async function fetchOrderDetail() {
         applied_coupon_code,
         discount_amount,
         order_items (
-            quantity,
-            price_at_purchase,
-            product:products (id, name, image_urls, sku)
+          quantity,
+          price_at_purchase,
+          product:products (id, name, image_urls, sku)
         )
       `,
       )
@@ -116,7 +156,6 @@ function goBack() {
           ><span :class="['status-badge', statusClass(order.status)]">{{ order.status }}</span>
         </p>
 
-        <!-- --- BLOQUE DE TOTALES ACTUALIZADO --- -->
         <div class="financial-summary">
           <p>
             <strong>Subtotal:</strong> <span>{{ formatPrice(subtotal) }}</span>
@@ -130,18 +169,33 @@ function goBack() {
             ><span class="total-amount">{{ formatPrice(order.total_amount) }}</span>
           </p>
         </div>
-        <!-- --- FIN DEL BLOQUE --- -->
 
         <p><strong>Método Pago:</strong> {{ order.payment_method || '-' }}</p>
-        <a
-          v-if="order.comprobante_url"
-          :href="
-            supabase.storage.from('comprobantes').getPublicUrl(order.comprobante_url).data.publicUrl
-          "
-          target="_blank"
-          class="btn btn-info btn-sm"
-          >📄 Ver Comprobante</a
-        >
+
+        <div class="admin-actions">
+          <a
+            v-if="order.comprobante_url"
+            :href="
+              supabase.storage.from('comprobantes').getPublicUrl(order.comprobante_url).data
+                .publicUrl
+            "
+            target="_blank"
+            class="btn btn-info btn-sm"
+            >📄 Ver Comprobante</a
+          >
+
+          <button
+            v-if="
+              order.payment_method === 'transferencia' &&
+              (order.status === 'pending' || order.status === 'pending_verification')
+            "
+            @click="approveOrder"
+            :disabled="isApproving"
+            class="btn btn-success btn-sm"
+          >
+            {{ isApproving ? 'Procesando...' : '✅ Aprobar Pago y Descontar Stock' }}
+          </button>
+        </div>
         <h4>Cliente</h4>
         <p><strong>Nombre:</strong> {{ order.customer_name || 'N/A' }}</p>
         <p><strong>Email:</strong> {{ order.customer_email || 'N/A' }}</p>
@@ -389,7 +443,6 @@ h2 {
   }
 }
 
-/* --- NUEVOS ESTILOS --- */
 .financial-summary {
   border-top: 1px solid var(--color-border-hover);
   border-bottom: 1px solid var(--color-border-hover);
@@ -403,5 +456,27 @@ h2 {
 .discount-row {
   color: green;
   font-size: 0.9em !important;
+}
+
+/* --- 🔥 NUEVOS ESTILOS --- */
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 5px;
+  margin-bottom: 15px;
+}
+.btn-success {
+  background-color: #28a745;
+  color: white;
+  font-weight: bold;
+}
+.btn-success:hover {
+  background-color: #218838;
+}
+.btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 </style>

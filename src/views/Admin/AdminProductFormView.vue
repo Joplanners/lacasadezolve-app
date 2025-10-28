@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+// 🔥 CAMBIO: Se añadió 'onUnmounted'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabaseClient'
 import { useToast } from 'vue-toastification'
@@ -36,6 +37,7 @@ const imageFileInputKey = ref(Date.now())
 const loading = ref(false)
 const saving = ref(false)
 const errorMsg = ref('')
+const newImagePreviews = ref([]) // 🔥 NUEVO: Ref para guardar las URLs de previsualización
 
 const formTitle = computed(() => (props.isEditMode ? 'Editar Producto' : 'Añadir Nuevo Producto'))
 
@@ -86,8 +88,19 @@ async function fetchProductData(productId) {
   }
 }
 
+// 🔥 NUEVA: Función para limpiar previsualizaciones y liberar memoria
+function cleanupPreviews() {
+  newImagePreviews.value.forEach((url) => URL.revokeObjectURL(url))
+  newImagePreviews.value = []
+}
+
+// 🔥 CAMBIO: 'handleFileChange' ahora usa la función de limpieza y crea las previsualizaciones
 function handleFileChange(event) {
+  cleanupPreviews() // Limpia las previsualizaciones anteriores
   selectedImageFiles.value = Array.from(event.target.files)
+
+  // Crea las nuevas URLs de previsualización y las guarda en el ref
+  newImagePreviews.value = selectedImageFiles.value.map((file) => URL.createObjectURL(file))
 }
 
 async function saveProduct() {
@@ -164,6 +177,11 @@ onMounted(() => {
   if (props.isEditMode) {
     fetchProductData(route.params.id)
   }
+})
+
+// 🔥 NUEVO: Hook para limpiar la memoria cuando sales de la página
+onUnmounted(() => {
+  cleanupPreviews()
 })
 </script>
 
@@ -301,12 +319,13 @@ onMounted(() => {
               &times;
             </button>
           </div>
+
           <div
-            v-for="(file, index) in selectedImageFiles"
+            v-for="(previewUrl, index) in newImagePreviews"
             :key="`new-${index}`"
             class="img-preview new"
           >
-            <img :src="URL.createObjectURL(file)" :alt="file.name" />
+            <img :src="previewUrl" :alt="selectedImageFiles[index]?.name || 'Nueva imagen'" />
           </div>
         </div>
       </div>

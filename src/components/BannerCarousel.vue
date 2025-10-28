@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, computed } from 'vue'
+// 🔥 NUEVO: Importamos 'ref'
+import { ref, onMounted, computed } from 'vue'
 import { useBannersStore } from '@/stores/storeBanners'
 
 const bannersStore = useBannersStore()
@@ -8,14 +9,18 @@ const banners = computed(() => bannersStore.banners)
 const loading = computed(() => bannersStore.loading)
 const error = computed(() => bannersStore.error)
 
-// Estilos dinámicos SOLO para el carrusel (cuando hay más de 1 banner)
+// 🔥 NUEVO: Creamos una variable reactiva para la duración
+// 5 segundos será el valor por defecto (móvil)
+const secondsPerBanner = ref(5)
+
+// Estilos dinámicos SOLO para el carrusel
 const trackStyle = computed(() => {
   if (banners.value.length > 1) {
     const totalBanners = banners.value.length
     return {
-      // El track contiene los banners originales + los clones
       width: `${totalBanners * 2 * 100}%`,
-      animationDuration: `${totalBanners * 5}s`, // 5 segundos por banner
+      // ✨ CAMBIO: Usamos nuestra variable reactiva en lugar del '5' fijo
+      animationDuration: `${totalBanners * secondsPerBanner.value}s`,
     }
   }
   return {}
@@ -23,6 +28,14 @@ const trackStyle = computed(() => {
 
 onMounted(() => {
   bannersStore.fetchActiveBanners()
+
+  // 🔥 NUEVO: Chequeamos el tamaño de la pantalla al cargar
+  const mediaQuery = window.matchMedia('(min-width: 768px)') // 768px es un breakpoint común para 'desktop'
+
+  if (mediaQuery.matches) {
+    // Si la pantalla es ancha (desktop), cambiamos la duración
+    secondsPerBanner.value = 8 // Por ejemplo, 8 segundos. ¡Juega con este número!
+  }
 })
 </script>
 
