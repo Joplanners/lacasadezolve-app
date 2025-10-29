@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { supabase } from '@/lib/supabaseClient' // Lo usaremos para llamar a la función
+import { supabase } from '@/lib/supabaseClient'
 import { useToast } from 'vue-toastification'
 
 const route = useRoute()
@@ -9,9 +9,10 @@ const router = useRouter()
 const toast = useToast()
 
 const order = ref(null)
+const orderItems = ref([]) // <-- ✨ NUEVO: Guardaremos los items aquí
 const loading = ref(true)
 const error = ref('')
-const isApproving = ref(false) // Estado para el botón
+const isApproving = ref(false)
 
 const orderId = computed(() => route.params.orderId)
 
@@ -20,11 +21,9 @@ const subtotal = computed(() => {
   return (order.value.total_amount || 0) + (order.value.discount_amount || 0)
 })
 
-// Función para aprobar la orden
 async function approveOrder() {
-  // 🔥🔥🔥 NUESTRO "CHIVATO" 🔥🔥🔥
+  // ... (Tu función de aprobar es perfecta, no la tocamos) ...
   console.log('🖱️ ¡Clic detectado! Intentando aprobar la orden...')
-
   if (
     !order.value ||
     !confirm(
@@ -33,26 +32,17 @@ async function approveOrder() {
   ) {
     return
   }
-
   isApproving.value = true
   try {
     toast.info('Procesando aprobación...')
-
-    // Llamamos a la Edge Function
     const { data, error: funcError } = await supabase.functions.invoke('approve-transfer-payment', {
       body: { orderId: order.value.id },
     })
-
     if (funcError) throw funcError
-
-    // Si la función nos da un error (ej: "ya estaba pagada"), lo mostramos
     if (data.success === false) {
       throw new Error(data.error || 'La función reportó un error.')
     }
-
     toast.success('¡Orden aprobada! El stock ha sido descontado.')
-
-    // Volvemos a cargar los datos para ver el estado "paid"
     await fetchOrderDetail()
   } catch (err) {
     console.error('Error al aprobar la orden:', err)
@@ -66,6 +56,7 @@ async function fetchOrderDetail() {
   loading.value = true
   error.value = ''
   order.value = null
+  orderItems.value = [] // <-- ✨ Limpiamos los items
 
   if (!orderId.value) {
     error.value = 'ID de pedido no especificado.'
@@ -74,31 +65,44 @@ async function fetchOrderDetail() {
   }
 
   try {
-    const { data, error: fetchError } = await supabase
+    // --- 🔥 FIX 1: PRIMERA CONSULTA (Solo la Orden) ---
+    // Traemos todo de la orden, pero quitamos el join de 'order_items'
+    const { data: orderData, error: orderError } = await supabase
       .from('orders')
-      .select(
-        `
-        *,
-        applied_coupon_code,
-        discount_amount,
-        order_items (
-          quantity,
-          price_at_purchase,
-          product:products (id, name, image_urls, sku)
-        )
-      `,
-      )
+      .select('*') // Pedimos todo, incluidas las notas y archivos
       .eq('id', orderId.value)
       .single()
 
-    if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
+    if (orderError) {
+      if (orderError.code === 'PGRST116') {
         throw new Error(`Pedido con ID #${orderId.value.substring(0, 8)}... no encontrado.`)
       } else {
-        throw fetchError
+        throw orderError
       }
     }
-    order.value = data
+    order.value = orderData
+
+    // --- 🔥 FIX 1: SEGUNDA CONSULTA (Los Items) ---
+    // Ahora, por separado, pedimos los items de esa orden
+    const { data: itemsData, error: itemsError } = await supabase
+      .from('order_items')
+      .select(
+        `
+        quantity,
+        price_at_purchase,
+        product:products (id, name, image_urls, sku)
+      `,
+      )
+      .eq('order_id', orderId.value)
+
+    if (itemsError) throw itemsError
+
+    // Guardamos los items en su propia variable reactiva
+    orderItems.value = itemsData || []
+
+    // (Opcional) Si quieres mantener tu estructura original, puedes hacer esto:
+    // order.value.order_items = itemsData || []
+    // Pero usar una variable separada (orderItems) es más limpio.
   } catch (err) {
     console.error('Error fetching order detail:', err)
     error.value = err.message || 'No se pudo cargar el detalle del pedido.'
@@ -217,14 +221,35 @@ function goBack() {
           <h4>Dirección de Envío</h4>
           <p><em>(No especificada)</em></p>
         </div>
+
+        <div
+          v-if="order.customization_notes || order.customization_files?.length > 0"
+          class="personalization-info"
+        >
+          <h4>Información de Personalización</h4>
+          <div v-if="order.customization_notes" class="notes-section">
+            <strong>Notas del Cliente:</strong>
+            <pre class="notes-text">{{ order.customization_notes }}</pre>
+          </div>
+          <div v-if="order.customization_files?.length > 0" class="files-section">
+            <strong>Archivos Adjuntos:</strong>
+            <ul class="files-list">
+              <li v-for="(fileUrl, index) in order.customization_files" :key="fileUrl">
+                <a :href="fileUrl" target="_blank" rel="noopener noreferrer">
+                  Descargar Archivo {{ index + 1 }}
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
         <div class="order-items-list">
           <h4>Productos en este Pedido</h4>
-          <div v-if="!order.order_items || order.order_items.length === 0">
+          <div v-if="!orderItems || orderItems.length === 0">
             <p><em>No se encontraron productos para este pedido.</em></p>
           </div>
           <div v-else>
             <div
-              v-for="item in order.order_items"
+              v-for="item in orderItems"
               :key="item.product?.id || Math.random()"
               class="order-item-detail"
             >
@@ -371,6 +396,7 @@ h2 {
   font-size: 0.8em;
   border: 1px solid transparent;
 }
+/* (Tus clases de status) */
 .status-pending,
 .status-pending_verification {
   color: #856404;
@@ -405,6 +431,7 @@ h2 {
 .status-failed {
   text-decoration: line-through;
 }
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -457,8 +484,6 @@ h2 {
   color: green;
   font-size: 0.9em !important;
 }
-
-/* --- 🔥 NUEVOS ESTILOS --- */
 .admin-actions {
   display: flex;
   flex-wrap: wrap;
@@ -478,5 +503,53 @@ h2 {
   background-color: #cccccc;
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+/* --- 🔥 NUEVOS ESTILOS PARA PERSONALIZACIÓN --- */
+.personalization-info {
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border-hover);
+  border-radius: 6px;
+  padding: 15px;
+  margin-top: 20px;
+}
+.personalization-info h4 {
+  margin-top: 0;
+}
+.notes-section {
+  margin-bottom: 15px;
+}
+.notes-text {
+  background-color: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 10px;
+  white-space: pre-wrap; /* Mantiene los saltos de línea */
+  word-wrap: break-word;
+  font-family: inherit;
+  font-size: 0.9em;
+}
+.files-section strong {
+  display: block;
+  margin-bottom: 5px;
+}
+.files-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+.files-list li a {
+  display: block;
+  padding: 8px;
+  background-color: var(--color-background-mute);
+  border-radius: 4px;
+  margin-bottom: 5px;
+  text-decoration: none;
+  color: var(--brand-turquoise);
+  font-weight: 500;
+}
+.files-list li a:hover {
+  background-color: var(--color-border);
+  text-decoration: underline;
 }
 </style>

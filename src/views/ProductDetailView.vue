@@ -23,13 +23,29 @@ const errorMsg = ref('')
 const mainImageUrl = ref('')
 const selectedQuantity = ref(1)
 
+// 🔥 Refs para personalización
+const customizationFiles = ref([])
+const customizationNotes = ref('') // 🔥 NUEVO: Ref para las notas
+
 const changeMainImage = (url) => {
   mainImageUrl.value = url
 }
 
+// 🔥 Función que recibe los archivos del componente FileUploads
+const handleFilesUpdate = (updatedFiles) => {
+  customizationFiles.value = updatedFiles
+  console.log(
+    'Archivos de personalización actualizados en ProductDetail:',
+    customizationFiles.value,
+  )
+}
+
+// 🔥 MODIFICADO: handleAddToCart ahora pasa notas Y archivos
 function handleAddToCart() {
   if (!product.value) return
   const quantityToAdd = Number(selectedQuantity.value)
+
+  // Validaciones de cantidad y stock
   if (isNaN(quantityToAdd) || quantityToAdd < 1) {
     toast.error('Por favor, ingresa una cantidad válida (mínimo 1).')
     selectedQuantity.value = 1
@@ -48,13 +64,29 @@ function handleAddToCart() {
       return
     }
   }
-  cartStore.addToCart(product.value.id, quantityToAdd)
-  toast.success(`"${product.value.name}" (x${quantityToAdd}) fue añadido al carrito!`)
+
+  // Pasa archivos Y notas al store
+  cartStore.addToCart(
+    product.value.id,
+    quantityToAdd,
+    customizationFiles.value,
+    customizationNotes.value,
+  )
+
+  toast.success(`"${product.value.name}" (x${quantityToAdd}) añadido al carrito!`)
+
+  // Limpia archivos Y notas
+  customizationFiles.value = []
+  customizationNotes.value = ''
+  // Aquí podríamos necesitar llamar a un método 'reset' en FileUploads si exponemos uno
 }
 
+// 🔥 MODIFICADO: handleBuyNow ahora pasa notas Y archivos
 function handleBuyNow() {
   if (!product.value) return
   const quantityToAdd = Number(selectedQuantity.value)
+
+  // Validaciones de cantidad y stock
   if (isNaN(quantityToAdd) || quantityToAdd < 1) {
     toast.error('Por favor, ingresa una cantidad válida (mínimo 1).')
     selectedQuantity.value = 1
@@ -73,8 +105,20 @@ function handleBuyNow() {
       return
     }
   }
-  cartStore.addToCart(product.value.id, quantityToAdd)
-  toast.info(`"${product.value.name}" (x${quantityToAdd}) añadido. Redirigiendo al carrito...`)
+
+  // Pasa archivos Y notas al store
+  cartStore.addToCart(
+    product.value.id,
+    quantityToAdd,
+    customizationFiles.value,
+    customizationNotes.value,
+  )
+
+  toast.info(`"${product.value.name}" (x${quantityToAdd}) añadido. Redirigiendo...`)
+
+  // Limpia archivos Y notas
+  customizationFiles.value = []
+  customizationNotes.value = ''
   router.push({ name: 'cart' })
 }
 
@@ -85,6 +129,7 @@ onMounted(async () => {
     loading.value = false
     return
   }
+  // Asegúrate que fetchProductById traiga la nueva columna 'requires_customization_notes'
   const fetchedProduct = await productsStore.fetchProductById(productId)
   if (fetchedProduct) {
     product.value = fetchedProduct
@@ -170,6 +215,7 @@ const pinterestShareUrl = computed(() => {
           <h1>{{ product.name }}</h1>
 
           <div class="product-description-html" v-html="product.description"></div>
+
           <div class="price-detail">
             <span>{{ formatPrice(product.price) }}</span>
           </div>
@@ -193,7 +239,24 @@ const pinterestShareUrl = computed(() => {
             </p>
             <p v-else class="stock-info out-of-stock">Producto Agotado</p>
           </div>
-          <FileUploads v-if="product.is_customizable" class="file-uploader" />
+
+          <FileUploads
+            v-if="product.is_customizable"
+            class="file-uploader"
+            @update:files="handleFilesUpdate"
+          />
+
+          <div v-if="product.requires_customization_notes" class="customization-notes-section">
+            <label for="customNotes">Detalles Adicionales:</label>
+            <textarea
+              id="customNotes"
+              v-model="customizationNotes"
+              rows="4"
+              maxlength="1000"
+              placeholder="Indica aquí el orden de tus imágenes (1: Portada...) u otras instrucciones."
+            ></textarea>
+            <div class="char-counter">{{ customizationNotes.length }} / 1000</div>
+          </div>
 
           <div class="actions-container">
             <div class="buttons-row">
@@ -203,6 +266,7 @@ const pinterestShareUrl = computed(() => {
               <button @click="handleBuyNow" class="btn btn-buy-now">⚡ Comprar Ahora</button>
             </div>
           </div>
+
           <div class="social-share-container">
             <span class="share-label">¡Comparte este producto!</span>
             <div class="share-buttons">
@@ -212,36 +276,32 @@ const pinterestShareUrl = computed(() => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Compartir en WhatsApp"
-              >
-                <font-awesome-icon :icon="faWhatsapp" />
-              </a>
+                ><font-awesome-icon :icon="faWhatsapp"
+              /></a>
               <a
                 :href="xTwitterShareUrl"
                 class="share-btn x-twitter"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Compartir en X"
-              >
-                <font-awesome-icon :icon="faXTwitter" />
-              </a>
+                ><font-awesome-icon :icon="faXTwitter"
+              /></a>
               <a
                 :href="threadsShareUrl"
                 class="share-btn threads"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Compartir en Threads"
-              >
-                <font-awesome-icon :icon="faThreads" />
-              </a>
+                ><font-awesome-icon :icon="faThreads"
+              /></a>
               <a
                 :href="pinterestShareUrl"
                 class="share-btn pinterest"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Compartir en Pinterest"
-              >
-                <font-awesome-icon :icon="faPinterest" />
-              </a>
+                ><font-awesome-icon :icon="faPinterest"
+              /></a>
             </div>
           </div>
         </div>
@@ -348,7 +408,7 @@ const pinterestShareUrl = computed(() => {
 }
 .product-info h1 {
   font-size: 2.2rem;
-  margin: 0 0 15px 0;
+  margin: 0 0 15px;
   line-height: 1.2;
 }
 .product-category-detail {
@@ -357,26 +417,24 @@ const pinterestShareUrl = computed(() => {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 10px;
-  font-weight: bold;
+  font-weight: 700;
 }
-
-/* 🔥🔥 ESTILOS PARA LA DESCRIPCIÓN RENDERIZADA CON v-html 🔥🔥 */
+/* Estilos v-html */
 .product-description-html {
-  flex-grow: 1; /* Ocupa espacio disponible */
+  flex-grow: 1;
   line-height: 1.7;
   margin-bottom: 25px;
   color: var(--color-text);
-  white-space: pre-wrap; /* Respeta saltos de línea y espacios del editor */
+  white-space: pre-wrap;
 }
 .product-description-html :deep(p) {
-  /* Usa :deep() para estilizar el contenido inyectado */
   margin-bottom: 1em;
 }
 .product-description-html :deep(ul),
 .product-description-html :deep(ol) {
   margin-left: 20px;
   margin-bottom: 1em;
-  padding-left: 1.5em; /* Espacio para bullets/números */
+  padding-left: 1.5em;
 }
 .product-description-html :deep(li) {
   margin-bottom: 0.5em;
@@ -387,7 +445,7 @@ const pinterestShareUrl = computed(() => {
 }
 .product-description-html :deep(strong),
 .product-description-html :deep(b) {
-  font-weight: bold;
+  font-weight: 700;
 }
 .product-description-html :deep(em),
 .product-description-html :deep(i) {
@@ -396,11 +454,10 @@ const pinterestShareUrl = computed(() => {
 .product-description-html :deep(u) {
   text-decoration: underline;
 }
-/* 🔥🔥 FIN DE ESTILOS v-html 🔥🔥 */
-
+/* Resto de estilos */
 .price-detail {
   font-size: 2rem;
-  font-weight: bold;
+  font-weight: 700;
   color: var(--brand-turquoise);
   margin-bottom: 30px;
 }
@@ -458,14 +515,14 @@ const pinterestShareUrl = computed(() => {
 }
 .btn-add-to-cart {
   background-color: var(--brand-pink);
-  color: white;
+  color: #fff;
 }
 .btn-add-to-cart:hover {
   background-color: #e65c7a;
 }
 .btn-buy-now {
   background-color: var(--brand-turquoise);
-  color: white;
+  color: #fff;
 }
 .btn-buy-now:hover {
   background-color: var(--color-link-hover);
@@ -481,19 +538,18 @@ const pinterestShareUrl = computed(() => {
   margin: 0;
 }
 .stock-info .stock-number {
-  font-weight: bold;
+  font-weight: 700;
 }
 .stock-info.low-stock {
   color: var(--brand-pink);
-  font-weight: bold;
+  font-weight: 700;
 }
 .stock-info.out-of-stock {
   color: #d93025;
-  font-weight: bold;
+  font-weight: 700;
   text-transform: uppercase;
 }
-
-/* Estilos para compartir */
+/* Estilos compartir */
 .social-share-container {
   margin-top: 30px;
   padding-top: 20px;
@@ -536,16 +592,50 @@ const pinterestShareUrl = computed(() => {
   background-color: #25d366;
 }
 .share-btn.x-twitter {
-  background-color: #000000;
+  background-color: #000;
 }
 .share-btn.threads {
-  background-color: #000000;
+  background-color: #000;
 }
 .share-btn.pinterest {
   background-color: #e60023;
 }
-
-/* Media Query para pantallas pequeñas */
+/* 🔥 Estilos Notas Adicionales */
+.customization-notes-section {
+  margin-top: 20px;
+  margin-bottom: 30px;
+}
+.customization-notes-section label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+.customization-notes-section textarea {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  font-size: 1rem;
+  font-family: var(--font-family-base);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  box-sizing: border-box;
+  min-height: 100px;
+  resize: vertical;
+}
+.customization-notes-section textarea::placeholder {
+  color: var(--color-text-mute);
+  opacity: 0.7;
+}
+.char-counter {
+  text-align: right;
+  font-size: 0.8em;
+  color: var(--color-text-mute);
+  margin-top: 4px;
+}
+/* Media Query */
 @media (max-width: 800px) {
   .product-layout {
     grid-template-columns: 1fr;

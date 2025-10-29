@@ -32,13 +32,14 @@ async function fetchOrders() {
   try {
     let query = supabase
       .from('orders')
+      // --- ✨ ¡SOLUCIÓN AQUÍ! ✨ ---
+      // Cambiamos el select() para que pida TODAS las columnas (*)
+      // en lugar de solo una lista específica.
       .select(
-        `
-        id, created_at, customer_name, customer_email,
-        total_amount, status, payment_method, comprobante_url
-        `,
+        `*`, // Antes aquí tenías una lista larga de columnas
         { count: 'exact' },
       )
+      // --- FIN DE LA SOLUCIÓN ---
       .order('created_at', { ascending: false })
       .range(from, to)
 
@@ -60,7 +61,7 @@ async function fetchOrders() {
     console.log('=== DEBUG ORDERS ===')
     console.log('Total count:', count)
     console.log('Orders data:', data)
-    console.log('JSON Orders:', JSON.stringify(data, null, 2))
+    console.log('JSON Orders:', JSON.stringify(data, null, 2)) // <-- ¡REVISA ESTE!
     console.log('Active filter:', activeFilter.value)
     console.log('Search query:', searchQuery.value)
     console.log('====================')

@@ -1,9 +1,7 @@
 <script setup>
-// 🔥 Importa el editor correcto y sus estilos
-import { QuillEditor } from '@vueup/vue-quill' // Usa @vueup/vue-quill
-import '@vueup/vue-quill/dist/vue-quill.snow.css' // Estilo 'snow'
-
-// Imports estándar de Vue y Supabase
+// Imports Quill y Vue/Supabase
+import { QuillEditor } from '@vueup/vue-quill'
+import '@vueup/vue-quill/dist/vue-quill.snow.css'
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabaseClient'
@@ -19,14 +17,15 @@ const toast = useToast()
 const formData = ref({
   id: null,
   name: '',
-  description: '', // Contendrá el HTML del editor
+  description: '',
   price: null,
   offer_price: null,
   stock: 0,
   is_active: true,
   is_customizable: false,
+  requires_customization_notes: false, // 🔥 Campo añadido
   category_id: null,
-  image_urls: [], // URLs de imágenes existentes
+  image_urls: [],
   discount_percentage: null,
   discount_start_date: null,
   discount_end_date: null,
@@ -36,31 +35,27 @@ const formData = ref({
 const enable_discount = ref(false)
 const discount_type = ref('fixed')
 const availableCategories = ref([])
-const selectedImageFiles = ref([]) // Archivos seleccionados por el usuario
-const imageFileInputKey = ref(Date.now()) // Para resetear el input de archivo
+const selectedImageFiles = ref([])
+const imageFileInputKey = ref(Date.now())
 const loading = ref(false)
 const saving = ref(false)
 const errorMsg = ref('')
-const newImagePreviews = ref([]) // URLs para previsualizar nuevas imágenes
-
-// Opciones del Editor Quill
+const newImagePreviews = ref([])
 const quillOptions = {
   modules: {
     toolbar: [
       ['bold', 'italic', 'underline'],
       [{ list: 'ordered' }, { list: 'bullet' }],
       ['link'],
-      ['clean'], // Botón para quitar formato
+      ['clean'],
     ],
   },
   placeholder: 'Escribe la descripción detallada del producto aquí...',
-  theme: 'snow', // Estilo de la interfaz del editor
+  theme: 'snow',
 }
 
-// Título del formulario (Editar vs Añadir)
+// --- Computed y Watchers ---
 const formTitle = computed(() => (props.isEditMode ? 'Editar Producto' : 'Añadir Nuevo Producto'))
-
-// Observador para activar/desactivar la sección de descuentos
 watch(
   formData,
   (newVal) => {
@@ -73,7 +68,6 @@ watch(
 )
 
 // --- Funciones ---
-
 function removeExistingImage(index) {
   formData.value.image_urls.splice(index, 1)
   toast.info('Imagen marcada para eliminar. Guarda los cambios para confirmar.')
@@ -97,8 +91,8 @@ async function fetchProductData(productId) {
   try {
     const { data, error } = await supabase.from('products').select('*').eq('id', productId).single()
     if (error) throw error
-    if (!data.image_urls) data.image_urls = [] // Asegura que sea un array
-    // Formatea fechas para input datetime-local
+    data.requires_customization_notes = data.requires_customization_notes ?? false // Asegura valor por defecto
+    if (!data.image_urls) data.image_urls = []
     if (data.discount_start_date) data.discount_start_date = data.discount_start_date.slice(0, 16)
     if (data.discount_end_date) data.discount_end_date = data.discount_end_date.slice(0, 16)
     formData.value = data
@@ -110,57 +104,48 @@ async function fetchProductData(productId) {
   }
 }
 
-// Limpia las URLs de previsualización para liberar memoria
 function cleanupPreviews() {
   newImagePreviews.value.forEach((url) => URL.revokeObjectURL(url))
   newImagePreviews.value = []
 }
 
-// Maneja la selección de nuevos archivos y crea previsualizaciones
 function handleFileChange(event) {
   cleanupPreviews()
   selectedImageFiles.value = Array.from(event.target.files)
   newImagePreviews.value = selectedImageFiles.value.map((file) => URL.createObjectURL(file))
 }
 
-// Función principal para guardar el producto (crear o actualizar)
 async function saveProduct() {
   saving.value = true
   errorMsg.value = ''
   try {
-    // Empieza con las URLs existentes si está editando
     let finalImageUrls = props.isEditMode ? [...formData.value.image_urls] : []
-
-    // Sube nuevas imágenes si se seleccionaron
     if (selectedImageFiles.value.length > 0) {
       toast.info(`Subiendo ${selectedImageFiles.value.length} imagen(es)...`)
-      // Usa tu Cloudflare Worker para las subidas
-      const workerUrl = 'https://r2-presigner-worker.jodiabunos.workers.dev'
+      const workerUrl = 'https://r2-presigner-worker.jodiabunos.workers.dev' // Tu worker
       const uploadPromises = selectedImageFiles.value.map(async (file) => {
         const formDataBody = new FormData()
         formDataBody.append('file', file, file.name)
         const response = await fetch(workerUrl, { method: 'POST', body: formDataBody })
         if (!response.ok) throw new Error(`Error al subir ${file.name}: ${await response.text()}`)
         const result = await response.json()
-        if (!result.publicUrl)
-          throw new Error(`La respuesta del worker no incluyó publicUrl para ${file.name}`)
+        if (!result.publicUrl) throw new Error(`Respuesta inválida del worker para ${file.name}`)
         return result.publicUrl
       })
       const newUrls = await Promise.all(uploadPromises)
       finalImageUrls.push(...newUrls)
     }
 
-    // Prepara el objeto de datos para Supabase
     const productData = {
       name: formData.value.name,
-      description: formData.value.description, // Contenido HTML
+      description: formData.value.description,
       price: formData.value.price,
       stock: formData.value.stock,
       is_active: formData.value.is_active,
       is_customizable: formData.value.is_customizable,
+      requires_customization_notes: formData.value.requires_customization_notes, // 🔥 Se incluye aquí
       category_id: formData.value.category_id,
-      image_urls: finalImageUrls, // Lista actualizada de URLs
-      // Manejo de campos de descuento
+      image_urls: finalImageUrls,
       offer_price:
         enable_discount.value && discount_type.value === 'fixed'
           ? formData.value.offer_price
@@ -179,28 +164,27 @@ async function saveProduct() {
           : null,
     }
 
-    // Realiza la operación Upsert (Update o Insert)
     if (props.isEditMode) {
       const { error } = await supabase
         .from('products')
         .update(productData)
         .eq('id', formData.value.id)
       if (error) throw error
-      toast.success(`Producto "${productData.name}" actualizado con éxito.`)
+      toast.success(`Producto "${productData.name}" actualizado.`)
     } else {
       const { error } = await supabase.from('products').insert(productData)
       if (error) throw error
-      toast.success(`Producto "${productData.name}" creado con éxito.`)
+      toast.success(`Producto "${productData.name}" creado.`)
     }
-    router.push({ name: 'admin-products' }) // Redirige a la lista de productos
+    router.push({ name: 'admin-products' })
   } catch (error) {
     errorMsg.value = `Error al guardar: ${error.message}`
     toast.error(errorMsg.value)
   } finally {
     saving.value = false
-    cleanupPreviews() // Limpia previsualizaciones después del intento de guardar
-    imageFileInputKey.value = Date.now() // Resetea el input de archivo
-    selectedImageFiles.value = [] // Limpia los archivos seleccionados
+    cleanupPreviews()
+    imageFileInputKey.value = Date.now()
+    selectedImageFiles.value = []
   }
 }
 
@@ -211,9 +195,8 @@ onMounted(() => {
     fetchProductData(route.params.id)
   }
 })
-
 onUnmounted(() => {
-  cleanupPreviews() // Limpia previsualizaciones al destruir el componente
+  cleanupPreviews()
 })
 </script>
 
@@ -274,18 +257,22 @@ onUnmounted(() => {
           <input type="checkbox" id="enableDiscount" v-model="enable_discount" />
           <label for="enableDiscount">Habilitar Oferta para este Producto</label>
         </div>
-
         <div v-if="enable_discount" class="discount-options">
           <div class="discount-type-selector">
-            <input type="radio" id="typeFixed" value="fixed" v-model="discount_type" />
-            <label for="typeFixed">Precio Fijo de Oferta</label>
-            <input type="radio" id="typePercentage" value="percentage" v-model="discount_type" />
-            <label for="typePercentage">Descuento por Porcentaje</label>
-          </div>
-
-          <div v-if="discount_type === 'fixed'" class="form-group">
-            <label for="productOfferPrice">Precio de Oferta Fijo:</label>
+            <input type="radio" id="typeFixed" value="fixed" v-model="discount_type" /><label
+              for="typeFixed"
+              >Precio Fijo</label
+            >
             <input
+              type="radio"
+              id="typePercentage"
+              value="percentage"
+              v-model="discount_type"
+            /><label for="typePercentage">Porcentaje (%)</label>
+          </div>
+          <div v-if="discount_type === 'fixed'" class="form-group">
+            <label for="productOfferPrice">Precio Oferta Fijo:</label
+            ><input
               type="number"
               id="productOfferPrice"
               v-model="formData.offer_price"
@@ -293,32 +280,31 @@ onUnmounted(() => {
               step="any"
             />
           </div>
-
           <div v-if="discount_type === 'percentage'" class="form-group">
-            <label for="productDiscountPercentage">Porcentaje de Descuento (%):</label>
-            <input
+            <label for="productDiscountPercentage">Porcentaje Descuento:</label
+            ><input
               type="number"
               id="productDiscountPercentage"
               v-model="formData.discount_percentage"
               min="1"
               max="100"
-              placeholder="Ej: 15 para un 15%"
+              placeholder="Ej: 15"
             />
           </div>
           <hr />
-          <p><strong>Programar duración de la oferta (opcional)</strong></p>
+          <p><strong>Programar duración (opcional)</strong></p>
           <div class="form-grid">
             <div class="form-group">
-              <label for="discountStartDate">Inicio de la Oferta:</label>
-              <input
+              <label for="discountStartDate">Inicio:</label
+              ><input
                 type="datetime-local"
                 id="discountStartDate"
                 v-model="formData.discount_start_date"
               />
             </div>
             <div class="form-group">
-              <label for="discountEndDate">Fin de la Oferta:</label>
-              <input
+              <label for="discountEndDate">Fin:</label
+              ><input
                 type="datetime-local"
                 id="discountEndDate"
                 v-model="formData.discount_end_date"
@@ -348,17 +334,13 @@ onUnmounted(() => {
           accept="image/*"
           :key="imageFileInputKey"
         />
-        <small
-          >Puedes seleccionar varias imágenes. Las nuevas se añadirán/reemplazarán las
-          seleccionadas.</small
-        >
+        <small>Puedes seleccionar varias. Las nuevas se añadirán.</small>
       </div>
-
       <div
         v-if="formData.image_urls.length > 0 || newImagePreviews.length > 0"
         class="image-preview-container"
       >
-        <p><strong>Imágenes Actuales y Nuevas:</strong></p>
+        <p><strong>Imágenes:</strong></p>
         <div class="image-grid">
           <div
             v-for="(url, index) in formData.image_urls"
@@ -370,7 +352,7 @@ onUnmounted(() => {
               type="button"
               @click="removeExistingImage(index)"
               class="remove-image-btn"
-              title="Eliminar imagen"
+              title="Eliminar"
             >
               &times;
             </button>
@@ -380,17 +362,29 @@ onUnmounted(() => {
             :key="`new-${index}`"
             class="img-preview new"
           >
-            <img :src="previewUrl" :alt="selectedImageFiles[index]?.name || 'Nueva imagen'" />
+            <img :src="previewUrl" :alt="selectedImageFiles[index]?.name || 'Nueva'" />
           </div>
         </div>
       </div>
 
       <div class="form-group checkbox-group">
         <input type="checkbox" id="isCustomizable" v-model="formData.is_customizable" />
-        <label for="isCustomizable">Producto Personalizable</label>
+        <label for="isCustomizable">Producto Personalizable (permite subir archivos)</label>
         <small class="tooltip"
           >(?)<span class="tooltip-text"
-            >Si se marca, aparecerá la opción para que el cliente suba sus archivos.</span
+            >Si se marca, aparecerá la opción para que el cliente suba sus archivos en la página del
+            producto.</span
+          ></small
+        >
+      </div>
+
+      <div v-if="formData.is_customizable" class="form-group checkbox-group sub-option">
+        <input type="checkbox" id="requiresNotes" v-model="formData.requires_customization_notes" />
+        <label for="requiresNotes">Requiere Notas Adicionales del Cliente</label>
+        <small class="tooltip"
+          >(?)<span class="tooltip-text"
+            >Si se marca, aparecerá un campo de texto en la página del producto para que el cliente
+            añada instrucciones (ej: orden de fotos, nombres).</span
           ></small
         >
       </div>
@@ -417,7 +411,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Estilos generales del formulario y sus elementos */
+/* Estilos generales */
 .admin-product-form {
   max-width: 800px;
   margin: 20px auto;
@@ -436,7 +430,7 @@ h3 {
 .form-group label {
   display: block;
   margin-bottom: 8px;
-  font-weight: bold;
+  font-weight: 700;
 }
 .form-group input[type='text'],
 .form-group input[type='number'],
@@ -450,34 +444,30 @@ h3 {
   box-sizing: border-box;
   font-size: 1rem;
 }
-
-/* Estilos específicos para integrar Quill */
+/* Estilos Quill */
 .form-group :deep(.ql-toolbar) {
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
-  border-bottom: none; /* Evita doble borde */
+  border-bottom: none;
 }
 .form-group :deep(.ql-container) {
   font-size: 1rem;
-  min-height: 150px; /* Altura mínima */
-  border: 1px solid #ccc; /* Asegura el borde */
+  min-height: 150px;
+  border: 1px solid #ccc;
   border-bottom-left-radius: 4px;
   border-bottom-right-radius: 4px;
 }
 .form-group :deep(.ql-editor) {
-  padding: 12px; /* Coincide con el padding de inputs */
-  background-color: white; /* Fondo blanco */
-  min-height: 150px; /* Altura mínima del área de escritura */
+  padding: 12px;
+  background-color: #fff;
+  min-height: 150px;
 }
-
-/* Grilla para precio y stock, y fechas de descuento */
+/* Resto de estilos */
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
-
-/* Checkboxes */
 .checkbox-group {
   display: flex;
   align-items: center;
@@ -485,19 +475,18 @@ h3 {
   margin-top: 20px;
 }
 .checkbox-group input[type='checkbox'] {
-  width: 18px;
+  width: auto;
   height: 18px;
+  width: 18px;
 }
 .checkbox-group label {
-  font-weight: normal;
+  font-weight: 400;
   margin-bottom: 0;
 }
-
-/* Acciones del formulario (botones) */
 .form-actions {
   margin-top: 30px;
   text-align: right;
-  border-top: 1px solid #eee; /* Separador */
+  border-top: 1px solid #eee;
   padding-top: 20px;
 }
 .btn {
@@ -514,32 +503,29 @@ h3 {
     opacity 0.2s ease;
 }
 .btn-save {
-  background-color: var(--brand-pink); /* Color de marca */
-  color: white;
+  background-color: var(--brand-pink);
+  color: #fff;
 }
 .btn-save:hover {
-  background-color: #d81b60; /* Rosa más oscuro */
+  background-color: #d81b60;
 }
 .btn-cancel {
   background-color: #6c757d;
-  color: white;
+  color: #fff;
 }
 .btn-cancel:hover {
   background-color: #5a6268;
 }
 .btn:disabled,
 .btn.disabled {
-  /* Clase añadida para el router-link */
-  background-color: #cccccc;
+  background-color: #ccc;
   cursor: not-allowed;
   opacity: 0.7;
 }
-
-/* Previsualización de imágenes */
 .image-preview-container {
   margin-top: 20px;
   padding-top: 15px;
-  border-top: 1px dashed #ccc; /* Separador */
+  border-top: 1px dashed #ccc;
 }
 .image-grid {
   display: flex;
@@ -548,34 +534,32 @@ h3 {
 }
 .img-preview {
   position: relative;
-  width: 120px; /* Previsualización más grande */
+  width: 120px;
   height: 120px;
   border: 1px solid #ddd;
   border-radius: 4px;
   overflow: hidden;
-  background-color: #eee; /* Fondo de placeholder */
+  background-color: #eee;
 }
 .img-preview img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block; /* Evita espacio extra */
+  display: block;
 }
 .img-preview.new::before {
-  /* Etiqueta "Nueva" */
   content: 'Nueva';
   position: absolute;
   top: 0;
   right: 0;
   background-color: #28a745;
-  color: white;
+  color: #fff;
   padding: 3px 6px;
   font-size: 0.75em;
   border-bottom-left-radius: 4px;
   z-index: 5;
 }
 .remove-image-btn {
-  /* Botón para borrar imágenes existentes */
   position: absolute;
   top: 5px;
   right: 5px;
@@ -583,10 +567,10 @@ h3 {
   height: 26px;
   border-radius: 50%;
   border: none;
-  background-color: rgba(216, 27, 96, 0.8); /* Rosa semitransparente */
-  color: white;
+  background-color: rgba(216, 27, 96, 0.8);
+  color: #fff;
   font-size: 18px;
-  font-weight: bold;
+  font-weight: 700;
   cursor: pointer;
   display: flex;
   justify-content: center;
@@ -594,22 +578,20 @@ h3 {
   line-height: 1;
   transition: background-color 0.2s ease;
   z-index: 10;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); /* Sombra sutil */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 .remove-image-btn:hover {
-  background-color: rgba(216, 27, 96, 1); /* Opaco al pasar el mouse */
+  background-color: rgba(216, 27, 96, 1);
 }
-
-/* Sección de descuentos */
 .discount-fieldset {
   border: 1px solid #ccc;
   border-radius: 5px;
   padding: 20px;
   margin: 30px 0;
-  background-color: #fdfdfd; /* Ligeramente diferente del fondo principal */
+  background-color: #fdfdfd;
 }
 .discount-fieldset legend {
-  font-weight: bold;
+  font-weight: 700;
   padding: 0 10px;
   font-size: 1.1em;
 }
@@ -619,7 +601,7 @@ h3 {
 .discount-type-selector {
   display: flex;
   flex-wrap: wrap;
-  gap: 15px 25px; /* Espacio vertical y horizontal */
+  gap: 15px 25px;
   margin-bottom: 20px;
   align-items: center;
 }
@@ -628,22 +610,19 @@ h3 {
   margin-right: 5px;
 }
 .discount-type-selector label {
-  font-weight: normal;
+  font-weight: 400;
   cursor: pointer;
 }
 hr {
-  /* Separador dentro de descuentos */
   border: none;
   border-top: 1px solid #eee;
   margin: 25px 0;
 }
-
-/* Tooltip (icono '?') */
 .tooltip {
   position: relative;
   cursor: help;
   display: inline-block;
-  background-color: #90a4ae; /* Color grisáceo */
+  background-color: #90a4ae;
   color: #fff;
   border-radius: 50%;
   width: 20px;
@@ -656,16 +635,16 @@ hr {
 .tooltip .tooltip-text {
   visibility: hidden;
   width: 220px;
-  background-color: #37474f; /* Tooltip más oscuro */
+  background-color: #37474f;
   color: #fff;
-  text-align: left; /* Mejor para texto largo */
+  text-align: left;
   border-radius: 6px;
   padding: 10px;
   position: absolute;
-  z-index: 100; /* Asegura visibilidad */
-  bottom: 135%; /* Posición arriba */
+  z-index: 100;
+  bottom: 135%;
   left: 50%;
-  margin-left: -110px; /* Centrado */
+  margin-left: -110px;
   opacity: 0;
   transition: opacity 0.3s ease;
   font-size: 0.9em;
@@ -676,8 +655,6 @@ hr {
   visibility: visible;
   opacity: 1;
 }
-
-/* Indicadores de carga y error */
 .loading-indicator,
 .error-message {
   padding: 15px;
@@ -686,35 +663,38 @@ hr {
   margin: 20px 0;
 }
 .loading-indicator {
-  background-color: #e3f2fd; /* Azul claro */
+  background-color: #e3f2fd;
   color: #1e88e5;
 }
 .error-message {
-  background-color: #ffebee; /* Rojo claro */
+  background-color: #ffebee;
   color: #c62828;
   font-weight: 500;
 }
-
-/* Ajustes responsivos */
+/* Estilo indentado */
+.sub-option {
+  margin-left: 25px;
+  margin-top: 5px;
+}
 @media (max-width: 600px) {
   .form-grid {
-    grid-template-columns: 1fr; /* Una columna en pantallas pequeñas */
+    grid-template-columns: 1fr;
   }
   .admin-product-form {
-    padding: 15px; /* Menos padding en móvil */
+    padding: 15px;
   }
   .discount-type-selector {
-    gap: 10px; /* Menos espacio en selector de descuento */
+    gap: 10px;
   }
   .form-actions {
     text-align: center;
     display: flex;
-    flex-direction: column; /* Botones uno debajo del otro */
+    flex-direction: column;
     gap: 10px;
   }
   .btn {
-    margin-left: 0; /* Quita margen izquierdo en móvil */
-    width: 100%; /* Botones ocupan todo el ancho */
+    margin-left: 0;
+    width: 100%;
   }
 }
 </style>
