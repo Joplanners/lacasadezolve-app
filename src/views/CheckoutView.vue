@@ -19,8 +19,7 @@ const productsStore = useProductsStore()
 const authStore = useAuthStore()
 const toast = useToast()
 
-// --- ✨ CORRECCIÓN AÑADIDA ✨ ---
-// Función para formatear precios
+// --- Función para formatear precios ---
 const formatPrice = (value) => {
   if (typeof value !== 'number' || isNaN(value)) {
     return '$ 0'
@@ -30,7 +29,74 @@ const formatPrice = (value) => {
     currency: 'CLP',
   }).format(value)
 }
-// --- FIN DE LA CORRECCIÓN ---
+
+// --- 🔥 INICIO: LÓGICA DE PRECIOS AÑADIDA ---
+
+/**
+ * Función helper que calcula el precio final de un producto,
+ * considerando ofertas, porcentajes y fechas.
+ * @param {object} product - El objeto de producto de Supabase
+ * @returns {object} - { finalPrice, originalPrice, onOffer }
+ */
+function getPriceInfo(product) {
+  if (!product) return { finalPrice: 0, originalPrice: 0, onOffer: false }
+
+  const now = new Date()
+  let onOffer = false
+  let finalPrice = product.price
+  let originalPrice = null
+
+  // Revisa si hay alguna oferta potencial
+  const hasOfferPrice =
+    product.offer_price && product.offer_price > 0 && product.offer_price < product.price
+  const hasPercentage = product.discount_percentage && product.discount_percentage > 0
+
+  if (hasOfferPrice || hasPercentage) {
+    // Revisa la validez de las fechas
+    const hasStartDate = !!product.discount_start_date
+    const hasEndDate = !!product.discount_end_date
+    const startDate = hasStartDate ? new Date(product.discount_start_date) : null
+    const endDate = hasEndDate ? new Date(product.discount_end_date) : null
+
+    let isDateValid = true
+    if (startDate && now < startDate) isDateValid = false // Aún no empieza
+    if (endDate && now > endDate) isDateValid = false // Ya terminó
+
+    if (isDateValid) {
+      onOffer = true
+      originalPrice = product.price // El precio original para tachar
+
+      // Prioriza el descuento por porcentaje
+      if (product.discount_percentage) {
+        finalPrice = product.price * (1 - product.discount_percentage / 100)
+      } else if (hasOfferPrice) {
+        finalPrice = product.offer_price // Usa el precio fijo de oferta
+      }
+    }
+  }
+
+  return {
+    finalPrice: finalPrice, // El precio que se debe cobrar
+    originalPrice: originalPrice, // El precio para tachar (o null)
+    onOffer: onOffer, // true si la oferta está activa
+  }
+}
+
+/**
+ * Nueva propiedad computada que procesa el carrito
+ * y añade los precios calculados a cada item.
+ */
+const processedCartItems = computed(() => {
+  return cartProductDetails.value.map((item) => {
+    // Calcula el precio para el producto de este item del carrito
+    const priceInfo = getPriceInfo(item.product)
+    return {
+      ...item, // Mantiene product_id, quantity, product (objeto completo)
+      ...priceInfo, // Añade finalPrice, originalPrice, onOffer
+    }
+  })
+})
+// --- 🔥 FIN: LÓGICA DE PRECIOS AÑADIDA ---
 
 // Obtenemos 'items' y 'appliedCoupon' reactivamente del store
 const { appliedCoupon, items: cartItems } = storeToRefs(cartStore)
@@ -58,7 +124,7 @@ const isSubmitting = ref(false)
 const userProfileData = ref(null)
 const loadingProfile = ref(false)
 const useSavedAddress = ref(true)
-const cartProductDetails = ref([])
+const cartProductDetails = ref([]) // Este se llena con loadCartDetailsForSummary
 const loadingCartDetails = ref(true)
 const pagoPopup = ref(null)
 const isProcessingPayment = ref(false)
@@ -74,21 +140,26 @@ const hasSavedAddress = computed(() => {
     Object.values(userProfileData.value.shipping_address).some((v) => v)
   )
 })
+
+// --- 🔥 COMPUTADA DE SUBTOTAL (MODIFICADA) ---
 const subtotal = computed(() => {
-  return cartProductDetails.value.reduce((total, item) => {
-    const price = item.product?.price || 0
-    return total + price * item.quantity
+  // Ahora usamos los items procesados con el precio final correcto
+  return processedCartItems.value.reduce((total, item) => {
+    return total + item.finalPrice * item.quantity
   }, 0)
 })
+// --- 🔥 FIN COMPUTADA DE SUBTOTAL ---
+
 const discountAmount = computed(() => {
   if (!appliedCoupon.value || !appliedCoupon.value.discount_percent) return 0
+  // El subtotal ya está con descuentos, el cupón se aplica sobre eso
   return (subtotal.value * appliedCoupon.value.discount_percent) / 100
 })
 const finalTotal = computed(() => {
   return Math.max(0, subtotal.value - discountAmount.value)
 })
 
-// --- Watchers ---
+// --- Watchers (Sin cambios) ---
 watch(
   () => customerData.value.region,
   (newRegionName) => {
@@ -111,7 +182,6 @@ watch(
   { immediate: true },
 )
 
-// Autocompleta/Limpia dirección basada en 'useSavedAddress'
 watch(useSavedAddress, (useSaved) => {
   if (!userProfileData.value) return
   if (useSaved && hasSavedAddress.value) {
@@ -132,7 +202,6 @@ watch(useSavedAddress, (useSaved) => {
   }
 })
 
-// Autocompleta datos del perfil cuando cargan
 watch(
   userProfileData,
   (profile) => {
@@ -162,7 +231,7 @@ watch(
   { immediate: true },
 )
 
-// --- Funciones ---
+// --- Funciones (Sin cambios en su lógica interna, excepto handleCheckoutSubmit) ---
 const formatRut = () => {
   let rut = customerData.value.rut.replace(/[^0-9kK]/g, '')
   if (rut.length > 1) {
@@ -173,7 +242,7 @@ const formatRut = () => {
   customerData.value.rut = rut
 }
 
-// Maneja mensajes del popup de Transbank
+// Maneja mensajes del popup de Transbank (Sin cambios)
 const handlePaymentMessage = async (event) => {
   if (event.origin !== window.location.origin) {
     return
@@ -198,7 +267,7 @@ const handlePaymentMessage = async (event) => {
   }
 }
 
-// Carga datos del perfil del usuario logueado
+// Carga datos del perfil del usuario logueado (Sin cambios)
 async function loadUserProfile() {
   if (!authStore.isLoggedIn || !authStore.user?.id) return
   loadingProfile.value = true
@@ -221,11 +290,12 @@ async function loadUserProfile() {
   }
 }
 
-// Carga detalles (precio, stock, etc.) de los productos en el carrito para el resumen
+// Carga detalles (precio, stock, etc.) de los productos en el carrito para el resumen (Sin cambios)
 async function loadCartDetailsForSummary() {
   loadingCartDetails.value = true
   const productIds = cartItems.value.map((item) => item.product_id)
   if (productIds.length > 0) {
+    // Esto trae el producto completo (incluyendo offer_price, discount_percentage, etc.)
     const productsData = await productsStore.fetchProductsByIds(productIds)
     cartProductDetails.value = cartItems.value
       .map((cartItem) => {
@@ -239,11 +309,11 @@ async function loadCartDetailsForSummary() {
   loadingCartDetails.value = false
 }
 
-// --- Función Principal de Checkout ---
+// --- 🔥 Función Principal de Checkout (MODIFICADA) ---
 async function handleCheckoutSubmit() {
   paymentHasFailed.value = false
 
-  // Validaciones básicas
+  // Validaciones básicas (Sin cambios)
   if (!selectedShippingMethod.value) {
     toast.error('Selecciona método de envío.')
     return
@@ -279,7 +349,7 @@ async function handleCheckoutSubmit() {
   let uploadedFileUrls = []
 
   try {
-    // 1. Preparar Dirección
+    // 1. Preparar Dirección (Sin cambios)
     let finalShippingAddress =
       !authStore.isLoggedIn || !useSavedAddress.value || !hasSavedAddress.value
         ? {
@@ -291,10 +361,13 @@ async function handleCheckoutSubmit() {
           }
         : userProfileData.value.shipping_address
 
-    // 2. Validar Carrito y Stock
+    // 2. Validar Carrito y Stock (Sin cambios)
     if (cartItems.value.length === 0) throw new Error('Tu carrito está vacío.')
+    // Nos aseguramos de tener los datos más recientes antes de usar processedCartItems
     await loadCartDetailsForSummary()
-    for (const item of cartProductDetails.value) {
+
+    // Ahora usamos processedCartItems que tiene la lógica de stock y precio
+    for (const item of processedCartItems.value) {
       if (!item.product) throw new Error(`Detalles no encontrados para un producto en tu carrito.`)
       if (item.product.stock !== null && item.quantity > item.product.stock) {
         throw new Error(
@@ -303,18 +376,7 @@ async function handleCheckoutSubmit() {
       }
     }
 
-    // --- 🕵️‍♂️ MICRÓFONO ESPÍA (INICIO) 🕵️‍♂️ ---
-    console.log('--- REPORTE DE CARRITO (PRE-SUBIDA) ---')
-    console.log('Items en el carrito:', cartItems.value.length)
-    cartItems.value.forEach((item, index) => {
-      console.log(`Item ${index} (ID: ${item.id}, ProdID: ${item.product_id}):`)
-      console.log('   Propiedad customizationFiles:', item.customizationFiles)
-      console.log('   Propiedad customizationNotes:', item.customizationNotes)
-    })
-    console.log('-------------------------------------------')
-    // --- 🕵️‍♂️ MICRÓFONO ESPÍA (FIN) 🕵️‍♂️ ---
-
-    // 3. Subir Archivos (SI HAY Y SI ESTÁ LOGUEADO)
+    // 3. Subir Archivos (Sin cambios)
     const itemsWithFiles = cartItems.value.filter(
       (item) => item.customizationFiles && item.customizationFiles.length > 0,
     )
@@ -327,7 +389,6 @@ async function handleCheckoutSubmit() {
         item.customizationFiles.map((file) => ({ file, itemId: item.id })),
       )
       const uploadSessionId = uuidv4()
-
       const fileMap = new Map()
 
       const uploadPromises = allFilesToUpload.map(async ({ file, itemId }, index) => {
@@ -358,25 +419,25 @@ async function handleCheckoutSubmit() {
       toast.success('Archivos de personalización subidos.')
     }
 
-    // 4. Preparar Datos de la Orden (¡Tomando notas del carrito!)
-    const orderItemsData = cartProductDetails.value.map((item) => ({
+    // --- 🔥 4. Preparar Datos de la Orden (MODIFICADO) ---
+    // Usamos processedCartItems para tener el precio final correcto
+    const orderItemsData = processedCartItems.value.map((item) => ({
       product_id: item.product_id,
       quantity: item.quantity,
-      price_at_purchase: item.product.price,
+      price_at_purchase: item.finalPrice, // <-- ✨ ¡¡AQUÍ ESTÁ LA CORRECCIÓN!!
     }))
 
-    // --- ✨ MEJORA DE NOTAS (INICIO) ✨ ---
     const allNotes = cartItems.value
       .map((item) => item.customizationNotes)
       .filter(Boolean)
       .join('\n---\n')
-
     const notesFromCart = allNotes
-    // --- ✨ MEJORA DE NOTAS (FIN) ✨ ---
 
+    // El resto de los datos de la orden (total, descuento) ya son correctos
+    // porque dependen de las computadas `finalTotal` y `discountAmount`
     const orderData = {
       user_id: authStore.user?.id || null,
-      total_amount: finalTotal.value,
+      total_amount: finalTotal.value, // <-- Ya está correcto
       status: 'pending',
       shipping_address: finalShippingAddress,
       customer_email: customerData.value.email,
@@ -384,19 +445,20 @@ async function handleCheckoutSubmit() {
       shipping_method: selectedShippingMethod.value,
       payment_method: selectedPaymentMethod.value,
       applied_coupon_code: appliedCoupon.value?.code || null,
-      discount_amount: discountAmount.value > 0 ? discountAmount.value : null,
+      discount_amount: discountAmount.value > 0 ? discountAmount.value : null, // <-- Ya está correcto
       customization_files: uploadedFileUrls.length > 0 ? uploadedFileUrls : null,
       customization_notes: notesFromCart.trim() || null,
     }
+    // --- 🔥 FIN MODIFICACIÓN ---
 
-    // 5. Insertar Orden y Items
+    // 5. Insertar Orden y Items (Sin cambios)
     const { data: orderResult, error: orderError } = await supabase
       .from('orders')
       .insert(orderData)
       .select('id')
       .single()
     if (orderError) throw orderError
-    newOrderId = orderResult.id // <-- El ID de la orden se guarda aquí
+    newOrderId = orderResult.id
 
     const orderItemsWithOrderId = orderItemsData.map((item) => ({ ...item, order_id: newOrderId }))
     const { error: itemsError } = await supabase.from('order_items').insert(orderItemsWithOrderId)
@@ -404,14 +466,13 @@ async function handleCheckoutSubmit() {
       throw itemsError
     }
 
-    // 6. Actualizar Perfil por Cupón (si aplica)
+    // 6. Actualizar Perfil por Cupón (si aplica) (Sin cambios)
     if (appliedCoupon.value?.coupon_type === 'FIRST_PURCHASE' && authStore.isLoggedIn) {
       /* ... */
     }
 
-    // 7. Procesar Pago o Redirigir
+    // 7. Procesar Pago o Redirigir (Sin cambios, esta lógica está perfecta)
     if (selectedPaymentMethod.value === 'transferencia') {
-      // ... (Lógica de transferencia, sin cambios)
       try {
         await supabase.functions.invoke('send-order-confirmation', {
           body: { orderData: { orderId: newOrderId } },
@@ -447,43 +508,30 @@ async function handleCheckoutSubmit() {
           throw new Error('Popup bloqueado.')
         }
 
-        // --- 🔥 ¡¡¡AQUÍ ESTÁ LA SOLUCIÓN!!! 🔥 ---
         const checkPopupClosed = setInterval(async () => {
           if (pagoPopup.value && pagoPopup.value.closed) {
-            // 1. Detener el reloj
             clearInterval(checkPopupClosed)
-
-            // 2. Si el 'postMessage' ya confirmó el pago, no hacemos nada.
             if (paymentCompleted) {
               console.log('Intervalo: Popup cerrado, pero el pago ya fue confirmado.')
               return
             }
-
-            // 3. El popup se cerró y no tenemos confirmación.
-            //    Debemos verificar el estado en la DB (Plan B).
             console.warn('Intervalo: Popup cerrado. Verificando estado de la orden en la DB...')
             try {
               const { data: order, error: checkError } = await supabase
                 .from('orders')
                 .select('status')
-                .eq('id', newOrderId) // Usamos el ID de la orden
+                .eq('id', newOrderId)
                 .single()
-
               if (checkError) throw checkError
-
-              // 4. Comparamos el estado
               if (order.status === 'paid' || order.status === 'processing') {
-                // ¡ÉXITO! El webhook de Transbank actualizó la orden
                 console.log('Intervalo: ¡Pago confirmado desde la DB! Redirigiendo...')
                 paymentCompleted = true
                 isProcessingPayment.value = false
                 isSubmitting.value = false
-
                 cartStore.clearCart()
                 toast.success('¡Pago exitoso! Redirigiendo...')
                 router.push({ name: 'order-confirmation', params: { orderId: newOrderId } })
               } else {
-                // FALLO O CANCELACIÓN. El estado sigue 'pending'.
                 console.log('Intervalo: El pago fue cancelado o falló.')
                 isProcessingPayment.value = false
                 isSubmitting.value = false
@@ -498,15 +546,13 @@ async function handleCheckoutSubmit() {
               toast.error('Error al verificar el estado del pago.')
             }
           }
-        }, 1000) // Revisa cada 1 segundo
-        // --- 🔥 ¡¡¡FIN DE LA SOLUCIÓN!!! 🔥 ---
+        }, 1000)
       } catch (transbankError) {
         toast.error(transbankError.message || 'No se pudo iniciar el pago.')
         isProcessingPayment.value = false
         isSubmitting.value = false
         paymentHasFailed.value = true
         if (newOrderId) {
-          // Lógica de reversa (¡esto está perfecto!)
           await supabase.from('orders').delete().eq('id', newOrderId)
           if (uploadedFileUrls.length > 0) {
             const filePaths = uploadedFileUrls.map((url) =>
@@ -528,7 +574,7 @@ async function handleCheckoutSubmit() {
   }
 }
 
-// --- Lifecycle Hooks ---
+// --- Lifecycle Hooks (Sin cambios) ---
 onMounted(() => {
   setTimeout(() => {
     if (cartItems.value.length === 0 && !isSubmitting.value) router.replace({ name: 'store' })
@@ -831,7 +877,7 @@ onUnmounted(() => {
         </div>
         <div v-else>
           <div class="summary-items">
-            <div v-for="item in cartProductDetails" :key="item.product_id" class="summary-item">
+            <div v-for="item in processedCartItems" :key="item.product_id" class="summary-item">
               <img
                 :src="item.product.image_urls?.[0] || '/Zolve_Logo.png'"
                 class="item-thumb"
@@ -839,7 +885,7 @@ onUnmounted(() => {
               />
               <span class="item-name-summary">{{ item.quantity }} x {{ item.product.name }}</span>
               <span class="item-price-summary">
-                {{ formatPrice(item.product.price * item.quantity) }}
+                {{ formatPrice(item.finalPrice * item.quantity) }}
               </span>
             </div>
           </div>

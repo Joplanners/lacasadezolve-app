@@ -1,5 +1,4 @@
 <script setup>
-// 🔥 NUEVO: Importamos 'ref'
 import { ref, onMounted, computed } from 'vue'
 import { useBannersStore } from '@/stores/storeBanners'
 
@@ -8,18 +7,40 @@ const bannersStore = useBannersStore()
 const banners = computed(() => bannersStore.banners)
 const loading = computed(() => bannersStore.loading)
 const error = computed(() => bannersStore.error)
-
-// 🔥 NUEVO: Creamos una variable reactiva para la duración
-// 5 segundos será el valor por defecto (móvil)
 const secondsPerBanner = ref(5)
 
-// Estilos dinámicos SOLO para el carrusel
+// --- 🔥 INICIO DE LA MEJORA (AHORA SÍ) 🔥 ---
+// Esta computada revisa los banners y decide si son clickeables.
+const processedBanners = computed(() => {
+  return banners.value.map((banner) => {
+    const url = banner.link_url ? banner.link_url.trim().toLowerCase() : null
+
+    // Lista de URLs que queremos ignorar (la página de inicio)
+    const ignoredUrls = [
+      '/',
+      'https://lacasadezolve.com',
+      'https://lacasadezolve.com/',
+      'http://lacasadezolve.com',
+      'http://lacasadezolve.com/',
+    ]
+
+    // Un banner es linkeable SOLO si la URL existe Y NO está en nuestra lista de ignorados.
+    const isLinkable = !!(url && !ignoredUrls.includes(url))
+
+    return {
+      ...banner,
+      isLinkable: isLinkable,
+      finalUrl: isLinkable ? banner.link_url.trim() : null, // Usamos el link original si es válido
+    }
+  })
+})
+// --- 🔥 FIN DE LA MEJORA 🔥 ---
+
 const trackStyle = computed(() => {
   if (banners.value.length > 1) {
     const totalBanners = banners.value.length
     return {
       width: `${totalBanners * 2 * 100}%`,
-      // ✨ CAMBIO: Usamos nuestra variable reactiva en lugar del '5' fijo
       animationDuration: `${totalBanners * secondsPerBanner.value}s`,
     }
   }
@@ -28,13 +49,9 @@ const trackStyle = computed(() => {
 
 onMounted(() => {
   bannersStore.fetchActiveBanners()
-
-  // 🔥 NUEVO: Chequeamos el tamaño de la pantalla al cargar
-  const mediaQuery = window.matchMedia('(min-width: 768px)') // 768px es un breakpoint común para 'desktop'
-
+  const mediaQuery = window.matchMedia('(min-width: 768px)')
   if (mediaQuery.matches) {
-    // Si la pantalla es ancha (desktop), cambiamos la duración
-    secondsPerBanner.value = 8 // Por ejemplo, 8 segundos. ¡Juega con este número!
+    secondsPerBanner.value = 8
   }
 })
 </script>
@@ -44,48 +61,54 @@ onMounted(() => {
     <div v-if="loading" class="feedback-placeholder">
       <p>Cargando banners...</p>
     </div>
-
     <div v-else-if="error" class="feedback-placeholder error">
       <p>No se pudieron cargar los banners. Revisa la conexión.</p>
     </div>
 
-    <div v-else-if="banners.length > 0">
-      <div v-if="banners.length > 1" class="carousel">
+    <div v-else-if="processedBanners.length > 0">
+      <div v-if="processedBanners.length > 1" class="carousel">
         <div class="carousel-track" :style="{ ...trackStyle, '--banner-count': banners.length }">
-          <a
-            v-for="banner in banners"
+          <component
+            v-for="banner in processedBanners"
             :key="banner.id"
-            :href="banner.link_url || '#'"
+            :is="banner.isLinkable ? 'a' : 'div'"
+            :href="banner.finalUrl"
+            :target="banner.isLinkable ? '_blank' : null"
+            :rel="banner.isLinkable ? 'noopener noreferrer' : null"
             class="carousel-slide"
-            target="_blank"
-            rel="noopener noreferrer"
           >
             <img :src="banner.image_url" :alt="banner.alt_text || 'Banner promocional'" />
-          </a>
+          </component>
+
           <template v-if="banners.length > 1">
-            <a
-              v-for="banner in banners"
+            <component
+              v-for="banner in processedBanners"
               :key="`${banner.id}-clone`"
-              :href="banner.link_url || '#'"
+              :is="banner.isLinkable ? 'a' : 'div'"
+              :href="banner.finalUrl"
+              :target="banner.isLinkable ? '_blank' : null"
+              :rel="banner.isLinkable ? 'noopener noreferrer' : null"
               class="carousel-slide"
-              target="_blank"
-              rel="noopener noreferrer"
             >
               <img :src="banner.image_url" :alt="banner.alt_text || 'Banner promocional'" />
-            </a>
+            </component>
           </template>
         </div>
       </div>
 
-      <a
+      <component
         v-else
-        :href="banners[0].link_url || '#'"
+        :is="processedBanners[0].isLinkable ? 'a' : 'div'"
+        :href="processedBanners[0].finalUrl"
+        :target="processedBanners[0].isLinkable ? '_blank' : null"
+        :rel="processedBanners[0].isLinkable ? 'noopener noreferrer' : null"
         class="static-banner"
-        target="_blank"
-        rel="noopener noreferrer"
       >
-        <img :src="banners[0].image_url" :alt="banners[0].alt_text || 'Banner promocional'" />
-      </a>
+        <img
+          :src="processedBanners[0].image_url"
+          :alt="processedBanners[0].alt_text || 'Banner promocional'"
+        />
+      </component>
     </div>
   </div>
 </template>

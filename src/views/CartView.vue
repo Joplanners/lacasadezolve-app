@@ -4,27 +4,94 @@ import { useCartStore } from '@/stores/storeCart'
 import { useProductsStore } from '@/stores/storeProducts'
 import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
-import { useAuthStore } from '@/stores/authStore' // <-- Importamos AuthStore
-import { supabase } from '@/lib/supabaseClient' // <-- Importamos Supabase
+import { useAuthStore } from '@/stores/authStore'
+import { supabase } from '@/lib/supabaseClient'
 
 const cartStore = useCartStore()
 const productsStore = useProductsStore()
 const router = useRouter()
 const toast = useToast()
-const authStore = useAuthStore() // <-- Instancia de AuthStore
+const authStore = useAuthStore()
 
-// Estado local para los detalles completos de los productos del carrito
 const cartProductsDetails = ref([])
 const isLoadingDetails = ref(true)
 const errorLoadingDetails = ref(null)
 
-// --- INICIO: NUEVO ESTADO PARA CUPONES ---
+// --- ESTADO PARA CUPONES ---
 const couponCodeInput = ref('')
-const appliedCoupon = ref(null) // Guardará el objeto del cupón si es válido
+const appliedCoupon = ref(null)
 const couponDiscount = ref(0)
 const isLoadingCoupon = ref(false)
 const couponError = ref('')
-// --- FIN: NUEVO ESTADO PARA CUPONES ---
+
+// --- 🔥 INICIO: LÓGICA DE PRECIOS AÑADIDA ---
+
+/**
+ * Función helper que calcula el precio final de un producto,
+ * considerando ofertas, porcentajes y fechas.
+ * @param {object} product - El objeto de producto de Supabase
+ * @returns {object} - { finalPrice, originalPrice, onOffer }
+ */
+function getPriceInfo(product) {
+  if (!product) return { finalPrice: 0, originalPrice: 0, onOffer: false }
+
+  const now = new Date()
+  let onOffer = false
+  let finalPrice = product.price
+  let originalPrice = null
+
+  // Revisa si hay alguna oferta potencial
+  const hasOfferPrice =
+    product.offer_price && product.offer_price > 0 && product.offer_price < product.price
+  const hasPercentage = product.discount_percentage && product.discount_percentage > 0
+
+  if (hasOfferPrice || hasPercentage) {
+    // Revisa la validez de las fechas
+    const hasStartDate = !!product.discount_start_date
+    const hasEndDate = !!product.discount_end_date
+    const startDate = hasStartDate ? new Date(product.discount_start_date) : null
+    const endDate = hasEndDate ? new Date(product.discount_end_date) : null
+
+    let isDateValid = true
+    if (startDate && now < startDate) isDateValid = false // Aún no empieza
+    if (endDate && now > endDate) isDateValid = false // Ya terminó
+
+    if (isDateValid) {
+      onOffer = true
+      originalPrice = product.price // El precio original para tachar
+
+      // Prioriza el descuento por porcentaje
+      if (product.discount_percentage) {
+        finalPrice = product.price * (1 - product.discount_percentage / 100)
+      } else if (hasOfferPrice) {
+        finalPrice = product.offer_price // Usa el precio fijo de oferta
+      }
+    }
+  }
+
+  return {
+    finalPrice: finalPrice, // El precio que se debe cobrar
+    originalPrice: originalPrice, // El precio para tachar (o null)
+    onOffer: onOffer, // true si la oferta está activa
+  }
+}
+
+/**
+ * Nueva propiedad computada que procesa el carrito
+ * y añade los precios calculados a cada item.
+ */
+const processedCartItems = computed(() => {
+  return cartProductsDetails.value.map((item) => {
+    // Calcula el precio para el producto de este item del carrito
+    const priceInfo = getPriceInfo(item.product)
+    return {
+      ...item, // Mantiene product_id, quantity, product (objeto completo)
+      ...priceInfo, // Añade finalPrice, originalPrice, onOffer
+    }
+  })
+})
+
+// --- 🔥 FIN: LÓGICA DE PRECIOS AÑADIDA ---
 
 async function loadCartProductDetails() {
   isLoadingDetails.value = true
@@ -39,7 +106,9 @@ async function loadCartProductDetails() {
   }
 
   try {
+    // Esto ya trae el producto completo (incluyendo offer_price, etc.)
     const productsData = await productsStore.fetchProductsByIds(productIds)
+
     cartProductsDetails.value = cartStore.items
       .map((cartItem) => {
         const product = productsData.find((p) => p.id === cartItem.product_id)
@@ -50,6 +119,7 @@ async function loadCartProductDetails() {
       })
       .filter((item) => item.product !== null)
 
+    // Lógica de ajuste de stock (se mantiene igual)
     cartProductsDetails.value.forEach((item) => {
       if (item.product.stock !== null && item.product.stock < item.quantity) {
         toast.warning(
@@ -71,14 +141,16 @@ async function loadCartProductDetails() {
 
 onMounted(loadCartProductDetails)
 
+// --- 🔥 COMPUTADA DE SUBTOTAL (MODIFICADA) ---
+// Ahora usa `processedCartItems` y `item.finalPrice`
 const subtotal = computed(() => {
-  return cartProductsDetails.value.reduce((total, item) => {
-    const price = typeof item.product.price === 'number' ? item.product.price : 0
-    return total + price * item.quantity
+  return processedCartItems.value.reduce((total, item) => {
+    // item.finalPrice es el precio ya calculado (con oferta si aplica)
+    return total + item.finalPrice * item.quantity
   }, 0)
 })
+// --- 🔥 FIN COMPUTADA DE SUBTOTAL ---
 
-// ¡NUEVA COMPUTADA PARA EL TOTAL!
 const total = computed(() => {
   const finalTotal = subtotal.value - couponDiscount.value
   return Math.max(0, finalTotal) // Asegura que el total no sea negativo
@@ -95,7 +167,6 @@ const hasFailedToLoad = computed(
   () => !isLoadingDetails.value && errorLoadingDetails.value && cartStore.items.length > 0,
 )
 
-// --- INICIO: NUEVA FUNCIÓN PARA APLICAR CUPÓN ---
 async function handleApplyCoupon() {
   if (!couponCodeInput.value) return
   isLoadingCoupon.value = true
@@ -139,8 +210,11 @@ async function handleApplyCoupon() {
     }
 
     appliedCoupon.value = coupon
+    // --- 🔥 MODIFICADO ---
+    // El subtotal ya está con descuentos de producto,
+    // el cupón se aplica sobre ese subtotal.
     couponDiscount.value = (subtotal.value * coupon.discount_percent) / 100
-    cartStore.setAppliedCoupon(coupon) // Guardamos el cupón en el store del carrito
+    cartStore.setAppliedCoupon(coupon)
     toast.success(`¡Cupón "${coupon.code}" aplicado!`)
   } catch (err) {
     couponError.value = err.message
@@ -155,12 +229,12 @@ function removeCoupon() {
   couponDiscount.value = 0
   couponCodeInput.value = ''
   couponError.value = ''
-  cartStore.clearAppliedCoupon() // Limpiamos el cupón del store del carrito
+  cartStore.clearAppliedCoupon()
   toast.info('Cupón eliminado.')
 }
-// --- FIN: NUEVA FUNCIÓN PARA APLICAR CUPÓN ---
 
 async function handleUpdateQuantity(productId, newQuantity) {
+  // Busca en cartProductsDetails (el array original)
   const item = cartProductsDetails.value.find((item) => item.product_id === productId)
   if (!item) return
 
@@ -178,6 +252,7 @@ async function handleUpdateQuantity(productId, newQuantity) {
   try {
     if (finalQuantity === 0) {
       await cartStore.removeItem(productId)
+      // Modifica el array original
       cartProductsDetails.value = cartProductsDetails.value.filter(
         (i) => i.product_id !== productId,
       )
@@ -194,6 +269,7 @@ async function handleUpdateQuantity(productId, newQuantity) {
 
 async function handleRemoveItem(productId, productName) {
   const originalItems = [...cartProductsDetails.value]
+  // Modifica el array original
   cartProductsDetails.value = cartProductsDetails.value.filter((i) => i.product_id !== productId)
 
   try {
@@ -242,7 +318,7 @@ function formatPrice(value) {
 
     <div v-else class="cart-layout">
       <div class="product-list">
-        <div v-for="item in cartProductsDetails" :key="item.product_id" class="cart-item">
+        <div v-for="item in processedCartItems" :key="item.product_id" class="cart-item">
           <img
             :src="
               item.product.image_urls && item.product.image_urls.length > 0
@@ -254,7 +330,13 @@ function formatPrice(value) {
           />
           <div class="item-details">
             <h3 class="item-name">{{ item.product.name }}</h3>
-            <p class="item-price">{{ formatPrice(item.product.price) }} c/u</p>
+
+            <p class="item-price">
+              <span class="final-item-price">{{ formatPrice(item.finalPrice) }} c/u</span>
+              <span v-if="item.onOffer" class="original-item-price">
+                {{ formatPrice(item.originalPrice) }}
+              </span>
+            </p>
             <p
               v-if="
                 item.product.stock !== null && item.product.stock <= 10 && item.product.stock > 0
@@ -287,9 +369,11 @@ function formatPrice(value) {
               +
             </button>
           </div>
+
           <div class="item-total">
-            {{ formatPrice(item.product.price * item.quantity) }}
+            {{ formatPrice(item.finalPrice * item.quantity) }}
           </div>
+
           <button
             @click="handleRemoveItem(item.product_id, item.product.name)"
             class="remove-item-btn"
@@ -307,7 +391,6 @@ function formatPrice(value) {
           <span>{{ formatPrice(subtotal) }}</span>
         </div>
 
-        <!-- INICIO: SECCIÓN DE CUPONES -->
         <div class="coupon-section">
           <div v-if="!appliedCoupon">
             <label for="coupon-input">¿Tienes un cupón?</label>
@@ -337,8 +420,6 @@ function formatPrice(value) {
             </button>
           </div>
         </div>
-        <!-- FIN: SECCIÓN DE CUPONES -->
-
         <div class="summary-row">
           <span>Envío</span>
           <small>Se calculará en el siguiente paso</small>
@@ -470,11 +551,25 @@ function formatPrice(value) {
   margin: 0 0 5px 0;
   color: var(--color-heading);
 }
+
+/* --- 🔥 INICIO: NUEVOS ESTILOS PARA PRECIO DE ITEM --- */
 .item-price {
-  font-size: 0.9rem;
-  color: #555;
   margin: 0;
 }
+.final-item-price {
+  font-size: 0.9rem;
+  color: #555;
+  font-weight: bold;
+  margin-right: 8px;
+}
+.original-item-price {
+  font-size: 0.8rem;
+  color: #999;
+  text-decoration: line-through;
+  font-weight: normal;
+}
+/* --- 🔥 FIN: NUEVOS ESTILOS PARA PRECIO DE ITEM --- */
+
 .item-stock-warning {
   font-size: 0.8rem;
   font-weight: bold;
@@ -579,7 +674,7 @@ function formatPrice(value) {
   margin-top: 20px;
 }
 
-/* --- INICIO: NUEVOS ESTILOS PARA CUPONES --- */
+/* Estilos de Cupones (sin cambios) */
 .coupon-section {
   border-top: 1px dashed var(--color-border);
   border-bottom: 1px dashed var(--color-border);
@@ -620,10 +715,10 @@ function formatPrice(value) {
   font-weight: bold;
   position: relative;
   padding-right: 25px;
-  flex-wrap: wrap; /* Para que el texto se ajuste si es largo */
+  flex-wrap: wrap;
 }
 .applied-coupon span:first-child {
-  margin-right: auto; /* Empuja el precio a la derecha */
+  margin-right: auto;
 }
 .remove-coupon-btn {
   position: absolute;
@@ -636,9 +731,8 @@ function formatPrice(value) {
   color: #aaa;
   cursor: pointer;
 }
-/* --- FIN: NUEVOS ESTILOS PARA CUPONES --- */
 
-/* Botones */
+/* Botones (sin cambios) */
 .btn {
   display: inline-block;
   text-align: center;
@@ -670,7 +764,7 @@ function formatPrice(value) {
   font-size: 1.1rem;
 }
 
-/* Media Queries */
+/* Media Queries (sin cambios) */
 @media (max-width: 900px) {
   .cart-layout {
     grid-template-columns: 1fr;

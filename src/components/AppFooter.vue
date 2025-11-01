@@ -31,9 +31,27 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
       <div class="footer-column footer-contact">
         <h4>Contacto</h4>
-        <p>📞 +56 9 3664 9482</p>
-        <p>📧 contacto@lacasadezolve.com</p>
-        <p>📍 Santiago, Chile</p>
+        <p>
+          <font-awesome-icon :icon="['fab', 'whatsapp']" class="contact-icon" />
+          <a
+            href="https://wa.me/56936649482"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="contact-link"
+          >
+            +56 9 3664 9482
+          </a>
+        </p>
+        <p>
+          <font-awesome-icon :icon="['fas', 'envelope']" class="contact-icon" />
+          <a href="mailto:contacto@lacasadezolve.com" class="contact-link">
+            contacto@lacasadezolve.com
+          </a>
+        </p>
+        <p>
+          <font-awesome-icon :icon="['fas', 'map-marker-alt']" class="contact-icon" />
+          <span>Santiago, Chile</span>
+        </p>
         <div class="social-icons">
           <a
             href="https://www.instagram.com/zolve_fox/"
@@ -44,7 +62,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
             <font-awesome-icon :icon="['fab', 'instagram']" />
           </a>
           <a
-            href="https://www.facebook.com/people/Zolve/61558525044896/"
+            href="https://www.facebook.com/lacasadezolve/"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Facebook"
@@ -155,8 +173,27 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
   color: var(--color-text);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 8px; /* Ajusta el espacio entre el icono y el texto */
 }
+
+/* 🔥 ESTILO CORREGIDO CON COLOR ROSA 🔥 */
+.contact-icon {
+  width: 20px; /* Fija un ancho para alinear los iconos verticalmente */
+  text-align: center; /* Centra el icono dentro de su "caja" */
+  color: var(--brand-pink); /* 🔥 ¡TU COLOR ROSA! 🔥 */
+  font-size: 1.1em; /* Ajusta el tamaño */
+}
+
+.footer-contact p a.contact-link {
+  color: inherit; /* Hereda el color del párrafo */
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.footer-contact p a.contact-link:hover {
+  color: var(--brand-pink);
+  text-decoration: underline;
+}
+/* 🔥 FIN ESTILO 🔥 */
 
 .social-icons {
   display: flex;
@@ -165,12 +202,12 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 }
 
 .social-icons a {
-  color: var(--color-text);
+  color: var(--color-text); /* Color por defecto de los iconos sociales */
   font-size: 1.5em;
   transition: color 0.2s ease;
 }
 .social-icons a:hover {
-  color: var(--brand-pink);
+  color: var(--brand-pink); /* Color al pasar el mouse */
 }
 
 .footer-copyright {

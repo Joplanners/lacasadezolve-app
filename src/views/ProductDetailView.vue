@@ -23,6 +23,87 @@ const errorMsg = ref('')
 const mainImageUrl = ref('')
 const selectedQuantity = ref(1)
 
+// --- 🔥 INICIO: LÓGICA DE PRECIOS Y OFERTAS ---
+
+// Computed para saber si la oferta está activa
+const onOffer = computed(() => {
+  if (!product.value) return false
+  const now = new Date()
+
+  // 1. ¿Tiene un precio de oferta válido?
+  const hasOfferPrice =
+    product.value.offer_price &&
+    product.value.offer_price > 0 &&
+    product.value.offer_price < product.value.price
+  // 2. ¿Tiene un porcentaje de descuento válido?
+  const hasPercentage = product.value.discount_percentage && product.value.discount_percentage > 0
+
+  // Si no tiene ninguno de los dos, no hay oferta
+  if (!hasOfferPrice && !hasPercentage) {
+    return false
+  }
+
+  // 3. Revisar fechas de la oferta
+  const hasStartDate = !!product.value.discount_start_date
+  const hasEndDate = !!product.value.discount_end_date
+  const startDate = hasStartDate ? new Date(product.value.discount_start_date) : null
+  const endDate = hasEndDate ? new Date(product.value.discount_end_date) : null
+
+  // Si tiene fecha de inicio y aún no empieza -> NO hay oferta
+  if (startDate && now < startDate) return false
+  // Si tiene fecha de fin y ya pasó -> NO hay oferta
+  if (endDate && now > endDate) return false
+
+  // Si pasó todas las validaciones, ¡SÍ hay oferta!
+  return true
+})
+
+// Computed para mostrar el precio FINAL (el que se cobra)
+const displayPrice = computed(() => {
+  if (!product.value) return ''
+
+  // Si la oferta está activa...
+  if (onOffer.value) {
+    // Prioriza el descuento por porcentaje si existe
+    if (product.value.discount_percentage) {
+      const discounted = product.value.price * (1 - product.value.discount_percentage / 100)
+      return formatPrice(discounted)
+    }
+    // Si no, usa el precio de oferta fijo
+    if (product.value.offer_price) {
+      return formatPrice(product.value.offer_price) // Tu precio de 5990
+    }
+  }
+
+  // Si no hay oferta, muestra el precio normal
+  return formatPrice(product.value.price) // Tu precio de 6990
+})
+
+// Computed para mostrar el precio ORIGINAL (tachado)
+const originalPrice = computed(() => {
+  if (onOffer.value) {
+    return formatPrice(product.value.price) // El precio normal (6990)
+  }
+  return null // No hay precio que tachar
+})
+
+// Computed para la etiqueta de descuento (ej: "-15%")
+const discountBadgeText = computed(() => {
+  if (onOffer.value && product.value.discount_percentage) {
+    return `-${product.value.discount_percentage}%`
+  }
+  // Calculamos el % si solo hay precio fijo
+  if (onOffer.value && product.value.offer_price) {
+    const percent = Math.round(
+      ((product.value.price - product.value.offer_price) / product.value.price) * 100,
+    )
+    return `-${percent}%`
+  }
+  return null
+})
+
+// --- 🔥 FIN: LÓGICA DE PRECIOS Y OFERTAS ---
+
 // 🔥 Refs para personalización
 const customizationFiles = ref([])
 const customizationNotes = ref('') // 🔥 NUEVO: Ref para las notas
@@ -217,7 +298,15 @@ const pinterestShareUrl = computed(() => {
           <div class="product-description-html" v-html="product.description"></div>
 
           <div class="price-detail">
-            <span>{{ formatPrice(product.price) }}</span>
+            <span class="display-price">{{ displayPrice }}</span>
+
+            <span v-if="originalPrice" class="original-price-striked">
+              {{ originalPrice }}
+            </span>
+
+            <span v-if="discountBadgeText" class="discount-badge-detail">
+              {{ discountBadgeText }}
+            </span>
           </div>
           <div class="quantity-selector">
             <label for="quantity">Cantidad:</label>
@@ -454,13 +543,45 @@ const pinterestShareUrl = computed(() => {
 .product-description-html :deep(u) {
   text-decoration: underline;
 }
-/* Resto de estilos */
+
+/* 🔥 INICIO: ESTILOS DE PRECIO Y OFERTA */
 .price-detail {
+  /* Modificamos el contenedor para alinear los precios */
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 30px; /* Margen que tenía el .price-detail original */
+}
+
+.price-detail .display-price {
+  /* Este es el precio final, grande y en color */
   font-size: 2rem;
   font-weight: 700;
   color: var(--brand-turquoise);
-  margin-bottom: 30px;
+  line-height: 1; /* Asegura alineación */
 }
+
+.price-detail .original-price-striked {
+  /* Este es el precio tachado */
+  font-size: 1.4rem;
+  color: #888;
+  text-decoration: line-through;
+  font-weight: 400;
+  line-height: 1; /* Asegura alineación */
+}
+
+.price-detail .discount-badge-detail {
+  /* Esta es la etiqueta rosa de % */
+  background-color: var(--brand-pink);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+/* 🔥 FIN: ESTILOS DE PRECIO Y OFERTA */
+
 .file-uploader {
   margin-bottom: 30px;
 }

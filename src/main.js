@@ -14,8 +14,16 @@ import {
   faVolumeMute,
   faStore,
   faShoppingCart,
+  faEnvelope, // 🔥 AÑADIDO (para el email)
+  faMapMarkerAlt, // 🔥 AÑADIDO (para la ubicación)
 } from '@fortawesome/free-solid-svg-icons'
-import { faInstagram, faFacebookF, faYoutube, faTiktok } from '@fortawesome/free-brands-svg-icons'
+import {
+  faInstagram,
+  faFacebookF,
+  faYoutube,
+  faTiktok,
+  faWhatsapp, // 🔥 AÑADIDO
+} from '@fortawesome/free-brands-svg-icons'
 import { useAuthStore } from '@/stores/authStore' // <-- ¡Importante añadir esto!
 
 library.add(
@@ -29,6 +37,9 @@ library.add(
   faYoutube,
   faTiktok,
   faShoppingCart,
+  faWhatsapp, // 🔥 AÑADIDO
+  faEnvelope, // 🔥 AÑADIDO
+  faMapMarkerAlt, // 🔥 AÑADIDO
 )
 
 const toastOptions = {
