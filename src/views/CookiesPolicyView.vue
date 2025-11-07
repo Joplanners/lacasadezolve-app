@@ -1,16 +1,17 @@
 <script setup>
 import { RouterLink } from 'vue-router'
 </script>
+
 <template>
   <div class="legal-page-container">
     <h1>Política de Cookies</h1>
-    <p class="last-updated">Última actualización: 08 de Mayo de 2025</p>
+    <p class="last-updated">Última actualización: 7 de noviembre de 2025</p>
     <h2>¿Qué es esta política?</h2>
     <p>
-      Esta Política de Cookies explica cómo La Casa de Zolve ("nosotros", "nos" o "nuestro") utiliza
-      cookies y tecnologías similares para reconocerte cuando visitas nuestro sitio web en
-      www.lacasadezolve.com ("Sitio Web"). Explica qué son estas tecnologías y por qué las
-      utilizamos, así como tus derechos para controlar el uso que hacemos de ellas.
+      Esta Política de Cookies explica cómo <strong>La Casa de Zolve SpA</strong> ("nosotros", "nos"
+      o "nuestro") utiliza cookies y tecnologías similares para reconocerte cuando visitas nuestro
+      sitio web en www.lacasadezolve.com ("Sitio Web"). Explica qué son estas tecnologías y por qué
+      las utilizamos, así como tus derechos para controlar el uso que hacemos de ellas.
     </p>
     <p>
       En algunos casos, podemos utilizar cookies que recopilen información que podría considerarse
@@ -27,12 +28,13 @@ import { RouterLink } from 'vue-router'
       proporcionar información de informes.
     </p>
     <p>
-      Las cookies establecidas por nosotros (La Casa de Zolve) se denominan "cookies de origen". Las
-      cookies establecidas por partes distintas a nosotros se denominan "cookies de terceros". Las
-      cookies de terceros permiten ofrecer características o funcionalidades de terceros en o a
-      través del sitio web (por ejemplo, análisis o funciones de proveedores de servicios). Las
-      partes que establecen estas cookies de terceros pueden reconocer tu dispositivo cuando visita
-      nuestro Sitio Web y también cuando visita otros sitios web que utilizan sus servicios.
+      Las cookies establecidas por nosotros (<strong>La Casa de Zolve SpA</strong>) se denominan
+      "cookies de origen". Las cookies establecidas por partes distintas a nosotros se denominan
+      "cookies de terceros". Las cookies de terceros permiten ofrecer características o
+      funcionalidades de terceros en o a través del sitio web (por ejemplo, análisis o funciones de
+      proveedores de servicios). Las partes que establecen estas cookies de terceros pueden
+      reconocer tu dispositivo cuando visita nuestro Sitio Web y también cuando visita otros sitios
+      web que utilizan sus servicios.
     </p>
 
     <h2>¿Por qué utilizamos cookies?</h2>
@@ -155,7 +157,7 @@ import { RouterLink } from 'vue-router'
     <p>
       No. Terceros no sirven cookies a través de nuestro Sitio Web con el propósito de mostrarte
       publicidad dirigida aquí. Como mencionamos, los enlaces a sitios de terceros (redes sociales,
-      SumUp) se rigen por sus propias políticas.
+      <strong>Transbank</strong>) se rigen por sus propias políticas.
     </p>
 
     <h2>¿Con qué frecuencia actualizarán esta Política de Cookies?</h2>

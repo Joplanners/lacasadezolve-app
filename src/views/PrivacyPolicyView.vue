@@ -5,7 +5,9 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
 <template>
   <div class="legal-page-container">
     <h1>Política de Privacidad</h1>
-    <h2>A. Introducción</h2>
+    <p class="last-updated">Última actualización: 7 de noviembre de 2025</p>
+
+    <h2>I. Introducción</h2>
     <p>
       La privacidad de los visitantes y usuarios de nuestro sitio web www.lacasadezolve.com es muy
       importante para nosotros y estamos comprometidos a protegerla. Esta política explica cómo
@@ -17,7 +19,7 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       Política de Cookies separada.
     </p>
 
-    <h2>B. Recopilación de Información Personal</h2>
+    <h2>II. Recopilación de Información Personal</h2>
     <p>
       Los siguientes tipos de información personal pueden ser recopilados, almacenados y usados:
     </p>
@@ -46,10 +48,20 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
         (WebAR).
       </li>
       <li>
-        Información relacionada con los pagos por servicios personalizados que realice (actualmente
-        vía transferencia bancaria o a través de links de pago de SumUp). Tenga en cuenta que los
-        datos completos de su tarjeta de crédito/débito son procesados directamente por SumUp y La
-        Casa de Zolve no los almacena.
+        Información relacionada con los pagos que realice.
+        <ul>
+          <li style="margin-top: 5px">
+            <strong>Para pagos con tarjeta (Transbank):</strong> No almacenamos los datos de su
+            tarjeta, estos son procesados directamente por Transbank (Webpay Plus).
+          </li>
+          <li style="margin-top: 5px">
+            <strong>Para pagos con Transferencia Bancaria:</strong> Recopilamos y almacenamos el
+            <strong>comprobante de depósito</strong> que usted sube al seleccionar este método. Este
+            documento (imagen o PDF) es un <strong>requisito indispensable</strong> para iniciar la
+            verificación del pago y contiene información como el monto, fecha y datos del originador
+            de fondos.
+          </li>
+        </ul>
       </li>
       <li>
         Información contenida en las comunicaciones que nos envía a través del formulario de
@@ -60,17 +72,17 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       <li>Cualquier otra información personal que usted decida enviarnos voluntariamente.</li>
     </ol>
 
-    <h3>B.1. Tratamiento de Datos en Funciones de Realidad Aumentada (AR) de La Casa de Zolve</h3>
+    <h3>II.1. Tratamiento de Datos en Funciones de Realidad Aumentada (AR) de La Casa de Zolve</h3>
     <p>
-      Cuando utilizas las funciones de Realidad Aumentada (AR) de La Casa de Zolve, la cámara de tu
-      dispositivo se activa para permitir la visualización de contenido digital superpuesto en el
-      mundo real. Queremos ser completamente transparentes sobre cómo manejamos los datos durante
-      este proceso:
+      Cuando utilizas las funciones de Realidad Aumentada (AR) de
+      <strong>La Casa de Zolve SpA</strong>, la cámara de tu dispositivo se activa para permitir la
+      visualización de contenido digital superpuesto en el mundo real. Queremos ser completamente
+      transparentes sobre cómo manejamos los datos durante este proceso:
     </p>
     <div style="padding-left: 20px">
       <p style="margin-bottom: 10px">
-        <strong>B.1.1. No Capturamos ni Almacenamos tu Entorno Físico:</strong> Es fundamental para
-        nosotros que comprendas que La Casa de Zolve
+        <strong>II.1.1. No Capturamos ni Almacenamos tu Entorno Físico:</strong> Es fundamental para
+        nosotros que comprendas que <strong>La Casa de Zolve SpA</strong>
         <strong
           >no captura, graba, ni almacena imágenes o secuencias de video de tu entorno físico, ni de
           las superficies que tu cámara visualiza</strong
@@ -80,12 +92,12 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
         superposición del contenido aumentado, sin retener datos visuales de tu entorno.
       </p>
       <p style="margin-bottom: 10px">
-        <strong>B.1.2. Contenido AR Proporcionado por el Usuario:</strong> Los únicos archivos
-        multimedia que La Casa de Zolve gestiona y almacena en relación con la funcionalidad AR son
-        aquellos que tú, como usuario, nos proporcionas explícitamente. Este tipo de información se
-        detalla en el
+        <strong>II.1.2. Contenido AR Proporcionado por el Usuario:</strong> Los únicos archivos
+        multimedia que <strong>La Casa de Zolve SpA</strong> gestiona y almacena en relación con la
+        funcionalidad AR son aquellos que tú, como usuario, nos proporcionas explícitamente. Este
+        tipo de información se detalla en el
         <strong
-          >cuarto punto (ítem 4) de la lista principal dentro de la sección "B. Recopilación de
+          >cuarto punto (ítem 4) de la lista principal dentro de la sección "II. Recopilación de
           Información Personal"</strong
         >
         de esta política, específicamente: "<em
@@ -96,7 +108,7 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
         que has personalizado.
       </p>
       <p style="margin-bottom: 10px">
-        <strong>B.1.3. Almacenamiento Seguro de tu Contenido AR:</strong> Los archivos que nos
+        <strong>II.1.3. Almacenamiento Seguro de tu Contenido AR:</strong> Los archivos que nos
         confías para crear tus experiencias AR se almacenan de manera segura. Para este fin,
         utilizamos servicios de almacenamiento en la nube robustos y diseñados para la protección de
         datos (como la infraestructura de almacenamiento de Cloudflare R2). Implementamos medidas de
@@ -104,7 +116,7 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
         integridad y confidencialidad.
       </p>
       <p style="margin-bottom: 10px">
-        <strong>B.1.4. Protección Adicional Mediante Ofuscación de Código:</strong> Como una capa
+        <strong>II.1.4. Protección Adicional Mediante Ofuscación de Código:</strong> Como una capa
         adicional de seguridad, ciertas partes de nuestro código de aplicación son sometidas a
         procesos de ofuscación. Esta técnica tiene como objetivo dificultar el análisis no
         autorizado de nuestra lógica de aplicación y, por ende, proteger el acceso a los sistemas
@@ -112,10 +124,10 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       </p>
     </div>
     <p>
-      La privacidad de los contenidos que creas y compartes a través de La Casa de Zolve es de suma
-      importancia para nosotros. Estamos comprometidos con la protección de tu información y la
-      transparencia en cómo la tratamos, asegurando que puedas disfrutar de nuestras experiencias AR
-      con total confianza.
+      La privacidad de los contenidos que creas y compartes a través de
+      <strong>La Casa de Zolve SpA</strong> es de suma importancia para nosotros. Estamos
+      comprometidos con la protección de tu información y la transparencia en cómo la tratamos,
+      asegurando que puedas disfrutar de nuestras experiencias AR con total confianza.
     </p>
 
     <p>
@@ -124,7 +136,7 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       información personal de acuerdo con esta política.
     </p>
 
-    <h2>C. Uso de su Información Personal</h2>
+    <h2>III. Uso de su Información Personal</h2>
     <p>
       La información personal que nos envíe a través de nuestro sitio web o por otros medios de
       contacto será usada con los fines especificados en esta política o en las páginas relevantes
@@ -141,8 +153,11 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
         de productos y la integración del contenido AR que nos proporcione.
       </li>
       <li>
-        Gestionar el pago de los servicios solicitados (confirmación de transferencias, generación
-        de links de pago SumUp).
+        Gestionar el pago de los servicios solicitados. Esto incluye la confirmación de pagos vía
+        <strong>Transbank</strong> y la
+        <strong>validación de pagos por Transferencia Bancaria</strong>, utilizando el comprobante
+        subido para realizar el cruce de información (cruce del pedido con el comprobante y la
+        acreditación de fondos).
       </li>
       <li>
         Coordinar la entrega de los productos adquiridos (entregas presenciales o envíos por
@@ -177,7 +192,7 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       para su marketing directo o el de otros terceros.
     </p>
 
-    <h2>D. Divulgación de Información Personal</h2>
+    <h2>IV. Divulgación de Información Personal</h2>
     <p>
       Podremos divulgar su información personal a nuestros proveedores de servicios tecnológicos
       estrictamente necesarios para operar nuestro sitio y ofrecer nuestros servicios, como sea
@@ -186,11 +201,10 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
     </p>
     <ul>
       <li>Supabase (Autenticación y base de datos).</li>
-      <li>Netlify (o tu proveedor de hosting).</li>
-      <li>Cloudflare (si aplica).</li>
-      <li>Nominalia (o tu proveedor de correo).</li>
+      <li>Netlify (proveedor de hosting).</li>
+      <li>Cloudflare (Seguridad, rendimiento y almacenamiento de contenido).</li>
       <li>Resend (Envío de correos transaccionales y de contacto).</li>
-      <li>SumUp (Procesamiento de pagos con tarjeta).</li>
+      <li><strong>Transbank</strong> (Procesamiento de pagos en línea).</li>
       <li>Empresas de Correo/Mensajería (Envíos físicos).</li>
     </ul>
     <p>
@@ -211,22 +225,22 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       información personal a otros terceros sin su consentimiento.
     </p>
 
-    <h2>E. Transferencias Internacionales de Datos</h2>
+    <h2>V. Transferencias Internacionales de Datos</h2>
     <p>
       La información que recopilamos puede ser almacenada y procesada en servidores ubicados fuera
       de Chile, específicamente en los países donde operan nuestros proveedores de servicios
-      tecnológicos como Supabase, Netlify, Cloudflare, Resend, Google (si usa Google Login) y SumUp
-      (principalmente Estados Unidos y Europa). Estos proveedores están comprometidos con altos
-      estándares de seguridad y protección de datos.
+      tecnológicos como Supabase, Netlify, Cloudflare, Resend, Google (si usa Google Login) y
+      <strong>Transbank</strong> (principalmente Estados Unidos y Europa). Estos proveedores están
+      comprometidos con altos estándares de seguridad y protección de datos.
     </p>
     <p>
       Al usar nuestros servicios, usted acepta explícitamente estas transferencias internacionales
-      de información personal necesarias para la operación del servicio, entendiendo que tomamos
+      de información personal necesarias para la operation del servicio, entendiendo que tomamos
       medidas razonables para asegurar que sus datos sean tratados de forma segura y de acuerdo con
       esta Política de Privacidad.
     </p>
 
-    <h2>F. Conservación de Información Personal</h2>
+    <h2>VI. Conservación de Información Personal</h2>
     <p>
       Esta sección especifica nuestras políticas y procedimientos de conservación de información
       personal, diseñadas para ayudar a garantizar que cumplimos con nuestras obligaciones legales.
@@ -259,7 +273,7 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       <li>Para establecer, ejercer o defender nuestros derechos legales.</li>
     </ol>
 
-    <h2>G. Seguridad de su Información Personal</h2>
+    <h2>VII. Seguridad de su Información Personal</h2>
     <p>
       Tomaremos precauciones técnicas y organizacionales razonables para evitar la pérdida, mal uso
       o alteración de su información personal.
@@ -270,8 +284,8 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       cortafuegos).
     </p>
     <p>
-      Las transacciones de pago con tarjeta son gestionadas directamente por SumUp a través de sus
-      plataformas seguras y cifradas.
+      Las transacciones de pago con tarjeta <strong>en línea</strong> son gestionadas directamente
+      por <strong>Transbank (Webpay Plus)</strong> a través de sus plataformas seguras y cifradas.
     </p>
     <p>
       Usted acepta que la transmisión de información en Internet nunca es completamente segura y,
@@ -284,7 +298,7 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       inicie sesión en el sitio).
     </p>
 
-    <h2>H. Modificaciones a esta Política</h2>
+    <h2>VIII. Modificaciones a esta Política</h2>
     <p>
       Es posible que actualicemos esta política de vez en cuando publicando una nueva versión en
       nuestro sitio web. Usted debe comprobar ocasionalmente esta página para asegurarse de que
@@ -292,7 +306,7 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       esta política a través de correo electrónico si tenemos su dirección registrada.
     </p>
 
-    <h2>I. Sus Derechos</h2>
+    <h2>IX. Sus Derechos</h2>
     <p>
       Usted tiene derecho a ejercer sus derechos de Acceso, Rectificación, Cancelación y Oposición
       (ARCO) respecto a su información personal que poseemos, de acuerdo con la Ley 19.628.
@@ -312,20 +326,21 @@ import { RouterLink } from 'vue-router' // Importar si necesitas enlaces interno
       la ley.
     </p>
 
-    <h2>J. Sitios Web de Terceros</h2>
+    <h2>X. Sitios Web de Terceros</h2>
     <p>
       Nuestro sitio web puede incluir hiperenlaces a sitios web de terceros (como Instagram,
-      Facebook, YouTube, SumUp). No tenemos control ni somos responsables por las políticas de
-      privacidad y prácticas de estos terceros. Le recomendamos leer sus políticas de privacidad.
+      Facebook, YouTube o <strong>Transbank</strong>). No tenemos control ni somos responsables por
+      las políticas de privacidad y prácticas de estos terceros. Le recomendamos leer sus políticas
+      de privacidad.
     </p>
 
-    <h2>K. Actualización de su Información</h2>
+    <h2>XI. Actualización de su Información</h2>
     <p>
       Por favor, mantenga actualizada la información de su perfil. Si necesita corregir algún dato
       que no pueda modificar directamente, contáctenos a contacto@lacasadezolve.com.
     </p>
 
-    <h2>L. Cookies</h2>
+    <h2>XII. Cookies</h2>
     <p>
       Nuestro sitio web usa cookies y tecnologías similares para su funcionamiento y para mejorar su
       experiencia. Para obtener información detallada sobre las cookies que utilizamos, sus fines y
