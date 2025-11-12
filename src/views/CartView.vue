@@ -563,7 +563,7 @@ function formatPrice(value) {
   color: var(--color-heading);
 }
 
-/* --- 🔥 INICIO: NUEVOS ESTILOS PARA PRECIO DE ITEM --- */
+/* Estilos para precio de item */
 .item-price {
   margin: 0;
 }
@@ -579,7 +579,6 @@ function formatPrice(value) {
   text-decoration: line-through;
   font-weight: normal;
 }
-/* --- 🔥 FIN: NUEVOS ESTILOS PARA PRECIO DE ITEM --- */
 
 .item-stock-warning {
   font-size: 0.8rem;
@@ -685,13 +684,19 @@ function formatPrice(value) {
   margin-top: 20px;
 }
 
-/* Estilos de Cupones (sin cambios) */
+/* 🔥 ESTILOS DE CUPONES ACTUALIZADOS PARA MÚLTIPLES */
 .coupon-section {
   border-top: 1px dashed var(--color-border);
   border-bottom: 1px dashed var(--color-border);
   padding: 15px 0;
   margin: 15px 0;
 }
+
+/* Contenedor del input de cupón */
+.coupon-input-container {
+  margin-bottom: 15px;
+}
+
 .coupon-section label {
   font-weight: 500;
   font-size: 0.9rem;
@@ -715,35 +720,97 @@ function formatPrice(value) {
   border-radius: 0 4px 4px 0;
   cursor: pointer;
   white-space: nowrap;
+  transition: background-color 0.2s ease;
+}
+.coupon-input-group button:hover:not(:disabled) {
+  background-color: #45a89e;
+}
+.coupon-input-group button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 .coupon-error {
-  color: red;
+  color: #d32f2f;
   font-size: 0.8rem;
   margin-top: 5px;
 }
-.applied-coupon {
-  color: green;
-  font-weight: bold;
-  position: relative;
-  padding-right: 25px;
-  flex-wrap: wrap;
-}
-.applied-coupon span:first-child {
-  margin-right: auto;
-}
-.remove-coupon-btn {
-  position: absolute;
-  right: -5px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: #aaa;
-  cursor: pointer;
+
+/* Lista de cupones aplicados */
+.applied-coupons-list {
+  margin-top: 15px;
 }
 
-/* Botones (sin cambios) */
+.coupons-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  margin-bottom: 10px;
+}
+
+/* Cada cupón individual */
+.applied-coupon-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #e8f5e9;
+  border: 1px solid #4caf50;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.applied-coupon-item:hover {
+  background-color: #c8e6c9;
+  border-color: #388e3c;
+}
+
+.coupon-info {
+  font-size: 0.9rem;
+  color: #2e7d32;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coupon-info strong {
+  font-weight: 700;
+  color: #1b5e20;
+}
+
+/* Botón para quitar cupón individual */
+.applied-coupon-item .remove-coupon-btn {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  color: #666;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.applied-coupon-item .remove-coupon-btn:hover {
+  color: #d32f2f;
+  transform: scale(1.1);
+}
+
+/* Fila del descuento total */
+.total-discount-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border);
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.total-discount-row span:last-child {
+  color: #1b5e20;
+  font-size: 1.05rem;
+}
+/* 🔥 FIN ESTILOS DE CUPONES */
+
+/* Botones */
 .btn {
   display: inline-block;
   text-align: center;
@@ -775,7 +842,7 @@ function formatPrice(value) {
   font-size: 1.1rem;
 }
 
-/* Media Queries (sin cambios) */
+/* Media Queries */
 @media (max-width: 900px) {
   .cart-layout {
     grid-template-columns: 1fr;
