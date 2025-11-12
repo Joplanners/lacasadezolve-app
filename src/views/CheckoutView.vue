@@ -11,7 +11,7 @@ import { faUniversity, faTruck, faHandshake } from '@fortawesome/free-solid-svg-
 import { useToast } from 'vue-toastification'
 import { isValidRut } from '@/utils/validation.js'
 import { storeToRefs } from 'pinia'
-import { v4 as uuidv4 } from 'uuid' // Para nombres de archivo únicos
+import { v4 as uuidv4 } from 'uuid'
 
 const router = useRouter()
 const cartStore = useCartStore()
@@ -30,11 +30,9 @@ const formatPrice = (value) => {
   }).format(value)
 }
 
-// --- 🔥 INICIO: LÓGICA DE PRECIOS AÑADIDA ---
-
+// --- LÓGICA DE PRECIOS ---
 /**
- * Función helper que calcula el precio final de un producto,
- * considerando ofertas, porcentajes y fechas.
+ * Calcula el precio final de un producto considerando ofertas, porcentajes y fechas
  * @param {object} product - El objeto de producto de Supabase
  * @returns {object} - { finalPrice, originalPrice, onOffer }
  */
@@ -46,62 +44,56 @@ function getPriceInfo(product) {
   let finalPrice = product.price
   let originalPrice = null
 
-  // Revisa si hay alguna oferta potencial
   const hasOfferPrice =
     product.offer_price && product.offer_price > 0 && product.offer_price < product.price
   const hasPercentage = product.discount_percentage && product.discount_percentage > 0
 
   if (hasOfferPrice || hasPercentage) {
-    // Revisa la validez de las fechas
     const hasStartDate = !!product.discount_start_date
     const hasEndDate = !!product.discount_end_date
     const startDate = hasStartDate ? new Date(product.discount_start_date) : null
     const endDate = hasEndDate ? new Date(product.discount_end_date) : null
 
     let isDateValid = true
-    if (startDate && now < startDate) isDateValid = false // Aún no empieza
-    if (endDate && now > endDate) isDateValid = false // Ya terminó
+    if (startDate && now < startDate) isDateValid = false
+    if (endDate && now > endDate) isDateValid = false
 
     if (isDateValid) {
       onOffer = true
-      originalPrice = product.price // El precio original para tachar
+      originalPrice = product.price
 
-      // Prioriza el descuento por porcentaje
       if (product.discount_percentage) {
         finalPrice = product.price * (1 - product.discount_percentage / 100)
       } else if (hasOfferPrice) {
-        finalPrice = product.offer_price // Usa el precio fijo de oferta
+        finalPrice = product.offer_price
       }
     }
   }
 
   return {
-    finalPrice: finalPrice, // El precio que se debe cobrar
-    originalPrice: originalPrice, // El precio para tachar (o null)
-    onOffer: onOffer, // true si la oferta está activa
+    finalPrice: finalPrice,
+    originalPrice: originalPrice,
+    onOffer: onOffer,
   }
 }
 
 /**
- * Nueva propiedad computada que procesa el carrito
- * y añade los precios calculados a cada item.
+ * Propiedad computada que procesa el carrito y añade los precios calculados
  */
 const processedCartItems = computed(() => {
   return cartProductDetails.value.map((item) => {
-    // Calcula el precio para el producto de este item del carrito
     const priceInfo = getPriceInfo(item.product)
     return {
-      ...item, // Mantiene product_id, quantity, product (objeto completo)
-      ...priceInfo, // Añade finalPrice, originalPrice, onOffer
+      ...item,
+      ...priceInfo,
     }
   })
 })
-// --- 🔥 FIN: LÓGICA DE PRECIOS AÑADIDA ---
 
-// Obtenemos 'items' y 'appliedCoupon' reactivamente del store
-const { appliedCoupon, items: cartItems } = storeToRefs(cartStore)
+// Obtenemos 'items' y 'appliedCoupons' reactivamente del store
+const { appliedCoupons, items: cartItems } = storeToRefs(cartStore)
 
-// Estado para datos del cliente
+// --- Estado ---
 const customerData = ref({
   fullName: '',
   rut: '',
@@ -114,7 +106,6 @@ const customerData = ref({
   addressDetail: '',
 })
 
-// Estado para UI y lógica del componente
 const regions = ref(regionesComunasData)
 const communes = ref([])
 const selectedRegionObject = ref(null)
@@ -124,7 +115,7 @@ const isSubmitting = ref(false)
 const userProfileData = ref(null)
 const loadingProfile = ref(false)
 const useSavedAddress = ref(true)
-const cartProductDetails = ref([]) // Este se llena con loadCartDetailsForSummary
+const cartProductDetails = ref([])
 const loadingCartDetails = ref(true)
 const pagoPopup = ref(null)
 const isProcessingPayment = ref(false)
@@ -132,7 +123,7 @@ const isProcessingPayment = ref(false)
 let paymentCompleted = false
 const paymentHasFailed = ref(false)
 
-// --- Computeds ---
+// --- Computadas ---
 const hasSavedAddress = computed(() => {
   return (
     !!userProfileData.value?.shipping_address &&
@@ -141,25 +132,32 @@ const hasSavedAddress = computed(() => {
   )
 })
 
-// --- 🔥 COMPUTADA DE SUBTOTAL (MODIFICADA) ---
 const subtotal = computed(() => {
-  // Ahora usamos los items procesados con el precio final correcto
   return processedCartItems.value.reduce((total, item) => {
     return total + item.finalPrice * item.quantity
   }, 0)
 })
-// --- 🔥 FIN COMPUTADA DE SUBTOTAL ---
 
+// 🔥 MODIFICADO: Método aditivo (suma directa de porcentajes)
 const discountAmount = computed(() => {
-  if (!appliedCoupon.value || !appliedCoupon.value.discount_percent) return 0
-  // El subtotal ya está con descuentos, el cupón se aplica sobre eso
-  return (subtotal.value * appliedCoupon.value.discount_percent) / 100
+  if (!appliedCoupons.value || appliedCoupons.value.length === 0) {
+    return 0
+  }
+
+  // Suma todos los porcentajes directamente
+  const totalPercent = appliedCoupons.value.reduce((sum, coupon) => {
+    return sum + (coupon.discount_percent || 0)
+  }, 0)
+
+  // Aplica el porcentaje total sobre el subtotal original
+  return (subtotal.value * totalPercent) / 100
 })
+
 const finalTotal = computed(() => {
   return Math.max(0, subtotal.value - discountAmount.value)
 })
 
-// --- Watchers (Sin cambios) ---
+// --- Watchers ---
 watch(
   () => customerData.value.region,
   (newRegionName) => {
@@ -231,7 +229,7 @@ watch(
   { immediate: true },
 )
 
-// --- Funciones (Sin cambios en su lógica interna, excepto handleCheckoutSubmit) ---
+// --- Funciones ---
 const formatRut = () => {
   let rut = customerData.value.rut.replace(/[^0-9kK]/g, '')
   if (rut.length > 1) {
@@ -242,13 +240,12 @@ const formatRut = () => {
   customerData.value.rut = rut
 }
 
-// Maneja mensajes del popup de Transbank (Sin cambios)
 const handlePaymentMessage = async (event) => {
   if (event.origin !== window.location.origin) {
     return
   }
   if (event.data.type === 'PAYMENT_SUCCESS') {
-    paymentCompleted = true // <-- Variable CLAVE
+    paymentCompleted = true
     isProcessingPayment.value = false
     isSubmitting.value = false
     if (pagoPopup.value && !pagoPopup.value.closed) pagoPopup.value.close()
@@ -267,7 +264,6 @@ const handlePaymentMessage = async (event) => {
   }
 }
 
-// Carga datos del perfil del usuario logueado (Sin cambios)
 async function loadUserProfile() {
   if (!authStore.isLoggedIn || !authStore.user?.id) return
   loadingProfile.value = true
@@ -290,12 +286,10 @@ async function loadUserProfile() {
   }
 }
 
-// Carga detalles (precio, stock, etc.) de los productos en el carrito para el resumen (Sin cambios)
 async function loadCartDetailsForSummary() {
   loadingCartDetails.value = true
   const productIds = cartItems.value.map((item) => item.product_id)
   if (productIds.length > 0) {
-    // Esto trae el producto completo (incluyendo offer_price, discount_percentage, etc.)
     const productsData = await productsStore.fetchProductsByIds(productIds)
     cartProductDetails.value = cartItems.value
       .map((cartItem) => {
@@ -309,11 +303,10 @@ async function loadCartDetailsForSummary() {
   loadingCartDetails.value = false
 }
 
-// --- 🔥 Función Principal de Checkout (MODIFICADA) ---
 async function handleCheckoutSubmit() {
   paymentHasFailed.value = false
 
-  // Validaciones básicas (Sin cambios)
+  // Validaciones
   if (!selectedShippingMethod.value) {
     toast.error('Selecciona método de envío.')
     return
@@ -326,6 +319,7 @@ async function handleCheckoutSubmit() {
     toast.error('RUT inválido.')
     return
   }
+
   const requiredFields = {
     fullName: 'Nombre',
     email: 'Correo',
@@ -335,6 +329,7 @@ async function handleCheckoutSubmit() {
     addressStreet: 'Calle',
     addressNumber: 'Número',
   }
+
   for (const key in requiredFields) {
     if (!customerData.value[key]?.trim()) {
       toast.error(`Ingresa tu ${requiredFields[key]}.`)
@@ -349,7 +344,7 @@ async function handleCheckoutSubmit() {
   let uploadedFileUrls = []
 
   try {
-    // 1. Preparar Dirección (Sin cambios)
+    // 1. Preparar Dirección
     let finalShippingAddress =
       !authStore.isLoggedIn || !useSavedAddress.value || !hasSavedAddress.value
         ? {
@@ -361,12 +356,10 @@ async function handleCheckoutSubmit() {
           }
         : userProfileData.value.shipping_address
 
-    // 2. Validar Carrito y Stock (Sin cambios)
+    // 2. Validar Carrito y Stock
     if (cartItems.value.length === 0) throw new Error('Tu carrito está vacío.')
-    // Nos aseguramos de tener los datos más recientes antes de usar processedCartItems
     await loadCartDetailsForSummary()
 
-    // Ahora usamos processedCartItems que tiene la lógica de stock y precio
     for (const item of processedCartItems.value) {
       if (!item.product) throw new Error(`Detalles no encontrados para un producto en tu carrito.`)
       if (item.product.stock !== null && item.quantity > item.product.stock) {
@@ -376,14 +369,16 @@ async function handleCheckoutSubmit() {
       }
     }
 
-    // 3. Subir Archivos (Sin cambios)
+    // 3. Subir Archivos
     const itemsWithFiles = cartItems.value.filter(
       (item) => item.customizationFiles && item.customizationFiles.length > 0,
     )
+
     if (itemsWithFiles.length > 0) {
       if (!authStore.isLoggedIn) {
         throw new Error('Debes iniciar sesión para pedir productos con archivos personalizados.')
       }
+
       toast.info('Subiendo archivos de personalización...')
       const allFilesToUpload = itemsWithFiles.flatMap((item) =>
         item.customizationFiles.map((file) => ({ file, itemId: item.id })),
@@ -395,14 +390,18 @@ async function handleCheckoutSubmit() {
         const fileExtension = file.name.split('.').pop()
         const uniqueFileName = `${uploadSessionId}-${index + 1}.${fileExtension}`
         const filePath = `${uploadSessionId}/${uniqueFileName}`
+
         console.log(`⏳ Subiendo: ${file.name} como ${filePath}`)
+
         const { error: uploadError } = await supabase.storage
           .from('customer-customizations')
           .upload(filePath, file, { cacheControl: '3600', upsert: false })
+
         if (uploadError) {
           console.error(`❌ Error al subir ${file.name}:`, uploadError)
           throw new Error(`No se pudo subir el archivo ${file.name}. Intenta de nuevo.`)
         }
+
         const { data: urlData } = supabase.storage
           .from('customer-customizations')
           .getPublicUrl(filePath)
@@ -419,12 +418,11 @@ async function handleCheckoutSubmit() {
       toast.success('Archivos de personalización subidos.')
     }
 
-    // --- 🔥 4. Preparar Datos de la Orden (MODIFICADO) ---
-    // Usamos processedCartItems para tener el precio final correcto
+    // 4. Preparar Datos de la Orden
     const orderItemsData = processedCartItems.value.map((item) => ({
       product_id: item.product_id,
       quantity: item.quantity,
-      price_at_purchase: item.finalPrice, // <-- ✨ ¡¡AQUÍ ESTÁ LA CORRECCIÓN!!
+      price_at_purchase: item.finalPrice,
     }))
 
     const allNotes = cartItems.value
@@ -433,45 +431,45 @@ async function handleCheckoutSubmit() {
       .join('\n---\n')
     const notesFromCart = allNotes
 
-    // El resto de los datos de la orden (total, descuento) ya son correctos
-    // porque dependen de las computadas `finalTotal` y `discountAmount`
     const orderData = {
       user_id: authStore.user?.id || null,
-      total_amount: finalTotal.value, // <-- Ya está correcto
+      total_amount: finalTotal.value,
       status: 'pending',
       shipping_address: finalShippingAddress,
       customer_email: customerData.value.email,
       customer_name: customerData.value.fullName,
       shipping_method: selectedShippingMethod.value,
       payment_method: selectedPaymentMethod.value,
-      applied_coupon_code: appliedCoupon.value?.code || null,
-      discount_amount: discountAmount.value > 0 ? discountAmount.value : null, // <-- Ya está correcto
+      applied_coupon_code: appliedCoupons.value.map((c) => c.code).join(', ') || null,
+      discount_amount: discountAmount.value > 0 ? discountAmount.value : null,
       customization_files: uploadedFileUrls.length > 0 ? uploadedFileUrls : null,
       customization_notes: notesFromCart.trim() || null,
     }
-    // --- 🔥 FIN MODIFICACIÓN ---
 
-    // 5. Insertar Orden y Items (Sin cambios)
+    // 5. Insertar Orden y Items
     const { data: orderResult, error: orderError } = await supabase
       .from('orders')
       .insert(orderData)
       .select('id')
       .single()
+
     if (orderError) throw orderError
     newOrderId = orderResult.id
 
     const orderItemsWithOrderId = orderItemsData.map((item) => ({ ...item, order_id: newOrderId }))
     const { error: itemsError } = await supabase.from('order_items').insert(orderItemsWithOrderId)
+
     if (itemsError) {
       throw itemsError
     }
 
-    // 6. Actualizar Perfil por Cupón (si aplica) (Sin cambios)
-    if (appliedCoupon.value?.coupon_type === 'FIRST_PURCHASE' && authStore.isLoggedIn) {
-      /* ... */
+    // 6. Actualizar Perfil por Cupón
+    const firstPurchaseCoupon = appliedCoupons.value.find((c) => c.coupon_type === 'FIRST_PURCHASE')
+    if (firstPurchaseCoupon && authStore.isLoggedIn) {
+      // Lógica adicional si es necesario
     }
 
-    // 7. Procesar Pago o Redirigir (Sin cambios, esta lógica está perfecta)
+    // 7. Procesar Pago o Redirigir
     if (selectedPaymentMethod.value === 'transferencia') {
       try {
         await supabase.functions.invoke('send-order-confirmation', {
@@ -487,23 +485,28 @@ async function handleCheckoutSubmit() {
       try {
         isProcessingPayment.value = true
         toast.info('Abriendo pasarela de pago...')
+
         const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
           'create-transbank-payment',
           { body: { orderId: newOrderId } },
         )
+
         if (paymentError || !paymentData.success) {
           throw new Error(paymentError?.message || 'Error al iniciar pago Transbank')
         }
+
         const transbankUrl = `${paymentData.url}?token_ws=${paymentData.token}`
         const width = 800,
           height = 600,
           left = (screen.width - width) / 2,
           top = (screen.height - height) / 2
+
         pagoPopup.value = window.open(
           transbankUrl,
           'TransbankPayment',
           `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
         )
+
         if (!pagoPopup.value || pagoPopup.value.closed) {
           throw new Error('Popup bloqueado.')
         }
@@ -522,7 +525,9 @@ async function handleCheckoutSubmit() {
                 .select('status')
                 .eq('id', newOrderId)
                 .single()
+
               if (checkError) throw checkError
+
               if (order.status === 'paid' || order.status === 'processing') {
                 console.log('Intervalo: ¡Pago confirmado desde la DB! Redirigiendo...')
                 paymentCompleted = true
@@ -574,7 +579,7 @@ async function handleCheckoutSubmit() {
   }
 }
 
-// --- Lifecycle Hooks (Sin cambios) ---
+// --- Lifecycle Hooks ---
 onMounted(() => {
   setTimeout(() => {
     if (cartItems.value.length === 0 && !isSubmitting.value) router.replace({ name: 'store' })
@@ -583,6 +588,7 @@ onMounted(() => {
   if (authStore.isLoggedIn) loadUserProfile()
   window.addEventListener('message', handlePaymentMessage)
 })
+
 onUnmounted(() => {
   window.removeEventListener('message', handlePaymentMessage)
 })
@@ -894,10 +900,23 @@ onUnmounted(() => {
               <span>Subtotal</span>
               <span>{{ formatPrice(subtotal) }}</span>
             </p>
-            <p v-if="discountAmount > 0" class="discount-row">
-              <span>Descuento ({{ appliedCoupon.code }})</span>
-              <span>- {{ formatPrice(discountAmount) }}</span>
-            </p>
+
+            <!-- 🔥 MODIFICADO: Muestra cupones de forma clara y aditiva -->
+            <template v-if="appliedCoupons && appliedCoupons.length > 0">
+              <div class="coupons-breakdown">
+                <p v-for="coupon in appliedCoupons" :key="coupon.code" class="discount-row-item">
+                  <span>{{ coupon.code }}</span>
+                  <span>{{ coupon.discount_percent }}%</span>
+                </p>
+              </div>
+              <p class="discount-row total-discount">
+                <span>
+                  Descuento Total ({{ appliedCoupons.map((c) => c.discount_percent).join(' + ') }}%)
+                </span>
+                <span>- {{ formatPrice(discountAmount) }}</span>
+              </p>
+            </template>
+
             <div class="final-total">
               <p>
                 <span>Total a Pagar</span>
@@ -1264,9 +1283,55 @@ onUnmounted(() => {
   justify-content: space-between;
   margin: 8px 0;
 }
-.summary-totals .discount-row {
-  color: green;
+
+/* 🔥 NUEVOS ESTILOS PARA CUPONES MÚLTIPLES */
+.coupons-breakdown {
+  background: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0;
+  border: 1px solid var(--color-border);
 }
+
+.discount-row-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #666;
+  margin: 5px 0;
+  padding: 3px 0;
+}
+
+.discount-row-item span:first-child {
+  font-weight: 500;
+  color: var(--color-heading);
+}
+
+.discount-row-item span:last-child {
+  color: var(--brand-turquoise);
+  font-weight: 600;
+}
+
+.summary-totals .discount-row {
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.summary-totals .total-discount {
+  font-weight: 600;
+  color: #2e7d32;
+  border-top: 1px solid var(--color-border);
+  padding-top: 8px;
+  margin-top: 8px;
+  font-size: 0.95rem;
+}
+
+.summary-totals .total-discount span:last-child {
+  color: #2e7d32;
+  font-weight: 700;
+}
+/* 🔥 FIN NUEVOS ESTILOS */
+
 .final-total {
   border-top: 1px solid var(--color-border-hover);
   padding-top: 10px;

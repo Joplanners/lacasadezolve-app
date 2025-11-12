@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabaseClient'
+import { storeToRefs } from 'pinia'
 
 const cartStore = useCartStore()
 const productsStore = useProductsStore()
@@ -13,24 +14,21 @@ const router = useRouter()
 const toast = useToast()
 const authStore = useAuthStore()
 
+// 🔥 MODIFICADO: Ahora usamos appliedCoupons (plural) del store
+const { appliedCoupons } = storeToRefs(cartStore)
+
 const cartProductsDetails = ref([])
 const isLoadingDetails = ref(true)
 const errorLoadingDetails = ref(null)
 
 // --- ESTADO PARA CUPONES ---
 const couponCodeInput = ref('')
-const appliedCoupon = ref(null)
-const couponDiscount = ref(0)
 const isLoadingCoupon = ref(false)
 const couponError = ref('')
 
-// --- 🔥 INICIO: LÓGICA DE PRECIOS AÑADIDA ---
-
+// --- LÓGICA DE PRECIOS ---
 /**
- * Función helper que calcula el precio final de un producto,
- * considerando ofertas, porcentajes y fechas.
- * @param {object} product - El objeto de producto de Supabase
- * @returns {object} - { finalPrice, originalPrice, onOffer }
+ * Calcula el precio final de un producto considerando ofertas
  */
 function getPriceInfo(product) {
   if (!product) return { finalPrice: 0, originalPrice: 0, onOffer: false }
@@ -40,58 +38,48 @@ function getPriceInfo(product) {
   let finalPrice = product.price
   let originalPrice = null
 
-  // Revisa si hay alguna oferta potencial
   const hasOfferPrice =
     product.offer_price && product.offer_price > 0 && product.offer_price < product.price
   const hasPercentage = product.discount_percentage && product.discount_percentage > 0
 
   if (hasOfferPrice || hasPercentage) {
-    // Revisa la validez de las fechas
     const hasStartDate = !!product.discount_start_date
     const hasEndDate = !!product.discount_end_date
     const startDate = hasStartDate ? new Date(product.discount_start_date) : null
     const endDate = hasEndDate ? new Date(product.discount_end_date) : null
 
     let isDateValid = true
-    if (startDate && now < startDate) isDateValid = false // Aún no empieza
-    if (endDate && now > endDate) isDateValid = false // Ya terminó
+    if (startDate && now < startDate) isDateValid = false
+    if (endDate && now > endDate) isDateValid = false
 
     if (isDateValid) {
       onOffer = true
-      originalPrice = product.price // El precio original para tachar
+      originalPrice = product.price
 
-      // Prioriza el descuento por porcentaje
       if (product.discount_percentage) {
         finalPrice = product.price * (1 - product.discount_percentage / 100)
       } else if (hasOfferPrice) {
-        finalPrice = product.offer_price // Usa el precio fijo de oferta
+        finalPrice = product.offer_price
       }
     }
   }
 
   return {
-    finalPrice: finalPrice, // El precio que se debe cobrar
-    originalPrice: originalPrice, // El precio para tachar (o null)
-    onOffer: onOffer, // true si la oferta está activa
+    finalPrice: finalPrice,
+    originalPrice: originalPrice,
+    onOffer: onOffer,
   }
 }
 
-/**
- * Nueva propiedad computada que procesa el carrito
- * y añade los precios calculados a cada item.
- */
 const processedCartItems = computed(() => {
   return cartProductsDetails.value.map((item) => {
-    // Calcula el precio para el producto de este item del carrito
     const priceInfo = getPriceInfo(item.product)
     return {
-      ...item, // Mantiene product_id, quantity, product (objeto completo)
-      ...priceInfo, // Añade finalPrice, originalPrice, onOffer
+      ...item,
+      ...priceInfo,
     }
   })
 })
-
-// --- 🔥 FIN: LÓGICA DE PRECIOS AÑADIDA ---
 
 async function loadCartProductDetails() {
   isLoadingDetails.value = true
@@ -106,7 +94,6 @@ async function loadCartProductDetails() {
   }
 
   try {
-    // Esto ya trae el producto completo (incluyendo offer_price, etc.)
     const productsData = await productsStore.fetchProductsByIds(productIds)
 
     cartProductsDetails.value = cartStore.items
@@ -119,7 +106,6 @@ async function loadCartProductDetails() {
       })
       .filter((item) => item.product !== null)
 
-    // Lógica de ajuste de stock (se mantiene igual)
     cartProductsDetails.value.forEach((item) => {
       if (item.product.stock !== null && item.product.stock < item.quantity) {
         toast.warning(
@@ -141,19 +127,30 @@ async function loadCartProductDetails() {
 
 onMounted(loadCartProductDetails)
 
-// --- 🔥 COMPUTADA DE SUBTOTAL (MODIFICADA) ---
-// Ahora usa `processedCartItems` y `item.finalPrice`
+// --- COMPUTADAS ---
 const subtotal = computed(() => {
   return processedCartItems.value.reduce((total, item) => {
-    // item.finalPrice es el precio ya calculado (con oferta si aplica)
     return total + item.finalPrice * item.quantity
   }, 0)
 })
-// --- 🔥 FIN COMPUTADA DE SUBTOTAL ---
+
+// 🔥 MODIFICADO: Ahora usa múltiples cupones con método aditivo
+const couponDiscount = computed(() => {
+  if (!appliedCoupons.value || appliedCoupons.value.length === 0) {
+    return 0
+  }
+
+  // Suma todos los porcentajes directamente (método aditivo)
+  const totalPercent = appliedCoupons.value.reduce((sum, coupon) => {
+    return sum + (coupon.discount_percent || 0)
+  }, 0)
+
+  return (subtotal.value * totalPercent) / 100
+})
 
 const total = computed(() => {
   const finalTotal = subtotal.value - couponDiscount.value
-  return Math.max(0, finalTotal) // Asegura que el total no sea negativo
+  return Math.max(0, finalTotal)
 })
 
 const isCartEmpty = computed(
@@ -167,15 +164,21 @@ const hasFailedToLoad = computed(
   () => !isLoadingDetails.value && errorLoadingDetails.value && cartStore.items.length > 0,
 )
 
+// 🔥 MODIFICADO: Ahora agrega cupones al array
 async function handleApplyCoupon() {
   if (!couponCodeInput.value) return
   isLoadingCoupon.value = true
   couponError.value = ''
-  appliedCoupon.value = null
-  couponDiscount.value = 0
 
   try {
     const code = couponCodeInput.value.toUpperCase().trim()
+
+    // Verifica si ya está aplicado
+    const alreadyApplied = appliedCoupons.value.find((c) => c.code === code)
+    if (alreadyApplied) {
+      throw new Error('Este cupón ya está aplicado.')
+    }
+
     const { data: coupon, error } = await supabase
       .from('coupons')
       .select('*')
@@ -209,12 +212,9 @@ async function handleApplyCoupon() {
       }
     }
 
-    appliedCoupon.value = coupon
-    // --- 🔥 MODIFICADO ---
-    // El subtotal ya está con descuentos de producto,
-    // el cupón se aplica sobre ese subtotal.
-    couponDiscount.value = (subtotal.value * coupon.discount_percent) / 100
-    cartStore.setAppliedCoupon(coupon)
+    // Añade al store
+    cartStore.addAppliedCoupon(coupon)
+    couponCodeInput.value = ''
     toast.success(`¡Cupón "${coupon.code}" aplicado!`)
   } catch (err) {
     couponError.value = err.message
@@ -224,17 +224,13 @@ async function handleApplyCoupon() {
   }
 }
 
-function removeCoupon() {
-  appliedCoupon.value = null
-  couponDiscount.value = 0
-  couponCodeInput.value = ''
-  couponError.value = ''
-  cartStore.clearAppliedCoupon()
+// 🔥 MODIFICADO: Ahora quita cupones individuales
+function removeCoupon(couponCode) {
+  cartStore.removeAppliedCoupon(couponCode)
   toast.info('Cupón eliminado.')
 }
 
 async function handleUpdateQuantity(productId, newQuantity) {
-  // Busca en cartProductsDetails (el array original)
   const item = cartProductsDetails.value.find((item) => item.product_id === productId)
   if (!item) return
 
@@ -252,7 +248,6 @@ async function handleUpdateQuantity(productId, newQuantity) {
   try {
     if (finalQuantity === 0) {
       await cartStore.removeItem(productId)
-      // Modifica el array original
       cartProductsDetails.value = cartProductsDetails.value.filter(
         (i) => i.product_id !== productId,
       )
@@ -269,7 +264,6 @@ async function handleUpdateQuantity(productId, newQuantity) {
 
 async function handleRemoveItem(productId, productName) {
   const originalItems = [...cartProductsDetails.value]
-  // Modifica el array original
   cartProductsDetails.value = cartProductsDetails.value.filter((i) => i.product_id !== productId)
 
   try {
@@ -391,8 +385,10 @@ function formatPrice(value) {
           <span>{{ formatPrice(subtotal) }}</span>
         </div>
 
+        <!-- 🔥 SECCIÓN DE CUPONES MODIFICADA -->
         <div class="coupon-section">
-          <div v-if="!appliedCoupon">
+          <!-- Input para agregar cupón -->
+          <div class="coupon-input-container">
             <label for="coupon-input">¿Tienes un cupón?</label>
             <div class="coupon-input-group">
               <input
@@ -410,16 +406,31 @@ function formatPrice(value) {
             <p v-if="couponError" class="coupon-error">{{ couponError }}</p>
           </div>
 
-          <div v-if="appliedCoupon" class="summary-row applied-coupon">
-            <span
-              >Descuento ({{ appliedCoupon.code }} - {{ appliedCoupon.discount_percent }}%)</span
-            >
-            <span>- {{ formatPrice(couponDiscount) }}</span>
-            <button @click="removeCoupon" class="remove-coupon-btn" title="Quitar cupón">
-              &times;
-            </button>
+          <!-- Lista de cupones aplicados -->
+          <div v-if="appliedCoupons && appliedCoupons.length > 0" class="applied-coupons-list">
+            <p class="coupons-label">Cupones aplicados:</p>
+            <div v-for="coupon in appliedCoupons" :key="coupon.code" class="applied-coupon-item">
+              <span class="coupon-info">
+                <strong>{{ coupon.code }}</strong> (-{{ coupon.discount_percent }}%)
+              </span>
+              <button
+                @click="removeCoupon(coupon.code)"
+                class="remove-coupon-btn"
+                title="Quitar cupón"
+              >
+                &times;
+              </button>
+            </div>
+
+            <!-- Descuento total -->
+            <div class="summary-row total-discount-row">
+              <span>Descuento Total</span>
+              <span>- {{ formatPrice(couponDiscount) }}</span>
+            </div>
           </div>
         </div>
+        <!-- 🔥 FIN SECCIÓN DE CUPONES -->
+
         <div class="summary-row">
           <span>Envío</span>
           <small>Se calculará en el siguiente paso</small>
