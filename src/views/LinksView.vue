@@ -49,7 +49,7 @@ const openLink = (url) => {
         <img src="/zolveNavidad.png" alt="Zolve Avatar" />
       </div>
       <h1>@lacasadezolve</h1>
-      <p>Stationery & K-pop Stuff ✨</p>
+      <p>Papelería personalizada • Tecnología • K-pop 🦊✨</p>
     </div>
 
     <div class="links-list">
