@@ -66,7 +66,7 @@ const openLink = (url) => {
     </div>
 
     <footer class="footer">
-      <p>Hecho con 💚 por Jackie</p>
+      <p>Hecho con 💚 por La casa de Zolve</p>
     </footer>
   </div>
 </template>
