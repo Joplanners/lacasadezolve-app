@@ -15,10 +15,13 @@ const router = createRouter({
     },
     // 👇 AQUÍ PEGAS TU NUEVA RUTA DE LINKS 👇
     {
-      path: '/links',  // La URL será lacasadezolve.com/links
+      path: '/links',
       name: 'links',
       component: () => import('../views/LinksView.vue'),
-      meta: { requiresAuth: false }, // ¡Importante! Para que sea pública
+      meta: { 
+        requiresAuth: false,
+        blankLayout: true  // <--- ¡AGREGA ESTA LÍNEA!
+      }, 
     },
     // 👆 FIN DE LA NUEVA RUTA 👆
     {
