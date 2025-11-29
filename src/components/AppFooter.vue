@@ -8,7 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
     <div class="footer-main-content">
       <div class="footer-column footer-branding">
         <router-link :to="{ name: 'home' }">
-          <img src="/Zolve_Logo.png" alt="Logo La Casa de Zolve" class="footer-logo" />
+          <img src="/Zolve_Logo.png" alt="Logo La Casa de Zolve" class="footer-logo" width="100" height="100" />
         </router-link>
         <div class="footer-legal-info">
           <p><strong>La Casa de Zolve</strong></p>
@@ -226,17 +226,32 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
   .footer-main-content {
     grid-template-columns: 1fr;
     text-align: center;
+    gap: 15px;
   }
   .footer-column,
   .footer-branding {
     text-align: center;
     align-items: center;
   }
+  .footer-logo {
+    max-width: 60px;
+  }
+  .footer-column h4 {
+    display: none;
+  }
+  .footer-links-section ul {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
   .footer-contact p {
     justify-content: center;
+    margin-bottom: 5px;
   }
   .social-icons {
     justify-content: center;
+    margin-top: 10px;
   }
 }
 </style>
