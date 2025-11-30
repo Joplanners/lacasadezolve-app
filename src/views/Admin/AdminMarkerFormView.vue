@@ -18,7 +18,7 @@ const toast = useToast();
 
 // --- Estado del formulario ---
 const formData = ref({
-    id: null, name: '', mind_file_name: '', // Guardará URL R2
+    id: null, name: '', mind_file_name: '', preview_image_url: '', // Guardará URL R2
     is_public: true, user_id: null
 });
 const selectedMindFile = ref(null);
@@ -112,7 +112,7 @@ async function fetchMarkerDataAndAssociations(markerId) {
         // 1. Obtener datos del marcador
         const { data: markerData, error: markerError } = await supabase
             .from('markers')
-            .select('id, name, mind_file_name, is_public, user_id')
+            .select('id, name, mind_file_name, preview_image_url, is_public, user_id')
             .eq('id', markerId)
             .single();
 
@@ -124,6 +124,7 @@ async function fetchMarkerDataAndAssociations(markerId) {
         formData.value.id = markerData.id;
         formData.value.name = markerData.name;
         formData.value.mind_file_name = markerData.mind_file_name; // URL R2 existente
+        formData.value.preview_image_url = markerData.preview_image_url;
         formData.value.is_public = markerData.is_public;
         formData.value.user_id = markerData.user_id;
 
@@ -289,6 +290,7 @@ async function saveMarker() {
         const markerDataToSave = {
             name: formData.value.name,
             mind_file_name: finalMindFileUrl, // Guardar la URL R2 aquí
+            preview_image_url: formData.value.preview_image_url,
             is_public: formData.value.is_public,
             user_id: finalUserId
         };

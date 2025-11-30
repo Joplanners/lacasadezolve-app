@@ -27,7 +27,7 @@ const isMobileMenuOpen = ref(false)
 const isMobileView = ref(window.innerWidth < 768)
 const isLandscape = ref(false)
 
-const isARExperienceActive = computed(() => route.name === 'ar-experience')
+const isARExperienceActive = computed(() => ['ar-experience', 'ar-experience-demo'].includes(route.name))
 const isOverlayPhotoCaptureActive = computed(() => route.name === 'overlay-photo-capture')
 
 const appHeaderRef = ref(null)
@@ -76,6 +76,7 @@ const showNavbar = computed(() => {
     'home',
     'login',
     'how-to',
+    'ar-demo',
     'store',
     'terms-conditions',
     'privacy-policy',
@@ -258,6 +259,7 @@ function handleResizeAndOrientation() {
       <nav class="main-nav" :class="{ 'mobile-menu-active': isMobileMenuOpen }">
         <router-link :to="{ name: 'home' }" @click="closeMobileMenu">Inicio</router-link>
         <router-link :to="{ name: 'how-to' }" @click="closeMobileMenu">Cómo Usar</router-link>
+        <router-link :to="{ name: 'ar-demo' }" @click="closeMobileMenu">Demo AR</router-link>
         <router-link :to="{ name: 'store' }" @click="closeMobileMenu">Tienda</router-link>
         <router-link v-if="!isLoggedIn" :to="{ name: 'login' }" @click="closeMobileMenu"
           >Login/Registro</router-link
@@ -598,4 +600,17 @@ function handleResizeAndOrientation() {
   }
 }
 /* --- FIN DEL BLOQUE RESPONSIVE --- */
+.ar-mode-active {
+  background-color: transparent !important;
+}
+.ar-mode-active .main-content {
+  padding: 0 !important;
+  max-width: none !important;
+}
+
+/* Force transparency on root elements when AR is active */
+body:has(.ar-mode-active),
+html:has(body .ar-mode-active) {
+  background-color: transparent !important;
+}
 </style>

@@ -104,11 +104,24 @@ const router = createRouter({
       },
     },
     {
+      path: '/demo',
+      name: 'ar-demo',
+      component: () => import('../views/ARDemoView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
+      path: '/experiencia-ar/demo/:markerId',
+      name: 'ar-experience-demo',
+      component: () => import('../views/ARExperienceView.vue'),
+      props: true,
+      meta: { requiresAuth: false, blankLayout: true },
+    },
+    {
       path: '/experiencia-ar/:markerId',
       name: 'ar-experience',
       component: () => import('../views/ARExperienceView.vue'),
       props: true,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, blankLayout: true },
     },
     {
       path: '/mi-perfil',

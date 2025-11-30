@@ -673,7 +673,9 @@ const userDisplayName = computed(() => {
 
       <hr class="section-divider" />
 
-      <!-- SECCIÓN MIS FOTOS MÁGICAS -->
+
+      <!-- SECCIÓN MIS FOTOS MÁGICAS - TEMPORALMENTE DESHABILITADA -->
+      <!--
       <section class="experiences-section overlay-experiences-section">
         <h3>Mis Fotos Mágicas</h3>
         <div v-if="loadingOverlays" class="loading-indicator">Cargando fotos mágicas...</div>
@@ -723,6 +725,7 @@ const userDisplayName = computed(() => {
           </div>
         </div>
       </section>
+      -->
     </div>
   </div>
 </template>
