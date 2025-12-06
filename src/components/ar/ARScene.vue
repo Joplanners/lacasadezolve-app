@@ -1,6 +1,51 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 
+// Register Chroma Key Shader Component for A-Frame
+if (typeof window !== 'undefined' && window.AFRAME) {
+  window.AFRAME.registerShader('chromakey', {
+    schema: {
+      src: { type: 'map' },
+      color: { type: 'color', default: '#00FF00', is: 'uniform' },
+      transparent: { type: 'boolean', default: true, is: 'uniform' },
+      keyColor: { type: 'color', default: '#00FF00', is: 'uniform' },
+      similarity: { type: 'number', default: 0.4, is: 'uniform' },
+      smoothness: { type: 'number', default: 0.08, is: 'uniform' }
+    },
+    
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    
+    fragmentShader: `
+      uniform sampler2D src;
+      uniform vec3 keyColor;
+      uniform float similarity;
+      uniform float smoothness;
+      varying vec2 vUv;
+      
+      void main() {
+        vec4 videoColor = texture2D(src, vUv);
+        
+        float Y1 = 0.299 * keyColor.r + 0.587 * keyColor.g + 0.114 * keyColor.b;
+        float Cr1 = keyColor.r - Y1;
+        float Cb1 = keyColor.b - Y1;
+        
+        float Y2 = 0.299 * videoColor.r + 0.587 * videoColor.g + 0.114 * videoColor.b;
+        float Cr2 = videoColor.r - Y2;
+        float Cb2 = videoColor.b - Y2;
+        
+        float blend = smoothstep(similarity, similarity + smoothness, distance(vec2(Cr2, Cb2), vec2(Cr1, Cb1)));
+        gl_FragColor = vec4(videoColor.rgb, videoColor.a * blend);
+      }
+    `
+  });
+}
+
 const props = defineProps({
   mindFileUrl: String,
   currentContent: Object,
@@ -218,28 +263,97 @@ function updatePlaneDimensions(content) {
   if (!content) return
   
   const type = content.type.toLowerCase()
-  let width = 1, height = 1
+  let width = 1
+  let height = 1
+  let finalScale = 1
   
-  if (type === 'video' && videoAssetRef.value) {
-    const v = videoAssetRef.value
-    if (v.videoWidth && v.videoHeight) {
-      height = v.videoHeight / v.videoWidth
+  // Calculate auto-scale (object-fit: cover effect)
+  if (content.auto_scale !== false) {
+    // Auto-scale is enabled - simple approach that works
+    if (type === 'video' && videoAssetRef.value) {
+      const v = videoAssetRef.value
+      if (v.videoWidth && v.videoHeight) {
+        // Just use aspect ratio directly with a good multiplier
+        const videoAspect = v.videoWidth / v.videoHeight
+        
+        // For portrait videos (taller than wide), scale up
+        // For landscape videos (wider than tall), scale differently
+        if (videoAspect < 1) {
+          // Portrait video (9:16, etc) - needs more scale
+          finalScale = 1.3
+        } else {
+          // Landscape video (16:9, etc)
+          finalScale = 1.3
+        }
+      }
+      
+      if (videoPlaneRef.value) {
+        videoPlaneRef.value.setAttribute('width', '1')
+        videoPlaneRef.value.setAttribute('height', '1')
+        videoPlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
+        videoPlaneRef.value.setAttribute('visible', 'true')
+        
+        // Apply chroma key shader if needed
+        if (content.use_chroma_key) {
+          videoPlaneRef.value.setAttribute('material', 'shader: chromakey; src: #videoAsset; transparent: true; side: double;')
+        } else {
+          videoPlaneRef.value.setAttribute('material', 'shader: flat; src: #videoAsset; transparent: true;')
+        }
+      }
+    } else if (type === 'image' && imageAssetRef.value) {
+      finalScale = 1.3
+      
+      if (imagePlaneRef.value) {
+        imagePlaneRef.value.setAttribute('width', '1')
+        imagePlaneRef.value.setAttribute('height', '1')
+        imagePlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
+        imagePlaneRef.value.setAttribute('visible', 'true')
+      }
     }
-    if (videoPlaneRef.value) {
-      videoPlaneRef.value.setAttribute('width', '1')
-      videoPlaneRef.value.setAttribute('height', height.toString())
-      videoPlaneRef.value.setAttribute('visible', 'true')
+  } else {
+    // Manual scale override
+    finalScale = content.scale_override || 1
+    
+    if (type === 'video' && videoAssetRef.value) {
+      const v = videoAssetRef.value
+      if (v.videoWidth && v.videoHeight) {
+        height = v.videoHeight / v.videoWidth
+      }
+      if (videoPlaneRef.value) {
+        videoPlaneRef.value.setAttribute('width', '1')
+        videoPlaneRef.value.setAttribute('height', height.toString())
+        videoPlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
+        videoPlaneRef.value.setAttribute('visible', 'true')
+        
+        if (content.use_chroma_key) {
+          videoPlaneRef.value.setAttribute('material', 'shader: chromakey; src: #videoAsset; transparent: true; side: double;')
+        } else {
+          videoPlaneRef.value.setAttribute('material', 'shader: flat; src: #videoAsset; transparent: true;')
+        }
+      }
+    } else if (type === 'image' && imageAssetRef.value) {
+      const i = imageAssetRef.value
+      if (i.naturalWidth && i.naturalHeight) {
+        height = i.naturalHeight / i.naturalWidth
+      }
+      if (imagePlaneRef.value) {
+        imagePlaneRef.value.setAttribute('width', '1')
+        imagePlaneRef.value.setAttribute('height', height.toString())
+        imagePlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
+        imagePlaneRef.value.setAttribute('visible', 'true')
+      }
     }
-  } else if (type === 'image' && imageAssetRef.value) {
-    const i = imageAssetRef.value
-    if (i.naturalWidth && i.naturalHeight) {
-      height = i.naturalHeight / i.naturalWidth
-    }
-    if (imagePlaneRef.value) {
-      imagePlaneRef.value.setAttribute('width', '1')
-      imagePlaneRef.value.setAttribute('height', height.toString())
-      imagePlaneRef.value.setAttribute('visible', 'true')
-    }
+  }
+  
+  // Apply position adjustments
+  const posX = content.position_x || 0
+  const posY = content.position_y || 0
+  const posZ = content.position_z || 0
+  
+  if (type === 'video' && videoPlaneRef.value) {
+    videoPlaneRef.value.setAttribute('position', `${posX} ${posY} ${posZ}`)
+  } else if (type === 'image' && imagePlaneRef.value) {
+    imagePlaneRef.value.setAttribute('position', `${posX} ${posY} ${posZ}`)
   }
 }
 

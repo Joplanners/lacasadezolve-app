@@ -55,8 +55,6 @@ const {
 const isARReady = ref(false)
 const isMarkerVisible = ref(false)
 const isMediaLoading = ref(false)
-const showFullscreenPrompt = ref(false)
-const userDismissedFullscreenPrompt = ref(false)
 
 // Computed
 const isLoading = computed(() => isDataLoading.value || isMediaLoading.value)
@@ -70,7 +68,6 @@ async function initializeExperience() {
   resetContentState()
   isARReady.value = false
   isMarkerVisible.value = false
-  userDismissedFullscreenPrompt.value = false
   
   const permissionGranted = await checkAndRequestCameraPermission()
   if (permissionGranted) {
@@ -101,13 +98,11 @@ function handleArError(error) {
 function handleMarkerFound() {
   console.log('[ARView] Marker Found')
   isMarkerVisible.value = true
-  checkAndShowFullscreenPrompt()
 }
 
 function handleMarkerLost() {
   console.log('[ARView] Marker Lost')
   isMarkerVisible.value = false
-  showFullscreenPrompt.value = false
 }
 
 function handleContentLoadingStart() {
@@ -124,33 +119,6 @@ function handleContentError(msg) {
   // Optional: Show a toast or non-blocking error
 }
 
-// --- Fullscreen Logic ---
-
-function checkAndShowFullscreenPrompt() {
-  if (isInBrowserFullscreen.value) {
-    showFullscreenPrompt.value = false
-    return
-  }
-  
-  if (isConsideredMobileForPrompt.value && !userDismissedFullscreenPrompt.value) {
-    showFullscreenPrompt.value = true
-  }
-}
-
-function dismissFullscreenPrompt() {
-  userDismissedFullscreenPrompt.value = true
-  showFullscreenPrompt.value = false
-  // Force play if needed
-  if (arSceneRef.value) {
-    arSceneRef.value.playVideo()
-  }
-}
-
-function handleRequestFullscreen() {
-  requestFullscreen(arViewContainerRef.value)
-  showFullscreenPrompt.value = false
-}
-
 const goHome = () => {
   router.push({ name: 'home' })
 }
@@ -163,13 +131,6 @@ onMounted(() => {
 
 watch(() => props.markerId, (newId) => {
   if (newId) initializeExperience()
-})
-
-watch(isInBrowserFullscreen, (isFullscreen) => {
-  if (isFullscreen) {
-    showFullscreenPrompt.value = false
-    userDismissedFullscreenPrompt.value = true
-  }
 })
 
 </script>
@@ -188,22 +149,6 @@ watch(isInBrowserFullscreen, (isFullscreen) => {
       @retry-camera="initializeExperience"
       @retry-load="initializeExperience"
     />
-
-    <!-- Fullscreen Prompt -->
-    <div
-      v-if="isARReady && isMarkerVisible && showFullscreenPrompt && !userDismissedFullscreenPrompt"
-      class="ar-prompt-overlay"
-    >
-      <p>Para mejor experiencia, usa pantalla completa.</p>
-      <div class="prompt-buttons">
-        <button @click="handleRequestFullscreen" class="prompt-button primary">
-          Pantalla Completa
-        </button>
-        <button @click="dismissFullscreenPrompt" class="prompt-button secondary">
-          Continuar así
-        </button>
-      </div>
-    </div>
 
     <!-- Controls -->
     <ARControls
@@ -276,58 +221,5 @@ watch(isInBrowserFullscreen, (isFullscreen) => {
   padding: 8px 15px;
   border-radius: 20px;
   font-size: 1em;
-}
-
-.ar-prompt-overlay {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 40px);
-  max-width: 450px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background-color: rgba(34, 34, 34, 0.95);
-  color: #fff;
-  z-index: 210;
-  text-align: center;
-  padding: 20px 25px;
-  border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
-  pointer-events: auto;
-}
-
-.ar-prompt-overlay p {
-  margin: 0 0 15px 0;
-  font-size: 1.1em;
-}
-
-.prompt-buttons {
-  display: flex;
-  gap: 10px;
-}
-
-.prompt-button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: opacity 0.2s;
-}
-
-.prompt-button.primary {
-  background-color: var(--brand-pink, #ff6b87);
-  color: white;
-}
-
-.prompt-button.secondary {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-.prompt-button:hover {
-  opacity: 0.9;
 }
 </style>

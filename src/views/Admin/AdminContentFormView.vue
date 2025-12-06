@@ -21,6 +21,12 @@ const formData = ref({
   content_url: '',
   user_id: null,
   is_public: true,
+  use_chroma_key: false,
+  auto_scale: true,
+  scale_override: null,
+  position_x: 0,
+  position_y: 0,
+  position_z: 0,
 })
 const selectedFiles = ref([])
 const fileInputKey = ref(Date.now())
@@ -84,6 +90,12 @@ async function fetchContentData(contentId) {
     formData.value.content_url = contentData.content_url
     formData.value.user_id = contentData.user_id
     formData.value.is_public = contentData.is_public === null ? true : contentData.is_public
+    formData.value.use_chroma_key = contentData.use_chroma_key || false
+    formData.value.auto_scale = contentData.auto_scale === null ? true : contentData.auto_scale
+    formData.value.scale_override = contentData.scale_override || null
+    formData.value.position_x = contentData.position_x || 0
+    formData.value.position_y = contentData.position_y || 0
+    formData.value.position_z = contentData.position_z || 0
 
     if (!formData.value.is_public && formData.value.user_id) {
       console.log('Editando contenido privado, buscando dueño ID:', formData.value.user_id)
@@ -248,6 +260,12 @@ async function saveContent() {
         content_url: finalContentUrl,
         is_public: formData.value.is_public,
         user_id: finalUserId,
+        use_chroma_key: formData.value.use_chroma_key,
+        auto_scale: formData.value.auto_scale,
+        scale_override: formData.value.scale_override,
+        position_x: formData.value.position_x,
+        position_y: formData.value.position_y,
+        position_z: formData.value.position_z,
       }
       const { error: dbError } = await supabase
         .from('contents')
@@ -339,6 +357,12 @@ async function saveContent() {
         content_url: fileUrl,
         is_public: formData.value.is_public,
         user_id: finalUserId,
+        use_chroma_key: formData.value.use_chroma_key,
+        auto_scale: formData.value.auto_scale,
+        scale_override: formData.value.scale_override,
+        position_x: formData.value.position_x,
+        position_y: formData.value.position_y,
+        position_z: formData.value.position_z,
       }
 
       console.log(`Insertando en DB para ${file.name}...`)
@@ -480,6 +504,60 @@ onUnmounted(() => {
           >Si está marcado, todos lo podrán ver. Si no, asigna un usuario o se asignará a tu
           cuenta.</small
         >
+      </div>
+
+      <div class="form-group checkbox-group" v-if="formData.type === 'video' || selectedFiles.some(f => f.type.startsWith('video/'))">
+        <input type="checkbox" id="useChromaKey" v-model="formData.use_chroma_key" />
+        <label for="useChromaKey">🟢 Usar Chroma Key (Pantalla Verde)</label>
+        <small
+          >Marca esto si el video tiene fondo verde. El fondo se volverá transparente en AR.</small
+        >
+      </div>
+
+      <!-- Auto-Scale Controls (Solo en modo edición) -->
+      <div v-if="props.isEditMode" class="form-section">
+        <h4>⚙️ Ajustes de Visualización AR</h4>
+        
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="autoScale" v-model="formData.auto_scale" />
+          <label for="autoScale">🎯 Auto-ajustar al marcador</label>
+          <small>El contenido se escalará automáticamente para cubrir el marcador (efecto "piel")</small>
+        </div>
+
+        <div v-if="!formData.auto_scale" class="form-group">
+          <label for="scaleOverride">Escala Manual:</label>
+          <input 
+            type="number" 
+            id="scaleOverride" 
+            v-model.number="formData.scale_override" 
+            step="0.1" 
+            min="0.1" 
+            max="5.0"
+            placeholder="1.0 = tamaño normal"
+          />
+          <small>Valores mayores a 1.0 agrandan el contenido. Ej: 1.5 = 150% del tamaño</small>
+        </div>
+
+        <details class="advanced-controls">
+          <summary>Ajustes Avanzados (Posición)</summary>
+          <div class="position-controls">
+            <div class="form-group">
+              <label for="posX">Posición X (horizontal):</label>
+              <input type="number" id="posX" v-model.number="formData.position_x" step="0.1" />
+              <small>Negativo = izquierda, Positivo = derecha</small>
+            </div>
+            <div class="form-group">
+              <label for="posY">Posición Y (vertical):</label>
+              <input type="number" id="posY" v-model.number="formData.position_y" step="0.1" />
+              <small>Negativo = abajo, Positivo = arriba</small>
+            </div>
+            <div class="form-group">
+              <label for="posZ">Posición Z (profundidad):</label>
+              <input type="number" id="posZ" v-model.number="formData.position_z" step="0.1" />
+              <small>Negativo = atrás, Positivo = adelante</small>
+            </div>
+          </div>
+        </details>
       </div>
 
       <div class="form-group" id="user-search-container" v-if="!formData.is_public">

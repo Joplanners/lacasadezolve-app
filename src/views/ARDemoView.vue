@@ -89,7 +89,7 @@ async function loadPublicMarkers() {
   try {
     console.log('[Demo] Fetching public markers...')
     
-    // First, get public markers
+    // Get public AND listed markers only
     const { data: markersData, error: markersError } = await supabase
       .from('markers')
       .select(`
@@ -108,6 +108,7 @@ async function loadPublicMarkers() {
         )
       `)
       .eq('is_public', true)
+      .eq('is_listed', true)
       .order('created_at', { ascending: false })
 
     console.log('[Demo] Query result:', { markersData, markersError })
@@ -238,12 +239,6 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.marker-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
   transition: transform 0.3s;
 }
 
@@ -319,25 +314,28 @@ onMounted(() => {
   opacity: 0.9;
 }
 
-.empty-state {
+.empty-state p {
+  font-size: 1.1rem;
   color: var(--color-text);
+  opacity: 0.7;
 }
 
 .empty-hint {
-  opacity: 0.6;
+  font-size: 0.95rem;
   margin-top: 0.5rem;
 }
 
 .instructions {
   background: var(--color-background-soft);
-  border-radius: 12px;
   padding: 2rem;
+  border-radius: 12px;
   margin-top: 3rem;
 }
 
 .instructions h2 {
   color: var(--color-heading);
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 1.75rem;
 }
 
 .instructions ol {
@@ -347,29 +345,15 @@ onMounted(() => {
 
 .instructions li {
   margin-bottom: 0.75rem;
+  font-size: 1.05rem;
   line-height: 1.6;
 }
 
 .compatibility-note {
-  background: rgba(255, 193, 7, 0.1);
-  border-left: 4px solid #ffc107;
+  background: var(--color-background-mute);
   padding: 1rem;
-  border-radius: 4px;
-  margin-top: 1rem;
-}
-
-@media (max-width: 767px) {
-  .demo-container {
-    padding: 1rem;
-  }
-
-  .demo-header h1 {
-    font-size: 2rem;
-  }
-
-  .markers-grid {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
+  border-radius: 8px;
+  border-left: 4px solid var(--brand-turquoise);
+  margin-top: 1.5rem;
 }
 </style>
