@@ -32,6 +32,7 @@ const formData = ref({
 })
 const selectedFiles = ref([])
 const fileInputKey = ref(Date.now())
+const creationMode = ref('file') // 'file' or 'text'
 
 // --- Estado para Búsqueda de Usuario ---
 const userSearchTerm = ref('')
@@ -295,6 +296,60 @@ async function saveContent() {
       }
     }
   } else {
+    // New content creation
+    // Check if this is a text-only creation (no file needed)
+    if (creationMode.value === 'text') {
+      // Validate text content
+      if (!formData.value.name || !formData.value.text_content) {
+        toast.error('Debes ingresar un nombre y el texto que aparecerá en AR.')
+        saving.value = false
+        return
+      }
+
+      let finalUserId = null
+      if (!formData.value.is_public) {
+        if (assignedUser.value) {
+          finalUserId = assignedUser.value.id
+        } else {
+          finalUserId = authStore.user?.id || null
+          if (!finalUserId) {
+            toast.error('No se pudo determinar el usuario admin para asignar contenido privado.')
+            saving.value = false
+            return
+          }
+        }
+      }
+
+      try {
+        const textContentData = {
+          name: formData.value.name,
+          type: 'text',
+          content_url: null, // No file URL for text-only content
+          is_public: formData.value.is_public,
+          user_id: finalUserId,
+          auto_scale: formData.value.auto_scale,
+          text_content: formData.value.text_content,
+          text_color: formData.value.text_color,
+          position_x: formData.value.position_x,
+          position_y: formData.value.position_y,
+          position_z: formData.value.position_z,
+        }
+
+        const { error: dbError } = await supabase.from('contents').insert(textContentData)
+        if (dbError) throw dbError
+
+        toast.success('¡Contenido de texto creado exitosamente!')
+        router.push({ name: 'admin-contents' })
+      } catch (err) {
+        console.error('Error creando texto:', err)
+        toast.error(`Error al crear contenido de texto: ${err.message}`)
+      } finally {
+        saving.value = false
+      }
+      return
+    }
+
+    // File upload mode - requires files
     if (selectedFiles.value.length === 0) {
       toast.error('Debes seleccionar al menos un archivo.')
       saving.value = false
@@ -476,19 +531,41 @@ onUnmounted(() => {
         </p>
       </div>
 
-      <div class="form-group">
+      <!-- Mode selector for new content -->
+      <div v-if="!props.isEditMode" class="form-group">
+        <label>¿Qué tipo de contenido quieres crear?</label>
+        <div class="mode-selector">
+          <button 
+            type="button" 
+            :class="['mode-btn', creationMode === 'file' ? 'active' : '']"
+            @click="creationMode = 'file'"
+          >
+            📁 Subir Archivo (Video/Imagen/Audio)
+          </button>
+          <button 
+            type="button" 
+            :class="['mode-btn', creationMode === 'text' ? 'active' : '']"
+            @click="creationMode = 'text'"
+          >
+            📝 Solo Texto Flotante
+          </button>
+        </div>
+      </div>
+
+      <!-- File upload (show only if creationMode is file or in edit mode) -->
+      <div class="form-group" v-if="creationMode === 'file' || props.isEditMode">
         <label for="contentFile">Archivo(s):</label>
         <input
           type="file"
           id="contentFile"
           @change="handleFileChange"
-          :accept="'image/*,video/*,text/plain,.txt,.md,.csv'"
+          :accept="'image/*,video/*,audio/*,text/plain,.txt,.md,.csv'"
           :key="fileInputKey"
-          :required="!props.isEditMode && selectedFiles.length === 0"
+          :required="!props.isEditMode && selectedFiles.length === 0 && creationMode === 'file'"
           :multiple="!props.isEditMode"
         />
-        <small v-if="!props.isEditMode"
-          >Selecciona uno o más archivos (imagen, video, texto).</small
+        <small v-if="!props.isEditMode && creationMode === 'file'"
+          >Selecciona uno o más archivos (imagen, video, audio).</small
         >
         <small v-if="props.isEditMode && formData.content_url"
           >URL actual: {{ formData.content_url }}. Selecciona un archivo para reemplazarlo.</small
@@ -503,6 +580,18 @@ onUnmounted(() => {
             {{ getFileType(file.type) }}
           </li>
         </ul>
+      </div>
+
+      <!-- Text content name (only show when creating text content) -->
+      <div class="form-group" v-if="!props.isEditMode && creationMode === 'text'">
+        <label for="textContentName">Nombre del contenido:</label>
+        <input 
+          type="text" 
+          id="textContentName" 
+          v-model="formData.name" 
+          placeholder="Ej: Mensaje de cumpleaños"
+          required
+        />
       </div>
 
       <div class="form-group checkbox-group">
@@ -876,5 +965,41 @@ h3 {
   background-color: #e9ecef;
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+/* Mode selector for content creation */
+.mode-selector {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  background: #f8f9fa;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.mode-btn:hover {
+  border-color: var(--brand-turquoise, #4db6ac);
+  background: #fff;
+}
+
+.mode-btn.active {
+  border-color: var(--brand-turquoise, #4db6ac);
+  background: var(--brand-turquoise, #4db6ac);
+  color: white;
+}
+
+@media (max-width: 600px) {
+  .mode-selector {
+    flex-direction: column;
+  }
 }
 </style>
