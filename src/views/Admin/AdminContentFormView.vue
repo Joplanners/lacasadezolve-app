@@ -27,6 +27,8 @@ const formData = ref({
   position_x: 0,
   position_y: 0,
   position_z: 0,
+  text_content: '',
+  text_color: '#FFFFFF',
 })
 const selectedFiles = ref([])
 const fileInputKey = ref(Date.now())
@@ -96,6 +98,8 @@ async function fetchContentData(contentId) {
     formData.value.position_x = contentData.position_x || 0
     formData.value.position_y = contentData.position_y || 0
     formData.value.position_z = contentData.position_z || 0
+    formData.value.text_content = contentData.text_content || ''
+    formData.value.text_color = contentData.text_color || '#FFFFFF'
 
     if (!formData.value.is_public && formData.value.user_id) {
       console.log('Editando contenido privado, buscando dueño ID:', formData.value.user_id)
@@ -266,6 +270,8 @@ async function saveContent() {
         position_x: formData.value.position_x,
         position_y: formData.value.position_y,
         position_z: formData.value.position_z,
+        text_content: formData.value.text_content,
+        text_color: formData.value.text_color,
       }
       const { error: dbError } = await supabase
         .from('contents')
@@ -363,6 +369,8 @@ async function saveContent() {
         position_x: formData.value.position_x,
         position_y: formData.value.position_y,
         position_z: formData.value.position_z,
+        text_content: formData.value.text_content,
+        text_color: formData.value.text_color,
       }
 
       console.log(`Insertando en DB para ${file.name}...`)
@@ -512,6 +520,32 @@ onUnmounted(() => {
         <small
           >Marca esto si el video tiene fondo verde. El fondo se volverá transparente en AR.</small
         >
+      </div>
+
+      <!-- Text Content Controls (Show when type is text or in edit mode) -->
+      <div v-if="formData.type === 'text' || props.isEditMode" class="form-section">
+        <h4>📝 Contenido de Texto AR</h4>
+        
+        <div class="form-group">
+          <label for="textContent">Texto que aparecerá flotando:</label>
+          <textarea 
+            id="textContent" 
+            v-model="formData.text_content" 
+            rows="3" 
+            placeholder="¡Feliz Cumpleaños! 🎉"
+          ></textarea>
+          <small>Este texto aparecerá como texto 3D flotante en AR</small>
+        </div>
+
+        <div class="form-group">
+          <label for="textColor">Color del texto:</label>
+          <input 
+            type="color" 
+            id="textColor" 
+            v-model="formData.text_color" 
+          />
+          <small>Elige el color del texto flotante. Blanco (#FFFFFF) funciona bien con fondos oscuros.</small>
+        </div>
       </div>
 
       <!-- Auto-Scale Controls (Solo en modo edición) -->

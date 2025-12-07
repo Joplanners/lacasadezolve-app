@@ -125,14 +125,30 @@ const weatherEmoji = computed(() => {
   if (desc.includes('nieve')) return '❄️'
   return '🌡️'
 })
+
+// State for lazy loading - don't request on mount
+const hasRequested = ref(false)
+
 onMounted(() => {
-  requestWeather()
+  // No longer auto-request - wait for user interaction
+  isLoading.value = false
 })
 </script>
 
 <template>
   <div class="weather-zolve-widget">
-    <div v-if="isLoading" class="weather-loading"><p>Obteniendo tu clima...</p></div>
+    <!-- Initial state: Show button to request weather -->
+    <div v-if="!hasRequested && !weatherData && !isLoading" class="weather-initial">
+      <img src="/zolveClima.png" alt="Zolve Clima" class="zolve-icon" />
+      <div class="weather-prompt">
+        <p class="weather-prompt-text">Consulta el clima de tu zona</p>
+        <button @click="hasRequested = true; requestWeather()" class="retry-button">
+          📍 Ver mi clima
+        </button>
+      </div>
+    </div>
+
+    <div v-else-if="isLoading" class="weather-loading"><p>Obteniendo tu clima...</p></div>
     <div v-else-if="errorMsg && !weatherData" class="weather-error">
       <img src="/zolveClima.png" alt="Zolve Clima" class="zolve-icon-error" />
       <p>{{ errorMsg }}</p>
@@ -192,6 +208,22 @@ onMounted(() => {
   box-sizing: border-box;
   color: var(--color-text);
   position: relative;
+}
+.weather-initial {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.weather-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+.weather-prompt-text {
+  margin: 0;
+  font-size: 0.9em;
+  color: var(--color-text-muted, #555);
 }
 .weather-loading p,
 .weather-error p {

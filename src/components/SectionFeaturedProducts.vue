@@ -27,6 +27,10 @@ onMounted(async () => {
 const goToStore = () => {
   router.push({ name: 'store' })
 }
+
+const goToProduct = (productId) => {
+  router.push({ name: 'product-detail', params: { id: productId } })
+}
 </script>
 
 <template>
@@ -46,7 +50,15 @@ const goToStore = () => {
     </div>
 
     <div v-else class="product-cards-container">
-      <div v-for="product in featuredProducts" :key="product.id" class="product-card">
+      <div 
+        v-for="product in featuredProducts" 
+        :key="product.id" 
+        class="product-card"
+        @click="goToProduct(product.id)"
+        role="button"
+        tabindex="0"
+        @keydown.enter="goToProduct(product.id)"
+      >
         <div class="product-image">
           <img
             v-if="product.image_urls && product.image_urls[0]"

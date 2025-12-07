@@ -70,12 +70,15 @@ const emit = defineEmits([
 const sceneRef = ref(null)
 const videoAssetRef = ref(null)
 const imageAssetRef = ref(null)
+const audioAssetRef = ref(null)
 const videoPlaneRef = ref(null)
 const imagePlaneRef = ref(null)
+const textPlaneRef = ref(null)
 const contentScalerRef = ref(null)
 
 // Internal state for media loading
 const isVideoPlaying = ref(false)
+const isAudioPlaying = ref(false)
 
 // --- A-Frame Event Handlers ---
 
@@ -105,6 +108,7 @@ const handleTargetFound = () => {
 const handleTargetLost = () => {
   emit('marker-lost')
   pauseVideo()
+  pauseAudio()
 }
 
 // --- Media Loading & Control ---
@@ -120,10 +124,12 @@ function getCacheBustedUrl(url) {
 }
 
 async function loadMedia(content) {
-  if (!content || !content.content_url) return
+  if (!content) return
 
-  // CRITICAL FIX: Stop any playing video before switching content
+  // CRITICAL FIX: Stop any playing media before switching content
   pauseVideo()
+  pauseAudio()
+  
   const videoEl = videoAssetRef.value
   if (videoEl) {
     videoEl.pause()
@@ -131,21 +137,34 @@ async function loadMedia(content) {
     videoEl.muted = true // Mute to ensure no audio plays during transition
   }
 
+  // Hide all planes first
+  if (videoPlaneRef.value) videoPlaneRef.value.setAttribute('visible', 'false')
+  if (imagePlaneRef.value) imagePlaneRef.value.setAttribute('visible', 'false')
+  if (textPlaneRef.value) textPlaneRef.value.setAttribute('visible', 'false')
+
   emit('content-loading-start')
   const type = content.type.toLowerCase()
-  const url = getCacheBustedUrl(content.content_url)
+  const url = content.content_url ? getCacheBustedUrl(content.content_url) : null
   
   try {
     if (type === 'video') {
       await loadVideo(url)
     } else if (type === 'image') {
       await loadImage(url)
+    } else if (type === 'text') {
+      loadText(content)
+    } else if (type === 'audio') {
+      await loadAudio(url)
     }
     emit('content-loaded')
     
     // Auto-play if marker is visible
-    if (props.isMarkerVisible && type === 'video') {
-      playVideo()
+    if (props.isMarkerVisible) {
+      if (type === 'video') {
+        playVideo()
+      } else if (type === 'audio') {
+        playAudio()
+      }
     }
   } catch (error) {
     console.error("Error loading media:", error)
@@ -236,6 +255,81 @@ function pauseVideo() {
   }
 }
 
+// --- Text Content ---
+function loadText(content) {
+  const textEl = textPlaneRef.value
+  if (!textEl) return
+  
+  // Use text_content field or name as fallback
+  const textValue = content.text_content || content.name || 'Texto de ejemplo'
+  const textColor = content.text_color || '#FFFFFF'
+  
+  textEl.setAttribute('value', textValue)
+  textEl.setAttribute('color', textColor)
+  textEl.setAttribute('visible', 'true')
+  
+  // Apply position adjustments
+  const posX = content.position_x || 0
+  const posY = content.position_y || 0
+  const posZ = content.position_z || 0
+  textEl.setAttribute('position', `${posX} ${posY} ${posZ}`)
+}
+
+// --- Audio Content ---
+function loadAudio(url) {
+  return new Promise((resolve, reject) => {
+    const audioEl = audioAssetRef.value
+    if (!audioEl) return reject(new Error("Audio element not found"))
+
+    // Reset
+    audioEl.pause()
+    audioEl.removeAttribute('src')
+    audioEl.load()
+
+    const onLoaded = () => {
+      cleanup()
+      resolve()
+    }
+
+    const onError = (e) => {
+      cleanup()
+      reject(new Error(`Error loading audio: ${e.type}`))
+    }
+
+    const cleanup = () => {
+      audioEl.removeEventListener('canplaythrough', onLoaded)
+      audioEl.removeEventListener('error', onError)
+    }
+
+    audioEl.addEventListener('canplaythrough', onLoaded, { once: true })
+    audioEl.addEventListener('error', onError, { once: true })
+    
+    audioEl.crossOrigin = 'anonymous'
+    audioEl.src = url
+    audioEl.load()
+  })
+}
+
+async function playAudio() {
+  const audioEl = audioAssetRef.value
+  if (audioEl && audioEl.readyState >= 2) {
+    try {
+      await audioEl.play()
+      isAudioPlaying.value = true
+    } catch (e) {
+      console.warn("Audio autoplay prevented:", e)
+    }
+  }
+}
+
+function pauseAudio() {
+  const audioEl = audioAssetRef.value
+  if (audioEl) {
+    audioEl.pause()
+    isAudioPlaying.value = false
+  }
+}
+
 // --- Watchers ---
 
 watch(() => props.currentContent, async (newContent, oldContent) => {
@@ -252,10 +346,16 @@ watch(() => props.currentContent, async (newContent, oldContent) => {
 }, { deep: true })
 
 watch(() => props.isMarkerVisible, (visible) => {
-  if (visible && props.currentContent?.type === 'video') {
-    playVideo()
+  const type = props.currentContent?.type?.toLowerCase()
+  if (visible) {
+    if (type === 'video') {
+      playVideo()
+    } else if (type === 'audio') {
+      playAudio()
+    }
   } else {
     pauseVideo()
+    pauseAudio()
   }
 })
 
@@ -361,7 +461,9 @@ function updatePlaneDimensions(content) {
 // Expose methods if needed by parent
 defineExpose({
   playVideo,
-  pauseVideo
+  pauseVideo,
+  playAudio,
+  pauseAudio
 })
 </script>
 
@@ -394,6 +496,13 @@ defineExpose({
           id="imageAsset"
           crossorigin="anonymous"
         />
+        <audio
+          ref="audioAssetRef"
+          id="audioAsset"
+          preload="auto"
+          loop
+          crossorigin="anonymous"
+        ></audio>
       </a-assets>
 
       <a-camera
@@ -443,6 +552,22 @@ defineExpose({
             src="#videoAsset"
             material="shader: flat; transparent: true;"
           ></a-video>
+
+          <!-- Text Plane -->
+          <a-text
+            ref="textPlaneRef"
+            id="textPlane"
+            position="0 0 0"
+            rotation="0 0 0"
+            visible="false"
+            align="center"
+            anchor="center"
+            baseline="center"
+            color="#FFFFFF"
+            value=""
+            width="1.5"
+            wrap-count="30"
+          ></a-text>
         </a-entity>
       </a-entity>
     </a-scene>
