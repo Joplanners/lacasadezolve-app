@@ -59,10 +59,26 @@ export function useARContent() {
         mindFileUrl.value = rawMindFileUrl
       }
 
-      // 2. Fetch Contents
+      // 2. Fetch Contents with ALL fields needed for AR
       const { data: contentsData, error: contentsError } = await supabase
         .from('marker_contents')
-        .select(`display_order, contents (id,content_url,type,name)`)
+        .select(`
+          display_order, 
+          contents (
+            id,
+            content_url,
+            type,
+            name,
+            use_chroma_key,
+            auto_scale,
+            scale_override,
+            position_x,
+            position_y,
+            position_z,
+            text_content,
+            text_color
+          )
+        `)
         .eq('marker_id', markerId)
         .order('display_order')
 

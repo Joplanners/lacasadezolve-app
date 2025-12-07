@@ -1,50 +1,100 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 
-// Register Chroma Key Shader Component for A-Frame
-if (typeof window !== 'undefined' && window.AFRAME) {
-  window.AFRAME.registerShader('chromakey', {
-    schema: {
-      src: { type: 'map' },
-      color: { type: 'color', default: '#00FF00', is: 'uniform' },
-      transparent: { type: 'boolean', default: true, is: 'uniform' },
-      keyColor: { type: 'color', default: '#00FF00', is: 'uniform' },
-      similarity: { type: 'number', default: 0.4, is: 'uniform' },
-      smoothness: { type: 'number', default: 0.08, is: 'uniform' }
-    },
-    
-    vertexShader: `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    
-    fragmentShader: `
-      uniform sampler2D src;
-      uniform vec3 keyColor;
-      uniform float similarity;
-      uniform float smoothness;
-      varying vec2 vUv;
+// Function to register Chroma Key Shader for A-Frame
+function registerChromaKeyShader() {
+  if (typeof window === 'undefined' || !window.AFRAME) {
+    console.warn('[ARScene] A-Frame not available for shader registration')
+    return false
+  }
+  
+  // Check if shader already registered
+  if (window.AFRAME.shaders && window.AFRAME.shaders.chromakey) {
+    console.log('[ARScene] Chroma key shader already registered')
+    return true
+  }
+  
+  try {
+    window.AFRAME.registerShader('chromakey', {
+      schema: {
+        src: { type: 'map' },
+        color: { type: 'color', default: '#00FF00' },
+        transparent: { default: true }
+      },
       
-      void main() {
-        vec4 videoColor = texture2D(src, vUv);
+      init: function(data) {
+        const videoEl = data.src
+        if (!videoEl) return
         
-        float Y1 = 0.299 * keyColor.r + 0.587 * keyColor.g + 0.114 * keyColor.b;
-        float Cr1 = keyColor.r - Y1;
-        float Cb1 = keyColor.b - Y1;
+        const texture = new window.THREE.VideoTexture(videoEl)
+        texture.minFilter = window.THREE.LinearFilter
+        texture.magFilter = window.THREE.LinearFilter
+        texture.format = window.THREE.RGBAFormat
         
-        float Y2 = 0.299 * videoColor.r + 0.587 * videoColor.g + 0.114 * videoColor.b;
-        float Cr2 = videoColor.r - Y2;
-        float Cb2 = videoColor.b - Y2;
+        // Parse the key color
+        const keyColorStr = data.color || '#00FF00'
+        const keyColor = new window.THREE.Color(keyColorStr)
         
-        float blend = smoothstep(similarity, similarity + smoothness, distance(vec2(Cr2, Cb2), vec2(Cr1, Cb1)));
-        gl_FragColor = vec4(videoColor.rgb, videoColor.a * blend);
+        this.material = new window.THREE.ShaderMaterial({
+          uniforms: {
+            map: { value: texture },
+            keyColor: { value: new window.THREE.Vector3(keyColor.r, keyColor.g, keyColor.b) },
+            similarity: { value: 0.3 },  // Threshold: how much G must exceed R and B
+            smoothness: { value: 0.15 }  // Edge smoothing
+          },
+          vertexShader: `
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform sampler2D map;
+            uniform vec3 keyColor;
+            uniform float similarity;
+            uniform float smoothness;
+            varying vec2 vUv;
+            
+            void main() {
+              vec4 texColor = texture2D(map, vUv);
+              
+              // Simple approach: detect if pixel is "green-ish"
+              // A pixel is green if: green channel is high AND greater than red and blue
+              float greenDominance = texColor.g - max(texColor.r, texColor.b);
+              
+              // If greenDominance is high (>0.3), it's a green pixel -> make transparent
+              // similarity controls the threshold
+              float alpha = 1.0 - smoothstep(similarity - smoothness, similarity + smoothness, greenDominance);
+              
+              gl_FragColor = vec4(texColor.rgb, texColor.a * alpha);
+            }
+          `,
+          transparent: true,
+          side: window.THREE.DoubleSide
+        })
+      },
+      
+      update: function(data) {
+        // Handle updates if needed
+        if (this.material && this.material.uniforms && data.src) {
+          const videoEl = data.src
+          if (videoEl && videoEl.tagName === 'VIDEO') {
+            this.material.uniforms.map.value = new window.THREE.VideoTexture(videoEl)
+          }
+        }
       }
-    `
-  });
+    })
+    console.log('[ARScene] Chroma key shader registered successfully')
+    return true
+  } catch (err) {
+    console.error('[ARScene] Error registering chroma key shader:', err)
+    return false
+  }
 }
+
+// Try to register immediately if A-Frame is available
+registerChromaKeyShader()
 
 const props = defineProps({
   mindFileUrl: String,
@@ -84,6 +134,10 @@ const isAudioPlaying = ref(false)
 
 const handleSceneLoaded = (event) => {
   emit('scene-loaded', event)
+  
+  // Ensure chroma key shader is registered when A-Frame scene is ready
+  registerChromaKeyShader()
+  
   // Hide VR button immediately
   const sceneEl = event.target
   const vrButton = sceneEl.querySelector('.a-enter-vr-button')
@@ -365,83 +419,65 @@ function updatePlaneDimensions(content) {
   const type = content.type.toLowerCase()
   let width = 1
   let height = 1
+  let baseScale = 1
   let finalScale = 1
   
-  // Calculate auto-scale (object-fit: cover effect)
+  console.log('[ARScene] updatePlaneDimensions:', {
+    type,
+    auto_scale: content.auto_scale,
+    scale_override: content.scale_override,
+    use_chroma_key: content.use_chroma_key
+  })
+  
+  // Determine base scale
   if (content.auto_scale !== false) {
-    // Auto-scale is enabled - simple approach that works
-    if (type === 'video' && videoAssetRef.value) {
-      const v = videoAssetRef.value
-      if (v.videoWidth && v.videoHeight) {
-        // Just use aspect ratio directly with a good multiplier
-        const videoAspect = v.videoWidth / v.videoHeight
-        
-        // For portrait videos (taller than wide), scale up
-        // For landscape videos (wider than tall), scale differently
-        if (videoAspect < 1) {
-          // Portrait video (9:16, etc) - needs more scale
-          finalScale = 1.3
-        } else {
-          // Landscape video (16:9, etc)
-          finalScale = 1.3
-        }
-      }
+    // Auto-scale mode: use 1.3 as base
+    baseScale = 1.3
+  } else {
+    // Manual mode: use 1.0 as base
+    baseScale = 1.0
+  }
+  
+  // Apply scale_override as a multiplier if provided
+  if (content.scale_override && content.scale_override > 0) {
+    finalScale = content.scale_override
+  } else {
+    finalScale = baseScale
+  }
+  
+  console.log('[ARScene] Final scale:', finalScale)
+  
+  if (type === 'video' && videoAssetRef.value) {
+    const v = videoAssetRef.value
+    if (v.videoWidth && v.videoHeight) {
+      height = v.videoHeight / v.videoWidth
+    }
+    
+    if (videoPlaneRef.value) {
+      videoPlaneRef.value.setAttribute('width', '1')
+      videoPlaneRef.value.setAttribute('height', height.toString())
+      videoPlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
+      videoPlaneRef.value.setAttribute('visible', 'true')
       
-      if (videoPlaneRef.value) {
-        videoPlaneRef.value.setAttribute('width', '1')
-        videoPlaneRef.value.setAttribute('height', '1')
-        videoPlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
-        videoPlaneRef.value.setAttribute('visible', 'true')
-        
-        // Apply chroma key shader if needed
-        if (content.use_chroma_key) {
-          videoPlaneRef.value.setAttribute('material', 'shader: chromakey; src: #videoAsset; transparent: true; side: double;')
-        } else {
-          videoPlaneRef.value.setAttribute('material', 'shader: flat; src: #videoAsset; transparent: true;')
-        }
-      }
-    } else if (type === 'image' && imageAssetRef.value) {
-      finalScale = 1.3
-      
-      if (imagePlaneRef.value) {
-        imagePlaneRef.value.setAttribute('width', '1')
-        imagePlaneRef.value.setAttribute('height', '1')
-        imagePlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
-        imagePlaneRef.value.setAttribute('visible', 'true')
+      // Apply chroma key shader if needed
+      if (content.use_chroma_key) {
+        console.log('[ARScene] Applying chroma key shader')
+        videoPlaneRef.value.setAttribute('material', 'shader: chromakey; src: #videoAsset; transparent: true; side: double;')
+      } else {
+        videoPlaneRef.value.setAttribute('material', 'shader: flat; src: #videoAsset; transparent: true;')
       }
     }
-  } else {
-    // Manual scale override
-    finalScale = content.scale_override || 1
+  } else if (type === 'image' && imageAssetRef.value) {
+    const i = imageAssetRef.value
+    if (i.naturalWidth && i.naturalHeight) {
+      height = i.naturalHeight / i.naturalWidth
+    }
     
-    if (type === 'video' && videoAssetRef.value) {
-      const v = videoAssetRef.value
-      if (v.videoWidth && v.videoHeight) {
-        height = v.videoHeight / v.videoWidth
-      }
-      if (videoPlaneRef.value) {
-        videoPlaneRef.value.setAttribute('width', '1')
-        videoPlaneRef.value.setAttribute('height', height.toString())
-        videoPlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
-        videoPlaneRef.value.setAttribute('visible', 'true')
-        
-        if (content.use_chroma_key) {
-          videoPlaneRef.value.setAttribute('material', 'shader: chromakey; src: #videoAsset; transparent: true; side: double;')
-        } else {
-          videoPlaneRef.value.setAttribute('material', 'shader: flat; src: #videoAsset; transparent: true;')
-        }
-      }
-    } else if (type === 'image' && imageAssetRef.value) {
-      const i = imageAssetRef.value
-      if (i.naturalWidth && i.naturalHeight) {
-        height = i.naturalHeight / i.naturalWidth
-      }
-      if (imagePlaneRef.value) {
-        imagePlaneRef.value.setAttribute('width', '1')
-        imagePlaneRef.value.setAttribute('height', height.toString())
-        imagePlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
-        imagePlaneRef.value.setAttribute('visible', 'true')
-      }
+    if (imagePlaneRef.value) {
+      imagePlaneRef.value.setAttribute('width', '1')
+      imagePlaneRef.value.setAttribute('height', height.toString())
+      imagePlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
+      imagePlaneRef.value.setAttribute('visible', 'true')
     }
   }
   
