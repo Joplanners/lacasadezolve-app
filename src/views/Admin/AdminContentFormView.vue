@@ -29,6 +29,10 @@ const formData = ref({
   position_z: 0,
   text_content: '',
   text_color: '#FFFFFF',
+  text_style: 'simple', // 'simple' or '3d'
+  text_font_size: 0.5,
+  text_font_family: 'Roboto',
+  text_animation: 'fadeIn' // 'none', 'fadeIn', 'scaleIn', 'bounceIn'
 })
 const selectedFiles = ref([])
 const fileInputKey = ref(Date.now())
@@ -101,6 +105,10 @@ async function fetchContentData(contentId) {
     formData.value.position_z = contentData.position_z || 0
     formData.value.text_content = contentData.text_content || ''
     formData.value.text_color = contentData.text_color || '#FFFFFF'
+    formData.value.text_style = contentData.text_style || 'simple'
+    formData.value.text_font_size = contentData.text_font_size || 0.5
+    formData.value.text_font_family = contentData.text_font_family || 'Roboto'
+    formData.value.text_animation = contentData.text_animation || 'fadeIn'
 
     if (!formData.value.is_public && formData.value.user_id) {
       console.log('Editando contenido privado, buscando dueño ID:', formData.value.user_id)
@@ -254,15 +262,20 @@ async function saveContent() {
         errorMsg.value = ''
       }
 
-      if (!finalContentUrl) throw new Error('No hay URL de contenido para guardar.')
+      // Text content doesn't need a URL - it stores text directly in the database
+      const isTextContent = formData.value.type === 'text'
+      
+      if (!finalContentUrl && !isTextContent) {
+        throw new Error('No hay URL de contenido para guardar.')
+      }
 
       console.log(
-        `Actualizando en DB: ID=${formData.value.id}, URL=${finalContentUrl}, UserID=${finalUserId}, Public=${formData.value.is_public}`,
+        `Actualizando en DB: ID=${formData.value.id}, URL=${finalContentUrl || 'N/A (Text)'}, UserID=${finalUserId}, Public=${formData.value.is_public}`,
       )
       const contentDataToUpdate = {
         name: formData.value.name,
         type: formData.value.type,
-        content_url: finalContentUrl,
+        content_url: finalContentUrl,  // Keep existing URL (null for text is fine)
         is_public: formData.value.is_public,
         user_id: finalUserId,
         use_chroma_key: formData.value.use_chroma_key,
@@ -273,6 +286,10 @@ async function saveContent() {
         position_z: formData.value.position_z,
         text_content: formData.value.text_content,
         text_color: formData.value.text_color,
+        text_style: formData.value.text_style,
+        text_font_size: formData.value.text_font_size,
+        text_font_family: formData.value.text_font_family,
+        text_animation: formData.value.text_animation,
       }
       const { error: dbError } = await supabase
         .from('contents')
@@ -330,6 +347,10 @@ async function saveContent() {
           auto_scale: formData.value.auto_scale,
           text_content: formData.value.text_content,
           text_color: formData.value.text_color,
+          text_style: formData.value.text_style,
+          text_font_size: formData.value.text_font_size,
+          text_font_family: formData.value.text_font_family,
+          text_animation: formData.value.text_animation,
           position_x: formData.value.position_x,
           position_y: formData.value.position_y,
           position_z: formData.value.position_z,
@@ -611,8 +632,8 @@ onUnmounted(() => {
         >
       </div>
 
-      <!-- Text Content Controls (Show when type is text or in edit mode) -->
-      <div v-if="formData.type === 'text' || props.isEditMode" class="form-section">
+      <!-- Text Content Controls (Show when text mode selected, type is text, or in edit mode) -->
+      <div v-if="creationMode === 'text' || formData.type === 'text' || (props.isEditMode && formData.text_content)" class="form-section">
         <h4>📝 Contenido de Texto AR</h4>
         
         <div class="form-group">
@@ -626,6 +647,21 @@ onUnmounted(() => {
           <small>Este texto aparecerá como texto 3D flotante en AR</small>
         </div>
 
+        <!-- Text Preview -->
+        <div v-if="formData.text_content" class="text-preview-container">
+          <label>Vista previa:</label>
+          <div 
+            class="text-preview" 
+            :style="{
+              color: formData.text_color,
+              fontFamily: formData.text_font_family || 'Roboto',
+              fontSize: (formData.text_font_size || 0.5) * 40 + 'px'
+            }"
+          >
+            {{ formData.text_content }}
+          </div>
+        </div>
+
         <div class="form-group">
           <label for="textColor">Color del texto:</label>
           <input 
@@ -634,6 +670,64 @@ onUnmounted(() => {
             v-model="formData.text_color" 
           />
           <small>Elige el color del texto flotante. Blanco (#FFFFFF) funciona bien con fondos oscuros.</small>
+        </div>
+
+        <!-- 3D Text Style Options -->
+        <div class="form-group">
+          <label>Estilo de texto:</label>
+          <div class="mode-selector">
+            <button 
+              type="button" 
+              :class="['mode-btn', formData.text_style === 'simple' ? 'active' : '']"
+              @click="formData.text_style = 'simple'"
+            >
+              📝 Simple
+            </button>
+            <button 
+              type="button" 
+              :class="['mode-btn', formData.text_style === '3d' ? 'active' : '']"
+              @click="formData.text_style = '3d'"
+            >
+              ✨ 3D Premium
+            </button>
+          </div>
+        </div>
+
+        <div v-if="formData.text_style === '3d'" class="form-row">
+          <div class="form-group">
+            <label for="textFont">Fuente:</label>
+            <select id="textFont" v-model="formData.text_font_family">
+              <option value="Roboto">Roboto (Moderna)</option>
+              <option value="Outfit">Outfit (Limpia)</option>
+              <option value="Poppins">Poppins (Redondeada)</option>
+              <option value="Inter">Inter (Legible)</option>
+              <option value="Lobster">Lobster (Decorativa)</option>
+              <option value="Dancing Script">Dancing Script (Cursiva)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="textSize">Tamaño:</label>
+            <input 
+              type="range" 
+              id="textSize" 
+              v-model.number="formData.text_font_size" 
+              min="0.2" 
+              max="1.5" 
+              step="0.1"
+            />
+            <small>{{ formData.text_font_size }} (0.5 = normal)</small>
+          </div>
+
+          <div class="form-group">
+            <label for="textAnimation">Animación de entrada:</label>
+            <select id="textAnimation" v-model="formData.text_animation">
+              <option value="none">Sin animación</option>
+              <option value="fadeIn">🌟 Aparecer suave</option>
+              <option value="scaleIn">🔍 Crecer</option>
+              <option value="bounceIn">🏀 Rebote</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -724,7 +818,8 @@ onUnmounted(() => {
           class="btn btn-save"
           :disabled="
             saving ||
-            (!props.isEditMode && selectedFiles.length === 0 && !formData.id) ||
+            (!props.isEditMode && creationMode === 'file' && selectedFiles.length === 0) ||
+            (!props.isEditMode && creationMode === 'text' && (!formData.name || !formData.text_content)) ||
             (props.isEditMode && !formData.id)
           "
         >
@@ -1001,5 +1096,31 @@ h3 {
   .mode-selector {
     flex-direction: column;
   }
+}
+
+/* Form row for 3D text options */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-top: 10px;
+}
+
+/* Text Preview */
+.text-preview-container {
+  margin: 15px 0;
+}
+.text-preview {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border-radius: 12px;
+  padding: 30px;
+  text-align: center;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 </style>

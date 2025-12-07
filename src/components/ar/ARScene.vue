@@ -1,6 +1,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 
+// Import troika-text for premium 3D text support
+// This will register the troika-text component with A-Frame
+try {
+  import('aframe-troika-text')
+} catch (e) {
+  console.warn('[ARScene] troika-text not available:', e)
+}
+
 // Function to register Chroma Key Shader for A-Frame
 function registerChromaKeyShader() {
   if (typeof window === 'undefined' || !window.AFRAME) {
@@ -288,6 +296,85 @@ function loadImage(url) {
   })
 }
 
+// Font URL mapping for troika-text
+const fontUrls = {
+  'Roboto': 'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf',
+  'Outfit': 'https://fonts.gstatic.com/s/outfit/v11/QGYpz_MVcBeNP4NJtEtq.ttf',
+  'Poppins': 'https://fonts.gstatic.com/s/poppins/v20/pxiEyp8kv8JHgFVrFJA.ttf',
+  'Inter': 'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.ttf',
+  'Lobster': 'https://fonts.gstatic.com/s/lobster/v28/neILzCirqoswsqX9zoKmM4MwWJU.ttf',
+  'Dancing Script': 'https://fonts.gstatic.com/s/dancingscript/v25/If2cXTr6YS-zF4S-kcSWSVi_sxjsohD9F50Ruu7B1i0HTeB9q4g.ttf'
+}
+
+function loadText(content) {
+  if (!textPlaneRef.value) return
+  
+  const textEl = textPlaneRef.value
+  const text = content.text_content || ''
+  const color = content.text_color || '#FFFFFF'
+  const fontSize = content.text_font_size || 0.5
+  const fontFamily = content.text_font_family || 'Roboto'
+  const textStyle = content.text_style || 'simple'
+  const animation = content.text_animation || 'fadeIn'
+  
+  console.log('[ARScene] loadText:', { text, color, fontSize, fontFamily, textStyle, animation })
+  
+  if (textStyle === '3d') {
+    // Use troika-text for 3D premium text
+    const fontUrl = fontUrls[fontFamily] || fontUrls['Roboto']
+    
+    textEl.setAttribute('troika-text', `
+      value: ${text};
+      color: ${color};
+      fontSize: ${fontSize};
+      font: ${fontUrl};
+      maxWidth: 2;
+      textAlign: center;
+      anchorX: center;
+      anchorY: middle;
+      outlineWidth: 0.02;
+      outlineColor: #000000;
+    `)
+    
+    // Remove simple text attributes if any
+    textEl.removeAttribute('value')
+    textEl.removeAttribute('text')
+  } else {
+    // Use simple a-text
+    textEl.removeAttribute('troika-text')
+    textEl.setAttribute('value', text)
+    textEl.setAttribute('color', color)
+    textEl.setAttribute('width', (fontSize * 3).toString())
+  }
+  
+  // Apply entry animation
+  if (animation !== 'none') {
+    textEl.setAttribute('opacity', '0')
+    textEl.setAttribute('scale', '0.01 0.01 0.01')
+    
+    setTimeout(() => {
+      if (animation === 'fadeIn') {
+        textEl.setAttribute('animation', 'property: opacity; from: 0; to: 1; dur: 800; easing: easeOutQuad')
+        textEl.setAttribute('animation__scale', 'property: scale; from: 0.01 0.01 0.01; to: 1 1 1; dur: 800; easing: easeOutQuad')
+      } else if (animation === 'scaleIn') {
+        textEl.setAttribute('opacity', '1')
+        textEl.setAttribute('animation', 'property: scale; from: 0.01 0.01 0.01; to: 1 1 1; dur: 600; easing: easeOutBack')
+      } else if (animation === 'bounceIn') {
+        textEl.setAttribute('opacity', '1')
+        textEl.setAttribute('animation', 'property: scale; from: 0.01 0.01 0.01; to: 1.1 1.1 1.1; dur: 400; easing: easeOutQuad')
+        setTimeout(() => {
+          textEl.setAttribute('animation', 'property: scale; from: 1.1 1.1 1.1; to: 1 1 1; dur: 200; easing: easeInQuad')
+        }, 400)
+      }
+    }, 100)
+  } else {
+    textEl.setAttribute('opacity', '1')
+    textEl.setAttribute('scale', '1 1 1')
+  }
+  
+  textEl.setAttribute('visible', 'true')
+}
+
 async function playVideo() {
   const videoEl = videoAssetRef.value
   if (videoEl && videoEl.readyState >= 2) {
@@ -309,25 +396,7 @@ function pauseVideo() {
   }
 }
 
-// --- Text Content ---
-function loadText(content) {
-  const textEl = textPlaneRef.value
-  if (!textEl) return
-  
-  // Use text_content field or name as fallback
-  const textValue = content.text_content || content.name || 'Texto de ejemplo'
-  const textColor = content.text_color || '#FFFFFF'
-  
-  textEl.setAttribute('value', textValue)
-  textEl.setAttribute('color', textColor)
-  textEl.setAttribute('visible', 'true')
-  
-  // Apply position adjustments
-  const posX = content.position_x || 0
-  const posY = content.position_y || 0
-  const posZ = content.position_z || 0
-  textEl.setAttribute('position', `${posX} ${posY} ${posZ}`)
-}
+// Note: loadText function is now defined earlier with 3D text support
 
 // --- Audio Content ---
 function loadAudio(url) {

@@ -76,7 +76,11 @@ export function useARContent() {
             position_y,
             position_z,
             text_content,
-            text_color
+            text_color,
+            text_style,
+            text_font_size,
+            text_font_family,
+            text_animation
           )
         `)
         .eq('marker_id', markerId)
@@ -84,8 +88,14 @@ export function useARContent() {
 
       if (contentsError) throw new Error(`Error al buscar contenidos: ${contentsError.message}`)
 
+      // Filter: content must have (content_url AND type) OR (text_content AND type=text)
       associatedContents.value = (contentsData || [])
-        .filter((i) => i.contents?.content_url && i.contents?.type)
+        .filter((i) => {
+          const c = i.contents
+          if (!c || !c.type) return false
+          // Allow text-only content (no URL) OR media content (with URL)
+          return (c.type === 'text' && c.text_content) || (c.content_url && c.type)
+        })
         .map((i) => ({ ...i.contents, display_order: i.display_order }))
         .sort((a, b) => a.display_order - b.display_order)
 
