@@ -51,6 +51,7 @@ function registerChromaKeyShader() {
             smoothness: { value: 0.15 }  // Edge smoothing
           },
           vertexShader: `
+            precision mediump float;
             varying vec2 vUv;
             void main() {
               vUv = uv;
@@ -58,6 +59,7 @@ function registerChromaKeyShader() {
             }
           `,
           fragmentShader: `
+            precision mediump float;
             uniform sampler2D map;
             uniform vec3 keyColor;
             uniform float similarity;
