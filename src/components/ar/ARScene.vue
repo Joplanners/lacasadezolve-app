@@ -621,7 +621,15 @@ const calY = ref(0)
 const calZ = ref(0)
 const calRotX = ref(0)
 // Using a reactive ref for scale to allow UI adjustments
-const finalScale = ref(1.0) 
+const finalScale = ref(1.0)
+
+// COMPUTED PROPERTIES: Guarantee clean numeric output for template bindings
+// This prevents any string contamination from reaching A-Frame
+const safeCalX = computed(() => Number(calX.value) || 0)
+const safeCalY = computed(() => Number(calY.value) || 0)
+const safeCalZ = computed(() => Number(calZ.value) || 0)
+const safeCalRotX = computed(() => Number(calRotX.value) || 0)
+const safeScale = computed(() => Number(finalScale.value) || 1)
 
 onMounted(() => {
   // Check for calibration mode
@@ -705,9 +713,9 @@ defineExpose({
         <a-entity 
           ref="contentScalerRef" 
           id="contentScaler" 
-          :scale="`${finalScale} ${finalScale} ${finalScale}`" 
-          :position="`${calX} ${calY} ${calZ}`"
-          :rotation="`${calRotX} 0 0`"
+          :scale="`${safeScale} ${safeScale} ${safeScale}`" 
+          :position="`${safeCalX} ${safeCalY} ${safeCalZ}`"
+          :rotation="`${safeCalRotX} 0 0`"
         >
           <!-- Image Plane -->
           <a-image
@@ -758,8 +766,8 @@ defineExpose({
     <div v-if="showCalibration" class="calibration-ui">
       <div class="cal-header">🛠️ Calib: {{ currentContent?.type || 'AR' }}</div>
       <div class="cal-readout">
-        <div>Pos: {{ calX.toFixed(2) }}, {{ calY.toFixed(2) }}, {{ calZ.toFixed(2) }}</div>
-        <div>Rot X: {{ calRotX }}° | Scale: {{ finalScale.toFixed(2) }}</div>
+        <div>Pos: {{ safeCalX.toFixed(2) }}, {{ safeCalY.toFixed(2) }}, {{ safeCalZ.toFixed(2) }}</div>
+        <div>Rot X: {{ safeCalRotX }}° | Scale: {{ safeScale.toFixed(2) }}</div>
       </div>
       <div class="cal-controls">
         <div class="cal-row">
