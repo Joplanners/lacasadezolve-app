@@ -572,10 +572,12 @@ function updatePlaneDimensions(content) {
   let defaultY = isMobile ? defaultMobileY : 0
   
   // DB values take precedence over defaults
+  // DB values take precedence over defaults
   // Note: We check if property exists to allow 0 as a valid override
-  const posX = (content.position_x !== undefined && content.position_x !== null) ? content.position_x : 0
-  const posY = (content.position_y !== undefined && content.position_y !== null) ? content.position_y : defaultY
-  const posZ = (content.position_z !== undefined && content.position_z !== null) ? content.position_z : 0
+  // CRITICAL FIX: Ensure values are cast to Number to prevent string concatenation bugs
+  const posX = (content.position_x !== undefined && content.position_x !== null) ? Number(content.position_x) : 0
+  const posY = (content.position_y !== undefined && content.position_y !== null) ? Number(content.position_y) : defaultY
+  const posZ = (content.position_z !== undefined && content.position_z !== null) ? Number(content.position_z) : 0
   
   // Update Calibration UI State to match initial values
   calX.value = posX
@@ -593,6 +595,9 @@ function updatePlaneDimensions(content) {
     videoPlaneRef.value.setAttribute('position', '0 0 0')
   } else if (type === 'image' && imagePlaneRef.value) {
     imagePlaneRef.value.setAttribute('position', '0 0 0')
+  } else if (type === 'text' && textPlaneRef.value) {
+    // Also reset text plane position!
+    textPlaneRef.value.setAttribute('position', '0 0 0')
   }
 }
 
