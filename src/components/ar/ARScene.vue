@@ -505,8 +505,8 @@ function updatePlaneDimensions(content) {
   
   // Determine base scale - use smaller value for mobile to fix offset issues
   if (content.auto_scale !== false) {
-    // Auto-scale mode: mobile = 1.0, desktop = 1.3
-    baseScale = isMobile ? 1.0 : 1.3
+    // Auto-scale mode: mobile = 0.7, desktop = 2.0
+    baseScale = isMobile ? 0.7 : 2.0
     console.log('[ARScene] Auto-scale mode, isMobile:', isMobile, 'baseScale:', baseScale)
   } else {
     // Manual mode: use 1.0 as base
