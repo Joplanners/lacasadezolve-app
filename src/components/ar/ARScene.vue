@@ -589,6 +589,8 @@ function updatePlaneDimensions(content) {
 const showCalibration = ref(false)
 const calX = ref(0)
 const calY = ref(0)
+const calZ = ref(0)
+const calRotX = ref(0)
 // Using a reactive ref for scale to allow UI adjustments
 const finalScale = ref(1.0) 
 
@@ -604,6 +606,8 @@ onMounted(() => {
 function adjustCal(prop, delta) {
   if (prop === 'x') calX.value += delta
   if (prop === 'y') calY.value += delta
+  if (prop === 'z') calZ.value += delta
+  if (prop === 'rotx') calRotX.value += (delta * 100) // Rotate in larger chunks (5 deg)
   if (prop === 'scale') finalScale.value += delta
 }
 
@@ -667,11 +671,13 @@ defineExpose({
         @targetFound="handleTargetFound"
         @targetLost="handleTargetLost"
       >
+
         <a-entity 
           ref="contentScalerRef" 
           id="contentScaler" 
           :scale="`${finalScale} ${finalScale} ${finalScale}`" 
-          :position="`${calX} ${calY} 0`"
+          :position="`${calX} ${calY} ${calZ}`"
+          :rotation="`${calRotX} 0 0`"
         >
           <!-- Image Plane -->
           <a-image
@@ -705,40 +711,44 @@ defineExpose({
           <a-text
             ref="textPlaneRef"
             id="textPlane"
-            position="0 0 0"
-            rotation="0 0 0"
             visible="false"
+            position="0 0 0"
             align="center"
             anchor="center"
             baseline="center"
-            color="#FFFFFF"
-            value=""
-            width="1.5"
+            width="2"
+            color="white"
             wrap-count="30"
           ></a-text>
         </a-entity>
       </a-entity>
     </a-scene>
+
     <!-- Calibration UI (Only visible if ?debug=calibrate is in URL) -->
     <div v-if="showCalibration" class="calibration-ui">
-      <div class="cal-header">🛠️ Calibración AR</div>
+      <div class="cal-header">🛠️ Calib: {{ currentContent?.type || 'AR' }}</div>
       <div class="cal-readout">
-        <div>X: {{ calX.toFixed(2) }}</div>
-        <div>Y: {{ calY.toFixed(2) }}</div>
-        <div>Scale: {{ finalScale.toFixed(2) }}</div>
+        <div>Pos: {{ calX.toFixed(2) }}, {{ calY.toFixed(2) }}, {{ calZ.toFixed(2) }}</div>
+        <div>Rot X: {{ calRotX }}° | Scale: {{ finalScale.toFixed(2) }}</div>
       </div>
       <div class="cal-controls">
         <div class="cal-row">
-          <button @click="adjustCal('y', 0.05)" class="cal-btn">⬆️ Subir</button>
+          <button @click="adjustCal('y', 0.05)" class="cal-btn">⬆️ Y+</button>
+          <button @click="adjustCal('z', -0.05)" class="cal-btn">🌑 Fondo</button>
         </div>
         <div class="cal-row">
-          <button @click="adjustCal('x', -0.05)" class="cal-btn">⬅️ Izq</button>
-          <button @click="adjustCal('x', 0.05)" class="cal-btn">Der ➡️</button>
+          <button @click="adjustCal('x', -0.05)" class="cal-btn">⬅️ X-</button>
+          <button @click="adjustCal('x', 0.05)" class="cal-btn">X+ ➡️</button>
         </div>
         <div class="cal-row">
-          <button @click="adjustCal('y', -0.05)" class="cal-btn">⬇️ Bajar</button>
+          <button @click="adjustCal('y', -0.05)" class="cal-btn">⬇️ Y-</button>
+          <button @click="adjustCal('z', 0.05)" class="cal-btn">🌕 Frente</button>
         </div>
         <div class="cal-divider"></div>
+        <div class="cal-row">
+          <button @click="adjustCal('rotx', -5)" class="cal-btn">🔄 Tumbado</button>
+          <button @click="adjustCal('rotx', 5)" class="cal-btn">🔄 Parado</button>
+        </div>
         <div class="cal-row">
           <button @click="adjustCal('scale', 0.05)" class="cal-btn">➕ Zoom</button>
           <button @click="adjustCal('scale', -0.05)" class="cal-btn">➖ Zoom</button>
