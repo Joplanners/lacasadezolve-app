@@ -698,6 +698,26 @@ a-scene {
   background-color: transparent !important;
 }
 
+/* Fix for MindAR canvas alignment on mobile */
+/* Camera feed canvas */
+a-scene :deep(.mindar-ui-overlay),
+a-scene :deep(video) {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  object-fit: cover !important;
+}
+
+/* WebGL canvas alignment */
+a-scene :deep(canvas.a-canvas) {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 /* Force MindAR video to be visible */
 a-scene video,
 a-scene canvas {
