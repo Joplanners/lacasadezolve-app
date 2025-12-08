@@ -747,7 +747,7 @@ onUnmounted(() => {
             type="number" 
             id="scaleOverride" 
             v-model.number="formData.scale_override" 
-            step="0.1" 
+            step="0.01" 
             min="0.1" 
             max="5.0"
             placeholder="1.0 = tamaño normal"
@@ -760,18 +760,18 @@ onUnmounted(() => {
           <div class="position-controls">
             <div class="form-group">
               <label for="posX">Posición X (horizontal):</label>
-              <input type="number" id="posX" v-model.number="formData.position_x" step="0.1" />
+              <input type="number" id="posX" v-model.number="formData.position_x" step="0.01" />
               <small>Negativo = izquierda, Positivo = derecha</small>
             </div>
             <div class="form-group">
               <label for="posY">Posición Y (vertical):</label>
-              <input type="number" id="posY" v-model.number="formData.position_y" step="0.1" />
+              <input type="number" id="posY" v-model.number="formData.position_y" step="0.01" />
               <small>Negativo = abajo, Positivo = arriba</small>
             </div>
             <div class="form-group">
               <label for="posZ">Posición Z (profundidad):</label>
-              <input type="number" id="posZ" v-model.number="formData.position_z" step="0.1" />
-              <small>Negativo = atrás, Positivo = adelante</small>
+              <input type="number" id="posZ" v-model.number="formData.position_z" step="0.01" />
+              <small>Negativo = alejar, Positivo = acercar</small>
             </div>
           </div>
         </details>
