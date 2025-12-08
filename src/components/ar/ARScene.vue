@@ -501,7 +501,7 @@ function updatePlaneDimensions(content) {
   let width = 1
   let height = 1
   let baseScale = 1
-  let finalScale = 1
+  // Removed local finalScale to use global ref
   
   console.log('[ARScene] updatePlaneDimensions:', {
     type,
@@ -769,7 +769,10 @@ a-scene {
 
 
 /* Force strict alignment for MindAR video and canvas to fix mobile offsets */
-a-scene video,
+
+/* Force strict alignment for MindAR video and canvas to fix mobile offsets */
+/* CRITICAL FIX: Exclude video assets inside a-assets from being forced visible */
+a-scene video:not(#videoAsset),
 a-scene canvas {
   display: block !important;
   visibility: visible !important;
