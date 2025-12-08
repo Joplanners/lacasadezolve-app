@@ -500,10 +500,14 @@ function updatePlaneDimensions(content) {
     use_chroma_key: content.use_chroma_key
   })
   
-  // Determine base scale
+  // Detect mobile device for responsive scaling
+  const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  
+  // Determine base scale - use smaller value for mobile to fix offset issues
   if (content.auto_scale !== false) {
-    // Auto-scale mode: use 1.3 as base
-    baseScale = 1.3
+    // Auto-scale mode: mobile = 1.0, desktop = 1.3
+    baseScale = isMobile ? 1.0 : 1.3
+    console.log('[ARScene] Auto-scale mode, isMobile:', isMobile, 'baseScale:', baseScale)
   } else {
     // Manual mode: use 1.0 as base
     baseScale = 1.0
@@ -698,25 +702,7 @@ a-scene {
   background-color: transparent !important;
 }
 
-/* Fix for MindAR canvas alignment on mobile */
-/* Camera feed canvas */
-a-scene :deep(.mindar-ui-overlay),
-a-scene :deep(video) {
-  position: absolute !important;
-  left: 50% !important;
-  top: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  object-fit: cover !important;
-}
-
-/* WebGL canvas alignment */
-a-scene :deep(canvas.a-canvas) {
-  position: absolute !important;
-  left: 0 !important;
-  top: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-}
+/* Note: Removed CSS transform fixes - they interfered with MindAR coordinates */
 
 /* Force MindAR video to be visible */
 a-scene video,
