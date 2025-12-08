@@ -525,12 +525,13 @@ function updatePlaneDimensions(content) {
   
   // Apply scale_override as a multiplier if provided
   if (content.scale_override && content.scale_override > 0) {
-    finalScale = content.scale_override
+    // Update global ref for the parent scaler
+    finalScale.value = content.scale_override
   } else {
-    finalScale = baseScale
+    finalScale.value = baseScale
   }
   
-  console.log('[ARScene] Final scale:', finalScale)
+  console.log('[ARScene] Final scale:', finalScale.value)
   
   if (type === 'video' && videoAssetRef.value) {
     const v = videoAssetRef.value
@@ -541,7 +542,8 @@ function updatePlaneDimensions(content) {
     if (videoPlaneRef.value) {
       videoPlaneRef.value.setAttribute('width', '1')
       videoPlaneRef.value.setAttribute('height', height.toString())
-      videoPlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
+      // Scale is now handled by parent contentScaler, so reset child scale or don't set it
+      videoPlaneRef.value.setAttribute('scale', '1 1 1')
       videoPlaneRef.value.setAttribute('visible', 'true')
       
       // Apply chroma key shader if needed
@@ -561,7 +563,7 @@ function updatePlaneDimensions(content) {
     if (imagePlaneRef.value) {
       imagePlaneRef.value.setAttribute('width', '1')
       imagePlaneRef.value.setAttribute('height', height.toString())
-      imagePlaneRef.value.setAttribute('scale', `${finalScale} ${finalScale} 1`)
+      imagePlaneRef.value.setAttribute('scale', '1 1 1') 
       imagePlaneRef.value.setAttribute('visible', 'true')
     }
   }
@@ -578,8 +580,33 @@ function updatePlaneDimensions(content) {
   }
 }
 
+
 // --- Lifecycle ---
 // Expose methods if needed by parent
+// (Moved defineExpose to end to avoid syntax error with reactive vars)
+
+// --- Calibration Logic ---
+const showCalibration = ref(false)
+const calX = ref(0)
+const calY = ref(0)
+// Using a reactive ref for scale to allow UI adjustments
+const finalScale = ref(1.0) 
+
+onMounted(() => {
+  // Check for calibration mode
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.get('debug') === 'calibrate') {
+    showCalibration.value = true
+    console.log('[ARScene] Calibration mode enabled')
+  }
+})
+
+function adjustCal(prop, delta) {
+  if (prop === 'x') calX.value += delta
+  if (prop === 'y') calY.value += delta
+  if (prop === 'scale') finalScale.value += delta
+}
+
 defineExpose({
   playVideo,
   pauseVideo,
@@ -643,8 +670,8 @@ defineExpose({
         <a-entity 
           ref="contentScalerRef" 
           id="contentScaler" 
-          :scale="`${scaleFactor} ${scaleFactor} ${scaleFactor}`" 
-          position="0 0 0"
+          :scale="`${finalScale} ${finalScale} ${finalScale}`" 
+          :position="`${calX} ${calY} 0`"
         >
           <!-- Image Plane -->
           <a-image
@@ -692,6 +719,32 @@ defineExpose({
         </a-entity>
       </a-entity>
     </a-scene>
+    <!-- Calibration UI (Only visible if ?debug=calibrate is in URL) -->
+    <div v-if="showCalibration" class="calibration-ui">
+      <div class="cal-header">🛠️ Calibración AR</div>
+      <div class="cal-readout">
+        <div>X: {{ calX.toFixed(2) }}</div>
+        <div>Y: {{ calY.toFixed(2) }}</div>
+        <div>Scale: {{ finalScale.toFixed(2) }}</div>
+      </div>
+      <div class="cal-controls">
+        <div class="cal-row">
+          <button @click="adjustCal('y', 0.05)" class="cal-btn">⬆️ Subir</button>
+        </div>
+        <div class="cal-row">
+          <button @click="adjustCal('x', -0.05)" class="cal-btn">⬅️ Izq</button>
+          <button @click="adjustCal('x', 0.05)" class="cal-btn">Der ➡️</button>
+        </div>
+        <div class="cal-row">
+          <button @click="adjustCal('y', -0.05)" class="cal-btn">⬇️ Bajar</button>
+        </div>
+        <div class="cal-divider"></div>
+        <div class="cal-row">
+          <button @click="adjustCal('scale', 0.05)" class="cal-btn">➕ Zoom</button>
+          <button @click="adjustCal('scale', -0.05)" class="cal-btn">➖ Zoom</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -740,8 +793,85 @@ a-scene canvas {
   height: 100% !important;
   object-fit: cover !important;
 }
+
 .mindar-ui-loading,
 .mindar-ui-compatibility {
   display: none !important;
+}
+
+
+/* Calibration UI Styles */
+.calibration-ui {
+  position: fixed;
+  top: 60px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #00ff00;
+  padding: 15px;
+  border-radius: 12px;
+  z-index: 99999;
+  font-family: monospace;
+  border: 1px solid #00ff00;
+  backdrop-filter: blur(5px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 120px;
+}
+
+.cal-header {
+  font-weight: bold;
+  text-align: center;
+  border-bottom: 1px solid #00ff00;
+  padding-bottom: 5px;
+  margin-bottom: 5px;
+}
+
+.cal-readout {
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+  background: rgba(0, 50, 0, 0.5);
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.cal-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.cal-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+}
+
+.cal-btn {
+  background: #333;
+  color: white;
+  border: 1px solid #666;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  font-weight: bold;
+}
+
+.cal-btn:active {
+  background: #555;
+  transform: scale(0.95);
+}
+
+.cal-divider {
+  height: 1px;
+  background: #444;
+  width: 100%;
+  margin: 5px 0;
 }
 </style>
