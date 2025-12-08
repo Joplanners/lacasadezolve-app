@@ -349,12 +349,25 @@ function loadText(content) {
     textEl.setAttribute('width', (fontSize * 3).toString())
   }
   
+  // Clear any existing animation timeouts
+  if (textEl.animationTimeout) {
+    clearTimeout(textEl.animationTimeout)
+  }
+  
+  // Reset state first to ensure visibility
+  textEl.removeAttribute('animation')
+  textEl.removeAttribute('animation__scale')
+  textEl.setAttribute('opacity', '1')
+  textEl.setAttribute('scale', '1 1 1')
+  
   // Apply entry animation
   if (animation !== 'none') {
+    // Force initial state for animation
     textEl.setAttribute('opacity', '0')
     textEl.setAttribute('scale', '0.01 0.01 0.01')
     
-    setTimeout(() => {
+    // Slight delay to ensure DOM update
+    textEl.animationTimeout = setTimeout(() => {
       if (animation === 'fadeIn') {
         textEl.setAttribute('animation', 'property: opacity; from: 0; to: 1; dur: 800; easing: easeOutQuad')
         textEl.setAttribute('animation__scale', 'property: scale; from: 0.01 0.01 0.01; to: 1 1 1; dur: 800; easing: easeOutQuad')
@@ -364,14 +377,11 @@ function loadText(content) {
       } else if (animation === 'bounceIn') {
         textEl.setAttribute('opacity', '1')
         textEl.setAttribute('animation', 'property: scale; from: 0.01 0.01 0.01; to: 1.1 1.1 1.1; dur: 400; easing: easeOutQuad')
-        setTimeout(() => {
+        textEl.animationTimeout = setTimeout(() => {
           textEl.setAttribute('animation', 'property: scale; from: 1.1 1.1 1.1; to: 1 1 1; dur: 200; easing: easeInQuad')
         }, 400)
       }
-    }, 100)
-  } else {
-    textEl.setAttribute('opacity', '1')
-    textEl.setAttribute('scale', '1 1 1')
+    }, 50) // Reduced delay
   }
   
   textEl.setAttribute('visible', 'true')
@@ -704,16 +714,32 @@ a-scene {
 
 /* Note: Removed CSS transform fixes - they interfered with MindAR coordinates */
 
-/* Force MindAR video to be visible */
+
+/* Force strict alignment for MindAR video and canvas to fix mobile offsets */
 a-scene video,
 a-scene canvas {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
-/* Ensure the camera video feed is positioned correctly */
-.mindar-ui-overlay,
+/* Ensure the camera video feed in overlays is also positioned correctly */
+.mindar-ui-overlay video {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
 .mindar-ui-loading,
 .mindar-ui-compatibility {
   display: none !important;
