@@ -497,6 +497,14 @@ watch(() => props.isMarkerVisible, (visible) => {
 function updatePlaneDimensions(content) {
   if (!content) return
   
+  // CRITICAL RESET: Prevent accumulation of previous content's values
+  // Zero out all calibration refs BEFORE assigning new values
+  calX.value = 0
+  calY.value = 0
+  calZ.value = 0
+  calRotX.value = 0
+  // finalScale will be set below based on content/device
+  
   const type = content.type.toLowerCase()
   let width = 1
   let height = 1
@@ -625,11 +633,12 @@ onMounted(() => {
 })
 
 function adjustCal(prop, delta) {
-  if (prop === 'x') calX.value += delta
-  if (prop === 'y') calY.value += delta
-  if (prop === 'z') calZ.value += delta
-  if (prop === 'rotx') calRotX.value += (delta * 100) // Rotate in larger chunks (5 deg)
-  if (prop === 'scale') finalScale.value += delta
+  // CRITICAL: Ensure we're doing math, not string concatenation
+  if (prop === 'x') calX.value = Number(calX.value) + Number(delta)
+  if (prop === 'y') calY.value = Number(calY.value) + Number(delta)
+  if (prop === 'z') calZ.value = Number(calZ.value) + Number(delta)
+  if (prop === 'rotx') calRotX.value = Number(calRotX.value) + Number(delta)
+  if (prop === 'scale') finalScale.value = Number(finalScale.value) + Number(delta)
 }
 
 defineExpose({
