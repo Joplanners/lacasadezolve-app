@@ -513,19 +513,19 @@ function updatePlaneDimensions(content) {
   // Detect mobile device for responsive scaling
   const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
   
-  // Determine base scale - use smaller value for mobile to fix offset issues
+  // Smart Defaults based on User Calibration
+  let defaultMobileScale = 1.5 // User found ~1.5 to be good
+  let defaultMobileY = -0.4    // User found -0.3 to -0.6 to be good
+  
+  // Determining Base Scale
   if (content.auto_scale !== false) {
-    // Auto-scale mode: mobile = 0.7, desktop = 2.0
-    baseScale = isMobile ? 0.7 : 2.0
-    console.log('[ARScene] Auto-scale mode, isMobile:', isMobile, 'baseScale:', baseScale)
+    baseScale = isMobile ? defaultMobileScale : 2.0
   } else {
-    // Manual mode: use 1.0 as base
     baseScale = 1.0
   }
   
-  // Apply scale_override as a multiplier if provided
+  // Apply scale_override (DB) > Base Scale (Mobile Default)
   if (content.scale_override && content.scale_override > 0) {
-    // Update global ref for the parent scaler
     finalScale.value = content.scale_override
   } else {
     finalScale.value = baseScale
@@ -542,7 +542,6 @@ function updatePlaneDimensions(content) {
     if (videoPlaneRef.value) {
       videoPlaneRef.value.setAttribute('width', '1')
       videoPlaneRef.value.setAttribute('height', height.toString())
-      // Scale is now handled by parent contentScaler, so reset child scale or don't set it
       videoPlaneRef.value.setAttribute('scale', '1 1 1')
       videoPlaneRef.value.setAttribute('visible', 'true')
       
@@ -569,14 +568,31 @@ function updatePlaneDimensions(content) {
   }
   
   // Apply position adjustments
-  const posX = content.position_x || 0
-  const posY = content.position_y || 0
-  const posZ = content.position_z || 0
+  // Smart Default for Y on mobile if not overridden
+  let defaultY = isMobile ? defaultMobileY : 0
+  
+  // DB values take precedence over defaults
+  // Note: We check if property exists to allow 0 as a valid override
+  const posX = (content.position_x !== undefined && content.position_x !== null) ? content.position_x : 0
+  const posY = (content.position_y !== undefined && content.position_y !== null) ? content.position_y : defaultY
+  const posZ = (content.position_z !== undefined && content.position_z !== null) ? content.position_z : 0
+  
+  // Update Calibration UI State to match initial values
+  calX.value = posX
+  calY.value = posY
+  calZ.value = posZ
+  
+  // Note: Ideally we should apply these to the contentScaler parent, but current logic applies to children planes. 
+  // Wait! The template binds `contentScaler` position to `calX/Y/Z`.
+  // So we MUST update calX/Y/Z for the position to take effect on the parent!
+  // The lines below setting attributes on planes are actually REDUNDANT/CONFLICTING if we move the scene.
+  // CORRECT APPROACH: Update calX/Y/Z refs, don't set position on children.
   
   if (type === 'video' && videoPlaneRef.value) {
-    videoPlaneRef.value.setAttribute('position', `${posX} ${posY} ${posZ}`)
+     // Reset child position to 0 because parent moves
+    videoPlaneRef.value.setAttribute('position', '0 0 0')
   } else if (type === 'image' && imagePlaneRef.value) {
-    imagePlaneRef.value.setAttribute('position', `${posX} ${posY} ${posZ}`)
+    imagePlaneRef.value.setAttribute('position', '0 0 0')
   }
 }
 
