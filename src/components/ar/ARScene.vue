@@ -518,21 +518,43 @@ function updatePlaneDimensions(content) {
     use_chroma_key: content.use_chroma_key
   })
   
-  // Detect mobile device for responsive scaling
-  const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  // 3-TIER DEVICE DETECTION: Phone vs Tablet vs Desktop
+  const screenWidth = window.innerWidth
+  const isSmallPhone = screenWidth <= 480  // Small phones only
+  const isTablet = screenWidth > 480 && screenWidth <= 1024
+  const isDesktop = screenWidth > 1024
   
-  // Smart Defaults based on User Calibration
-  let defaultMobileScale = 1.5 // User found ~1.5 to be good
-  let defaultMobileY = -0.4    // User found -0.3 to -0.6 to be good
+  // Also check user agent for touch devices
+  const isTouchDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  
+  console.log('[ARScene] Device detection:', { screenWidth, isSmallPhone, isTablet, isDesktop, isTouchDevice })
+  
+  // Smart Defaults based on User Calibration per device type
+  let defaultScale = 1.0
+  let defaultY = 0
+  
+  if (isSmallPhone) {
+    // Small phones: User found ~1.5 scale and -0.4 Y offset works well
+    defaultScale = 1.5
+    defaultY = -0.4
+  } else if (isTablet) {
+    // Tablets: No Y offset needed, slightly larger scale
+    defaultScale = 1.8
+    defaultY = 0
+  } else {
+    // Desktop: Original behavior
+    defaultScale = 2.0
+    defaultY = 0
+  }
   
   // Determining Base Scale
   if (content.auto_scale !== false) {
-    baseScale = isMobile ? defaultMobileScale : 2.0
+    baseScale = defaultScale
   } else {
     baseScale = 1.0
   }
   
-  // Apply scale_override (DB) > Base Scale (Mobile Default)
+  // Apply scale_override (DB) > Base Scale
   if (content.scale_override && content.scale_override > 0) {
     finalScale.value = content.scale_override
   } else {
@@ -576,10 +598,8 @@ function updatePlaneDimensions(content) {
   }
   
   // Apply position adjustments
-  // Smart Default for Y on mobile if not overridden
-  let defaultY = isMobile ? defaultMobileY : 0
+  // defaultY was already set in the 3-tier device detection above
   
-  // DB values take precedence over defaults
   // DB values take precedence over defaults
   // Note: We check if property exists to allow 0 as a valid override
   // CRITICAL FIX: Ensure values are cast to Number to prevent string concatenation bugs
