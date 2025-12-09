@@ -598,14 +598,27 @@ function updatePlaneDimensions(content) {
   }
   
   // Apply position adjustments
-  // defaultY was already set in the 3-tier device detection above
+  // LOGIC: 
+  // - auto_scale TRUE  → Use smart device defaults (ignore DB position)
+  // - auto_scale FALSE → Use DB position values (manual mode)
   
-  // DB values take precedence over defaults
-  // Note: We check if property exists to allow 0 as a valid override
-  // CRITICAL FIX: Ensure values are cast to Number to prevent string concatenation bugs
-  const posX = (content.position_x !== undefined && content.position_x !== null) ? Number(content.position_x) : 0
-  const posY = (content.position_y !== undefined && content.position_y !== null) ? Number(content.position_y) : defaultY
-  const posZ = (content.position_z !== undefined && content.position_z !== null) ? Number(content.position_z) : 0
+  let posX = 0
+  let posY = 0
+  let posZ = 0
+  
+  if (content.auto_scale !== false) {
+    // AUTO MODE: Use device-specific defaults only
+    posX = 0
+    posY = defaultY  // From 3-tier device detection
+    posZ = 0
+    console.log('[ARScene] Auto-scale ON: Using device defaults', { posX, posY, posZ })
+  } else {
+    // MANUAL MODE: Use DB values
+    posX = (content.position_x !== undefined && content.position_x !== null) ? Number(content.position_x) : 0
+    posY = (content.position_y !== undefined && content.position_y !== null) ? Number(content.position_y) : 0
+    posZ = (content.position_z !== undefined && content.position_z !== null) ? Number(content.position_z) : 0
+    console.log('[ARScene] Auto-scale OFF: Using DB values', { posX, posY, posZ })
+  }
   
   // Update Calibration UI State to match initial values
   calX.value = posX
