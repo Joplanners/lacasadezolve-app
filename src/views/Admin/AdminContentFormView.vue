@@ -109,6 +109,12 @@ async function fetchContentData(contentId) {
     formData.value.position_x = contentData.position_x || 0
     formData.value.position_y = contentData.position_y || 0
     formData.value.position_z = contentData.position_z || 0
+    // Mobile-specific fields
+    formData.value.mobile_scale = contentData.mobile_scale || null
+    formData.value.mobile_position_x = contentData.mobile_position_x || null
+    formData.value.mobile_position_y = contentData.mobile_position_y || null
+    formData.value.mobile_position_z = contentData.mobile_position_z || null
+    // Text fields
     formData.value.text_content = contentData.text_content || ''
     formData.value.text_color = contentData.text_color || '#FFFFFF'
     formData.value.text_style = contentData.text_style || 'simple'
@@ -290,6 +296,12 @@ async function saveContent() {
         position_x: formData.value.position_x,
         position_y: formData.value.position_y,
         position_z: formData.value.position_z,
+        // Mobile-specific fields
+        mobile_scale: formData.value.mobile_scale,
+        mobile_position_x: formData.value.mobile_position_x,
+        mobile_position_y: formData.value.mobile_position_y,
+        mobile_position_z: formData.value.mobile_position_z,
+        // Text fields
         text_content: formData.value.text_content,
         text_color: formData.value.text_color,
         text_style: formData.value.text_style,
@@ -360,6 +372,10 @@ async function saveContent() {
           position_x: formData.value.position_x,
           position_y: formData.value.position_y,
           position_z: formData.value.position_z,
+          mobile_scale: formData.value.mobile_scale,
+          mobile_position_x: formData.value.mobile_position_x,
+          mobile_position_y: formData.value.mobile_position_y,
+          mobile_position_z: formData.value.mobile_position_z,
         }
 
         const { error: dbError } = await supabase.from('contents').insert(textContentData)
@@ -451,6 +467,10 @@ async function saveContent() {
         position_x: formData.value.position_x,
         position_y: formData.value.position_y,
         position_z: formData.value.position_z,
+        mobile_scale: formData.value.mobile_scale,
+        mobile_position_x: formData.value.mobile_position_x,
+        mobile_position_y: formData.value.mobile_position_y,
+        mobile_position_z: formData.value.mobile_position_z,
         text_content: formData.value.text_content,
         text_color: formData.value.text_color,
       }
