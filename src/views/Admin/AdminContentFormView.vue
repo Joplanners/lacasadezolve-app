@@ -27,6 +27,12 @@ const formData = ref({
   position_x: 0,
   position_y: 0,
   position_z: 0,
+  // Mobile-specific settings
+  mobile_scale: null,
+  mobile_position_x: null,
+  mobile_position_y: null,
+  mobile_position_z: null,
+  // Text settings
   text_content: '',
   text_color: '#FFFFFF',
   text_style: 'simple', // 'simple' or '3d'
@@ -738,43 +744,59 @@ onUnmounted(() => {
         <div class="form-group checkbox-group">
           <input type="checkbox" id="autoScale" v-model="formData.auto_scale" />
           <label for="autoScale">🎯 Auto-ajustar al marcador</label>
-          <small>El contenido se escalará automáticamente para cubrir el marcador (efecto "piel")</small>
+          <small>Si está activo, se usarán ajustes automáticos inteligentes</small>
         </div>
 
-        <div v-if="!formData.auto_scale" class="form-group">
-          <label for="scaleOverride">Escala Manual:</label>
-          <input 
-            type="number" 
-            id="scaleOverride" 
-            v-model.number="formData.scale_override" 
-            step="0.01" 
-            min="0.1" 
-            max="5.0"
-            placeholder="1.0 = tamaño normal"
-          />
-          <small>Valores mayores a 1.0 agrandan el contenido. Ej: 1.5 = 150% del tamaño</small>
-        </div>
+        <!-- SEPARACIÓN: Tablet/Desktop vs Móvil -->
+        <div v-if="!formData.auto_scale" class="device-settings-container">
+          
+          <!-- 💻 TABLET / DESKTOP -->
+          <details class="device-settings desktop-settings" open>
+            <summary>💻 Ajustes para Tablet / PC</summary>
+            <div class="position-controls">
+              <div class="form-group">
+                <label for="scaleOverride">Escala:</label>
+                <input type="number" id="scaleOverride" v-model.number="formData.scale_override" step="0.01" min="0.1" max="5.0" placeholder="1.0"/>
+              </div>
+              <div class="form-group">
+                <label for="posX">Posición X:</label>
+                <input type="number" id="posX" v-model.number="formData.position_x" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label for="posY">Posición Y:</label>
+                <input type="number" id="posY" v-model.number="formData.position_y" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label for="posZ">Posición Z:</label>
+                <input type="number" id="posZ" v-model.number="formData.position_z" step="0.01" />
+              </div>
+            </div>
+          </details>
 
-        <details class="advanced-controls">
-          <summary>Ajustes Avanzados (Posición)</summary>
-          <div class="position-controls">
-            <div class="form-group">
-              <label for="posX">Posición X (horizontal):</label>
-              <input type="number" id="posX" v-model.number="formData.position_x" step="0.01" />
-              <small>Negativo = izquierda, Positivo = derecha</small>
+          <!-- 📱 MÓVIL -->
+          <details class="device-settings mobile-settings" open>
+            <summary>📱 Ajustes para Celulares</summary>
+            <div class="position-controls">
+              <div class="form-group">
+                <label for="mobileScale">Escala Móvil:</label>
+                <input type="number" id="mobileScale" v-model.number="formData.mobile_scale" step="0.01" min="0.1" max="5.0" placeholder="1.0"/>
+              </div>
+              <div class="form-group">
+                <label for="mobilePosX">Posición X:</label>
+                <input type="number" id="mobilePosX" v-model.number="formData.mobile_position_x" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label for="mobilePosY">Posición Y:</label>
+                <input type="number" id="mobilePosY" v-model.number="formData.mobile_position_y" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label for="mobilePosZ">Posición Z:</label>
+                <input type="number" id="mobilePosZ" v-model.number="formData.mobile_position_z" step="0.01" />
+              </div>
             </div>
-            <div class="form-group">
-              <label for="posY">Posición Y (vertical):</label>
-              <input type="number" id="posY" v-model.number="formData.position_y" step="0.01" />
-              <small>Negativo = abajo, Positivo = arriba</small>
-            </div>
-            <div class="form-group">
-              <label for="posZ">Posición Z (profundidad):</label>
-              <input type="number" id="posZ" v-model.number="formData.position_z" step="0.01" />
-              <small>Negativo = alejar, Positivo = acercar</small>
-            </div>
-          </div>
-        </details>
+            <small class="helper-text">Estos valores se aplican SOLO en teléfonos pequeños (≤480px)</small>
+          </details>
+        </div>
       </div>
 
       <div class="form-group" id="user-search-container" v-if="!formData.is_public">

@@ -518,33 +518,20 @@ function updatePlaneDimensions(content) {
     use_chroma_key: content.use_chroma_key
   })
   
-  // 3-TIER DEVICE DETECTION: Phone vs Tablet vs Desktop
+  // SIMPLIFIED DEVICE DETECTION - Conservative neutral defaults
   const screenWidth = window.innerWidth
-  const isSmallPhone = screenWidth <= 480  // Small phones only
-  const isTablet = screenWidth > 480 && screenWidth <= 1024
-  const isDesktop = screenWidth > 1024
+  const isSmallPhone = screenWidth <= 480
   
-  // Also check user agent for touch devices
-  const isTouchDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  console.log('[ARScene] Device detection:', { screenWidth, isSmallPhone })
   
-  console.log('[ARScene] Device detection:', { screenWidth, isSmallPhone, isTablet, isDesktop, isTouchDevice })
-  
-  // Smart Defaults based on User Calibration per device type
+  // NEUTRAL DEFAULTS: Work reasonably on all devices
+  // Scale 1.0 = natural size, Y 0 = centered on marker
   let defaultScale = 1.0
   let defaultY = 0
   
+  // Only small phones get a slight adjustment
   if (isSmallPhone) {
-    // Small phones: User found ~1.5 scale and -0.4 Y offset works well
-    defaultScale = 1.5
-    defaultY = -0.4
-  } else if (isTablet) {
-    // Tablets: No Y offset needed, slightly larger scale
-    defaultScale = 1.8
-    defaultY = 0
-  } else {
-    // Desktop: Original behavior
-    defaultScale = 2.0
-    defaultY = 0
+    defaultY = -0.2  // Very subtle, just to help with phone offset
   }
   
   // Determining Base Scale
@@ -600,24 +587,40 @@ function updatePlaneDimensions(content) {
   // Apply position adjustments
   // LOGIC: 
   // - auto_scale TRUE  → Use smart device defaults (ignore DB position)
-  // - auto_scale FALSE → Use DB position values (manual mode)
+  // - auto_scale FALSE → Use DB values based on device type
+  //   - Small phone: Use mobile_* fields (fallback to default if null)
+  //   - Tablet/Desktop: Use regular position_* fields
   
   let posX = 0
   let posY = 0
   let posZ = 0
+  let useScale = defaultScale
   
   if (content.auto_scale !== false) {
     // AUTO MODE: Use device-specific defaults only
     posX = 0
-    posY = defaultY  // From 3-tier device detection
+    posY = defaultY
     posZ = 0
-    console.log('[ARScene] Auto-scale ON: Using device defaults', { posX, posY, posZ })
+    console.log('[ARScene] Auto-scale ON: Using device defaults', { posX, posY, posZ, scale: useScale })
   } else {
-    // MANUAL MODE: Use DB values
-    posX = (content.position_x !== undefined && content.position_x !== null) ? Number(content.position_x) : 0
-    posY = (content.position_y !== undefined && content.position_y !== null) ? Number(content.position_y) : 0
-    posZ = (content.position_z !== undefined && content.position_z !== null) ? Number(content.position_z) : 0
-    console.log('[ARScene] Auto-scale OFF: Using DB values', { posX, posY, posZ })
+    // MANUAL MODE: Use DB values based on device type
+    if (isSmallPhone) {
+      // MOBILE: Use mobile_* fields, fallback to default if null
+      posX = (content.mobile_position_x !== undefined && content.mobile_position_x !== null) ? Number(content.mobile_position_x) : 0
+      posY = (content.mobile_position_y !== undefined && content.mobile_position_y !== null) ? Number(content.mobile_position_y) : -0.2
+      posZ = (content.mobile_position_z !== undefined && content.mobile_position_z !== null) ? Number(content.mobile_position_z) : 0
+      useScale = (content.mobile_scale !== undefined && content.mobile_scale !== null && content.mobile_scale > 0) ? Number(content.mobile_scale) : 1.0
+      console.log('[ARScene] Small phone: Using MOBILE settings', { posX, posY, posZ, scale: useScale })
+    } else {
+      // TABLET/DESKTOP: Use regular fields
+      posX = (content.position_x !== undefined && content.position_x !== null) ? Number(content.position_x) : 0
+      posY = (content.position_y !== undefined && content.position_y !== null) ? Number(content.position_y) : 0
+      posZ = (content.position_z !== undefined && content.position_z !== null) ? Number(content.position_z) : 0
+      useScale = (content.scale_override !== undefined && content.scale_override !== null && content.scale_override > 0) ? Number(content.scale_override) : 1.0
+      console.log('[ARScene] Tablet/Desktop: Using DESKTOP settings', { posX, posY, posZ, scale: useScale })
+    }
+    // Override finalScale with the device-specific manual scale
+    finalScale.value = useScale
   }
   
   // Update Calibration UI State to match initial values
