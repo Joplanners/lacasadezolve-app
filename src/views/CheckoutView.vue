@@ -438,6 +438,7 @@ async function handleCheckoutSubmit() {
       shipping_address: finalShippingAddress,
       customer_email: customerData.value.email,
       customer_name: customerData.value.fullName,
+      customer_phone: customerData.value.phone || null,
       shipping_method: selectedShippingMethod.value,
       payment_method: selectedPaymentMethod.value,
       applied_coupon_code: appliedCoupons.value.map((c) => c.code).join(', ') || null,

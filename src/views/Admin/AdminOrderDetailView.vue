@@ -203,6 +203,7 @@ function goBack() {
         <h4>Cliente</h4>
         <p><strong>Nombre:</strong> {{ order.customer_name || 'N/A' }}</p>
         <p><strong>Email:</strong> {{ order.customer_email || 'N/A' }}</p>
+        <p><strong>Teléfono:</strong> {{ order.customer_phone || 'N/A' }}</p>
         <p v-if="order.user_id">
           <strong>ID Usuario:</strong> <span class="user-id">{{ order.user_id }}</span>
         </p>
