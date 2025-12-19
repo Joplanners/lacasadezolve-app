@@ -14,7 +14,7 @@ const emit = defineEmits(['update:files'])
 
 // --- Estado Local ---
 const files = ref([])
-const maxFiles = 4
+const maxFiles = 20
 const maxFileSizeMB = 10
 
 // 🔥 Propiedad computada para saber si el usuario está logueado
@@ -72,10 +72,9 @@ const goToLogin = () => {
 <template>
   <div class="file-upload-container">
     <h4>Personaliza tu Producto</h4>
-    <p>Sube hasta {{ maxFiles }} imágenes para las portadas (frente, dorso, interior).</p>
+    <p>Sube hasta {{ maxFiles }} imágenes para tu personalización.</p>
     <p class="upload-order-info">
-      **Importante:** Sube las imágenes en este orden: 1. Portada, 2. Interior Portada, 3. Interior
-      Contraportada, 4. Contraportada.
+      **Importante:** Si tus imágenes requieren un orden específico, indícalo en el campo de "Detalles Adicionales" más abajo.
     </p>
 
     <div class="upload-area-wrapper">
