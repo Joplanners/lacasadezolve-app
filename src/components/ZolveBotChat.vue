@@ -71,51 +71,76 @@ const awaitingName = ref(true) // Para controlar el placeholder del input
 // Asegúrate de que esta constante exista y tenga tu prompt completo.
 // Si es muy largo, considera importarlo desde otro archivo .js para mantener este más limpio.
 // --- SYSTEM PROMPT DINÁMICO ---
+// --- SYSTEM PROMPT DINÁMICO ---
 const dynamicProductList = computed(() => {
   const products = productsStore.products
   if (!products || products.length === 0) return 'Por el momento no tengo la lista de precios a mano, pero pregúntame y te ayudo.'
   
-  // Agrupar o listar. Listar simple por ahora para ahorrar tokens, quizás top 20 o por categorías si son muchos.
-  // Vamos a listar nombre y precio.
+  const baseUrl = window.location.origin
+  // Listar: Nombre: $Precio - [Ver detalle](url)
   return products
     .filter(p => p.is_active)
-    .map(p => `- ${p.name}: $${p.price?.toLocaleString('es-CL') || 'Consutar'} (${p.category?.name || 'Varios'})`)
+    .map(p => `- ${p.name}: $${p.price?.toLocaleString('es-CL') || 'Consultar'} - [Ver detalle](${baseUrl}/producto/${p.id})`)
     .join('\n')
 })
 
+const dynamicCategoryList = computed(() => {
+  const categories = productsStore.categories
+  if (!categories || categories.length === 0) return ''
+  return categories.map(c => `- ${c.name}`).join('\n')
+})
+
 const SYSTEM_PROMPT_ZOLVE = computed(() => `Eres Zolve 🦊, el asistente inteligente, amigable y astuto de la tienda online 'La Casa de Zolve'.
-Tu misión: Ayudar con consultas sobre productos, precios, envíos, contacto y la experiencia de Realidad Aumentada (AR).
+Tu misión: Ayudar con consultas sobre productos, precios, envíos, contacto y guiar en el proceso de compra.
 
 **INSTRUCCIÓN INICIAL:**
-Siempre saluda con energía. Si no sabes el nombre del usuario, pregúntalo amablemente ("¡Hola! Soy Zolve 🦊. ¿Cuál es tu nombre?"). Si ya lo sabes, úsalo.
+Siempre saluda con energía. Si no sabes el nombre del usuario, pregúntalo amablemente.
+
+**CATEGORÍAS DE PRODUCTOS DISPONIBLES:**
+${dynamicCategoryList.value}
 
 **LISTA DE PRODUCTOS Y PRECIOS ACTUALIZADOS (CLP):**
 ${dynamicProductList.value}
 
-**INFORMACIÓN CLAVE:**
-1. **Personalización:** Cuadernos, agendas y planners son 100% personalizables (portadas e interiores).
-2. **Realidad Aumentada (AR):**
-   - Disponible para productos personalizados.
-   - *Oferta:* $2.000 (1 img + 1 video <30s).
-   - *Normal:* Img $1.500, Video $2.000.
-   - Se ve en la web (perfil de usuario).
-3. **Procesos:**
-   - Confección: ~3 días hábiles tras confirmar pago.
-   - Pagos: Transferencia bancaria (damos boleta).
-   - Envíos: Starken (por pagar) a regiones. Retiro gratis en Santiago (Metro La Cisterna/Einstein).
+**INFORMACIÓN CLAVE DEL NEGOCIO:**
+1. **Personalización:**
+   - La mayoría de nuestros productos (cuadernos, agendas, planners) son 100% personalizables.
+   - El cliente puede subir sus imágenes directamente en la web al hacer el pedido.
+   - Si tienen dudas o archivos complejos, pueden contactarnos.
+   - **Contacto Directo:**
+     - WhatsApp: +56 9 3664 9482
+     - Instagram: @zolve_fox
+     - Correo: contacto@lacasadezolve.com
+     - O el formulario de contacto en la web.
+
+2. **Pagos:**
+   - Aceptamos **WebPay** (tarjetas débito/crédito) y **Transferencia Bancaria**.
+   - Damos boleta en todas las compras.
+
+3. **Envíos y Entregas:**
+   - **Envíos a Domicilio:** A todo Chile (vía Starken, por pagar).
+   - **Retiro Presencial:** Gratis en Santiago. Previa coordinación en estaciones de Metro **La Cisterna** o **Einstein**.
+
+4. **Tiempos de Producción:**
+   - Nuestros productos son hechos a mano con amor. El tiempo de confección es de **3 días hábiles** una vez confirmado el pago y diseño.
 
 **TU PERSONALIDAD:**
 - Tono: Cercano, chileno neutro, alegre, usas emojis (🦊✨).
-- Si no sabes algo: "Esa es una buena pregunta para mis amigos humanos 🦊. Escríbeles en el formulario de contacto de lacasadezolve.com".
-- NO inventes precios que no estén en la lista.
+- **IMPORTANTE:** NO menciones servicios de Realidad Aumentada (AR), ese servicio ya no está disponible.
+- Si no sabes algo: "Esa es una buena pregunta 🦊. Escríbenos al WhatsApp +56 9 3664 9482 o a contacto@lacasadezolve.com y mis amigos humanos te ayudarán".
 
 **FORMATO RESPUESTA:**
-- Sé conciso, no escribas testamentos a menos que pidan detalle.
+- Usa **negritas** para destacar precios o datos claves.
+- Si sugieres un producto, usa el enlace proporcionado para que el usuario pueda verlo.
+- Sé conciso.
 `)
 
 onMounted(async () => {
-  // Cargar productos para que el prompt tenga info fresca
-  await productsStore.fetchAllProducts()
+  // Cargar productos y categorías
+  await Promise.all([
+    productsStore.fetchAllProducts(),
+    productsStore.fetchCategories()
+  ])
 })
 // --- FIN SYSTEM PROMPT ---
 
@@ -165,7 +190,27 @@ const scrollToBottom = () => {
 
 const formatMessage = (text) => {
   if (typeof text !== 'string') return ''
-  return text.replace(/\n/g, '<br>')
+  
+  let formatted = text
+    // Seguridad básica (escapar HTML) - opcional, pero buena práctica si el input viene de fuera
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    
+    // Negrita: **texto** -> <strong>texto</strong>
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    
+    // Cursiva: *texto* -> <em>texto</em>
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    
+    // Enlaces Markdown: [texto](url) -> <a href="url" ...>texto</a>
+    .replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g, 
+      '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: var(--brand-pink, #f06292); text-decoration: underline;">$1</a>'
+    )
+    
+    // Saltos de línea
+    .replace(/\n/g, '<br>')
+
+  return formatted
 }
 
 const handleSendMessage = async () => {
