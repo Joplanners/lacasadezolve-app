@@ -48,7 +48,7 @@ if (!OPENWEATHER_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
-const modelName = 'gemini-1.5-flash-latest'
+const modelName = 'gemini-2.5-flash'
 const generationConfig = { temperature: 0.7, maxOutputTokens: 800 }
 const safetySettings = [
   {
