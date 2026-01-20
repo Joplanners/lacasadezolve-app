@@ -1,0 +1,29 @@
+name: ZolveBot Health Check
+
+on:
+  schedule:
+    # Ejecutar todos los viernes a las 10:00 AM UTC (aprox 7:00 AM Chile)
+    - cron: '0 10 * * 5'
+  workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub para probar
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Chatbot API
+        run: |
+          # Reemplaza https://tu-sitio.netlify.app con tu URL real si es diferente
+          # Enviamos un "Ping" simple. Si el backend responde 200 OK, todo bien.
+          # Si el modelo murió o la API falló, responderá 500/400 y el curl fallará.
+          
+          response=$(curl --write-out "%{http_code}" --silent --output /dev/null \
+            -X POST "https://lacasadezolve.com/.netlify/functions/chat" \
+            -H "Content-Type: application/json" \
+            -d '{"userPrompt": "Health Check Ping", "systemPrompt": "Solo responde OK cortamente.", "chatHistory": []}')
+          
+          if [ "$response" -ne 200 ]; then
+            echo "🔥 ALERTA: ZolveBot respondió con código $response. Podría estar caído o el modelo expiró."
+            exit 1
+          else
+            echo "✅ ZolveBot está vivo y respondiendo (Código 200)."
+          fi

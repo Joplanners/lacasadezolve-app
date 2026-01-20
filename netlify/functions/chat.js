@@ -79,9 +79,72 @@ export async function handler(event, _context) {
   }
 
   try {
+    // ---------------------------------------------------------
+    // 1. LIMITACIÓN POR IP (Anti-Abuso Individual)
+    // ---------------------------------------------------------
+    const ip = event.headers['x-nf-client-connection-ip'] || event.headers['client-ip'] || event.headers['x-forwarded-for']?.split(',')[0] || 'unknown'
+    const MAX_PER_IP = 50 // Límite diario por persona
+    const today = new Date().toISOString().split('T')[0]
+
+    if (ip !== 'unknown' && ip !== '::1' && ip !== '127.0.0.1') { // Omitir localhost en dev si se quiere
+      let { data: ipData, error: ipError } = await supabase
+        .from('chat_rate_limits')
+        .select('*')
+        .eq('ip_address', ip)
+        .single()
+      
+      if (ipError && ipError.code !== 'PGRST116') {
+        console.error('Error checando IP:', ipError.message)
+        // No bloqueamos por error de DB, permitimos paso (fail-open) o bloqueamos (fail-closed).
+        // Fail-open es mejor para UX:
+      }
+
+      let currentIpCount = 0
+
+      if (!ipData) {
+        // Primera vez que vemos esta IP
+        await supabase.from('chat_rate_limits').insert({
+          ip_address: ip,
+          request_count: 1,
+          last_reset_date: today
+        })
+        currentIpCount = 1
+      } else {
+        // Ya existe, verificamos fecha
+        if (ipData.last_reset_date !== today) {
+          // Es un nuevo día, reseteamos
+          await supabase.from('chat_rate_limits')
+            .update({ request_count: 1, last_reset_date: today })
+            .eq('ip_address', ip)
+          currentIpCount = 1
+        } else {
+          // Mismo día, verificamos límite
+          if (ipData.request_count >= MAX_PER_IP) {
+            console.warn(`[RateLimit] IP ${ip} bloqueada por exceder ${MAX_PER_IP} reqs/día.`)
+            return {
+              statusCode: 429,
+              headers,
+              body: JSON.stringify({ 
+                text: '🦊✋ ¡Epa! Has hablado mucho conmigo hoy. Mis neuronas necesitan descansar. Vuelve mañana para seguir conversando.', 
+                error: 'ip_limit_exceeded' 
+              }),
+            }
+          }
+          // Incrementamos
+          await supabase.from('chat_rate_limits')
+            .update({ request_count: ipData.request_count + 1 })
+            .eq('ip_address', ip)
+          currentIpCount = ipData.request_count + 1
+        }
+      }
+    }
+
+    // ---------------------------------------------------------
+    // 2. LIMITACIÓN GLOBAL (Seguridad de Billetera/API Key)
+    // ---------------------------------------------------------
     let currentCount = 0
     let maxLimit = 490
-    const today = new Date().toISOString().split('T')[0]
+    // const today = new Date().toISOString().split('T')[0] // Ya definido arriba
     let { data: counterData, error: counterError } = await supabase
       .from('api_usage_counters')
       .select('current_count, last_reset_date, max_limit')
