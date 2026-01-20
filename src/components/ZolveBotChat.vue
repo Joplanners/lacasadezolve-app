@@ -6,7 +6,10 @@
         <div class="chat-header">
           <img src="/zolve-chat-icon.png" alt="Zolve Icon" class="header-icon" />
           <span>Zolve Bot</span>
-          <button @click="closeChat" class="close-chat-btn" aria-label="Cerrar chat">×</button>
+          <div class="header-controls">
+            <button @click="minimizeChat" class="control-btn minimize-btn" aria-label="Minimizar chat">−</button>
+            <button @click="closeChat" class="control-btn close-btn" aria-label="Cerrar chat">×</button>
+          </div>
         </div>
 
         <div class="chat-body" ref="chatBodyRef">
@@ -54,8 +57,10 @@
 <script setup>
 import { ref, nextTick, watch, computed, onMounted } from 'vue'
 import { useProductsStore } from '@/stores/storeProducts'
+import { useCouponsStore } from '@/stores/storeCoupons'
 
 const productsStore = useProductsStore()
+const couponsStore = useCouponsStore()
 
 const isChatOpen = ref(false)
 const messages = ref([])
@@ -77,10 +82,31 @@ const dynamicProductList = computed(() => {
   if (!products || products.length === 0) return 'Por el momento no tengo la lista de precios a mano, pero pregúntame y te ayudo.'
   
   const baseUrl = window.location.origin
-  // Listar: Nombre: $Precio - [Ver detalle](url)
+  
   return products
     .filter(p => p.is_active)
-    .map(p => `- ${p.name}: $${p.price?.toLocaleString('es-CL') || 'Consultar'} - [Ver detalle](${baseUrl}/producto/${p.id})`)
+    .map(p => {
+      // 1. Verificar Stock
+      const hasStock = p.stock > 0
+      const stockMsg = hasStock ? '' : ' (SIN STOCK)'
+      
+      // 2. Verificar Oferta (precio oferta < precio normal Y fecha vigente)
+      let priceDisplay = `$${p.price?.toLocaleString('es-CL')}`
+      const now = new Date()
+      let offerMsg = ''
+      
+      if (
+        p.offer_price && 
+        p.offer_price < p.price &&
+        (!p.discount_start_date || new Date(p.discount_start_date) <= now) &&
+        (!p.discount_end_date || new Date(p.discount_end_date) >= now)
+      ) {
+        priceDisplay = `ANTES: $${p.price?.toLocaleString('es-CL')} -> ¡AHORA: $${p.offer_price?.toLocaleString('es-CL')}!`
+        offerMsg = ' 🔥 ¡OFERTA!'
+      }
+
+      return `- ${p.name}: ${priceDisplay}${stockMsg}${offerMsg} - [Ver detalle](${baseUrl}/producto/${p.id})`
+    })
     .join('\n')
 })
 
@@ -90,14 +116,30 @@ const dynamicCategoryList = computed(() => {
   return categories.map(c => `- ${c.name}`).join('\n')
 })
 
+const dynamicCouponList = computed(() => {
+  const coupons = couponsStore.activeCoupons
+  if (!coupons || coupons.length === 0) return 'No hay cupones activos por el momento.'
+  
+  return coupons
+    .map(c => `- Código: ${c.code} (${c.discount_percent}% DCTO)${c.coupon_type === 'FIRST_PURCHASE' ? ' (Solo primera compra)' : ''}`)
+    .join('\n')
+})
+
 const SYSTEM_PROMPT_ZOLVE = computed(() => `Eres Zolve 🦊, el asistente inteligente, amigable y astuto de la tienda online 'La Casa de Zolve'.
 Tu misión: Ayudar con consultas sobre productos, precios, envíos, contacto y guiar en el proceso de compra.
 
 **INSTRUCCIÓN INICIAL:**
 Siempre saluda con energía. Si no sabes el nombre del usuario, pregúntalo amablemente.
 
+**REGLA DE ORO (IMPORTANTE):**
+Para personalizar productos (subir fotos durante la compra) o canjear cupones de descuento, **el usuario DEBE registrarse e iniciar sesión**.
+Si preguntan "cómo subo mis fotos" o "tengo un cupón", explícales que primero deben crear su cuenta o loguearse.
+
 **CATEGORÍAS DE PRODUCTOS DISPONIBLES:**
 ${dynamicCategoryList.value}
+
+**CUPONES Y DESCUENTOS VIGENTES:**
+${dynamicCouponList.value}
 
 **LISTA DE PRODUCTOS Y PRECIOS ACTUALIZADOS (CLP):**
 ${dynamicProductList.value}
@@ -105,41 +147,30 @@ ${dynamicProductList.value}
 **INFORMACIÓN CLAVE DEL NEGOCIO:**
 1. **Personalización:**
    - La mayoría de nuestros productos (cuadernos, agendas, planners) son 100% personalizables.
-   - El cliente puede subir sus imágenes directamente en la web al hacer el pedido.
-   - Si tienen dudas o archivos complejos, pueden contactarnos.
-   - **Contacto Directo:**
-     - WhatsApp: +56 9 3664 9482
-     - Instagram: @zolve_fox
-     - Correo: contacto@lacasadezolve.com
-     - O el formulario de contacto en la web.
+   - **Recuerda:** Se requiere cuenta registrada para subir imágenes.
+   - Contacto Ayuda: +56 9 3664 9482 (WhatsApp) o contacto@lacasadezolve.com.
 
 2. **Pagos:**
-   - Aceptamos **WebPay** (tarjetas débito/crédito) y **Transferencia Bancaria**.
-   - Damos boleta en todas las compras.
+   - WebPay (Débito/Crédito) y Transferencia Bancaria.
 
-3. **Envíos y Entregas:**
-   - **Envíos a Domicilio:** A todo Chile (vía Starken, por pagar).
-   - **Retiro Presencial:** Gratis en Santiago. Previa coordinación en estaciones de Metro **La Cisterna** o **Einstein**.
+3. **Envíos:**
+   - Domicilio (Starken por pagar) o Retiro (Metro La Cisterna/Einstein).
 
-4. **Tiempos de Producción:**
-   - Nuestros productos son hechos a mano con amor. El tiempo de confección es de **3 días hábiles** una vez confirmado el pago y diseño.
+4. **Tiempos:**
+   - 3 días hábiles de confección.
 
 **TU PERSONALIDAD:**
-- Tono: Cercano, chileno neutro, alegre, usas emojis (🦊✨).
-- **IMPORTANTE:** NO menciones servicios de Realidad Aumentada (AR), ese servicio ya no está disponible.
-- Si no sabes algo: "Esa es una buena pregunta 🦊. Escríbenos al WhatsApp +56 9 3664 9482 o a contacto@lacasadezolve.com y mis amigos humanos te ayudarán".
-
-**FORMATO RESPUESTA:**
-- Usa **negritas** para destacar precios o datos claves.
-- Si sugieres un producto, usa el enlace proporcionado para que el usuario pueda verlo.
-- Sé conciso.
+- Tono: Cercano, chileno neutro, alegre 🦊✨.
+- Si sugieres productos, usa los links.
+- Si ves algo SIN STOCK, avísalo.
 `)
 
 onMounted(async () => {
-  // Cargar productos y categorías
+  // Cargar productos, categorías y cupones
   await Promise.all([
     productsStore.fetchAllProducts(),
-    productsStore.fetchCategories()
+    productsStore.fetchCategories(),
+    couponsStore.fetchActiveCoupons()
   ])
 })
 // --- FIN SYSTEM PROMPT ---
@@ -157,19 +188,23 @@ const addMessage = (sender, text) => {
 
 const openChat = async () => {
   isChatOpen.value = true
-  awaitingName.value = true // Asumimos que siempre pedimos el nombre al abrir
-  messages.value = [] // Limpiar historial al abrir
+  
+  // Si ya tenemos mensajes (fue minimizado), no reiniciamos nada.
+  if (messages.value.length > 0) {
+    await nextTick()
+    scrollToBottom()
+    if (userInputRef.value) userInputRef.value.focus()
+    return
+  }
 
-  // El backend manejará el primer saludo si es una respuesta predefinida a "hola"
-  // o si la IA está instruida a saludar.
-  // Para controlar explícitamente el primer mensaje del bot desde el frontend:
+  // Si es una sesión nueva (estaba cerrado o vacío)
+  awaitingName.value = true 
+  messages.value = [] 
+
   addMessage(
     'bot',
     '¡Hola! Soy Zolve 🦊. Para una atención más personalizada, ¿me podrías decir tu nombre?',
   )
-  // Si prefieres que el saludo inicial venga del backend (para ahorrar una llamada si es predefinido):
-  // Podrías enviar un mensaje "inicial" al backend aquí, o simplemente esperar a que el usuario escriba.
-  // Por ahora, mantenemos el saludo desde el frontend para consistencia con tu diseño original.
 
   await nextTick()
   if (userInputRef.value) {
@@ -177,9 +212,16 @@ const openChat = async () => {
   }
 }
 
+const minimizeChat = () => {
+  // Solo ocultamos la ventana, NO borramos el historial.
+  isChatOpen.value = false
+}
+
 const closeChat = () => {
   isChatOpen.value = false
-  // No necesitamos limpiar la sesión de chat aquí porque se maneja en el backend por solicitud
+  messages.value = [] // Aquí SÍ borramos el historial (reset)
+  isLoading.value = false
+  userInput.value = ''
 }
 
 const scrollToBottom = () => {
@@ -390,19 +432,27 @@ watch(isChatOpen, (isOpen) => {
 .chat-header span {
   flex-grow: 1;
 }
-.close-chat-btn {
+.header-controls {
+  display: flex;
+  gap: 8px; /* Espacio entre botones */
+}
+
+.control-btn {
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.8);
   font-size: 1.8em;
   cursor: pointer;
-  line-height: 1; /* Ajusta para alinear mejor el '×' */
+  line-height: 1;
   padding: 0 5px;
   transition: color 0.2s ease;
 }
-.close-chat-btn:hover {
+
+.control-btn:hover {
   color: var(--vt-c-white, #ffffff);
 }
+/* Eliminar el estilo antiguo de .close-chat-btn ya que ahora usamos .control-btn */
+
 
 .chat-body {
   flex-grow: 1; /* Permite que el cuerpo del chat ocupe el espacio disponible */
