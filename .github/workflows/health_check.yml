@@ -2,8 +2,9 @@ name: ZolveBot Health Check
 
 on:
   schedule:
-    # Ejecutar todos los viernes a las 10:00 AM UTC (aprox 7:00 AM Chile)
-    - cron: '0 10 * * 5'
+    # Ejecutar lunes y viernes a las 10:00 AM UTC (aprox 7:00 AM Chile)
+    # Esto mantiene viva la DB de Supabase (evita pausa por inactividad de 7 días) y chequea salud.
+    - cron: '0 10 * * 1,5'
   workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub para probar
 
 jobs:
