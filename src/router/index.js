@@ -4,9 +4,8 @@ import AuthView from '../views/AuthView.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 import OrderDetail from '../views/OrderDetail.vue'
 
-const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
+// Quitamos createRouter y createWebHistory, ViteSSG se encarga de eso.
+export const routes = [
     {
       path: '/',
       name: 'home',
@@ -276,12 +275,18 @@ const router = createRouter({
       component: () => import('../views/NotFoundView.vue'),
       meta: { requiresAuth: false },
     },
-  ],
-})
+  ];
 
-// 🔥 GUARD CORREGIDO: Ahora espera a que la auth esté lista
-router.beforeEach(async (to, from, next) => {
-  const authStore = useAuthStore()
+// En lugar de llamar as router.beforeEach, exportamos la función para configurarlo
+export function setupRouterGuards(router, isClient) {
+  // 🔥 GUARD CORREGIDO: Ahora espera a que la auth esté lista
+  router.beforeEach(async (to, from, next) => {
+    // SSG FIX: Si se está haciendo el build (no es cliente), pasamos de largo el auth check
+    if (!isClient) {
+      return next()
+    }
+
+    const authStore = useAuthStore()
 
   console.log('🚦 Router Guard - Navegando a:', to.name, to.path)
 
@@ -318,8 +323,7 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'home' })
   }
 
-  console.log('✅ Navegación permitida')
-  next()
-})
-
-export default router
+    console.log('✅ Navegación permitida')
+    next()
+  })
+}

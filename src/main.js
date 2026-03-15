@@ -1,7 +1,7 @@
-import { createApp } from 'vue'
+import { ViteSSG } from 'vite-ssg'
 import { createPinia } from 'pinia'
 import App from './App.vue'
-import router from './router'
+import { routes, setupRouterGuards } from './router'
 import './assets/main.css'
 import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
@@ -57,31 +57,28 @@ const toastOptions = {
   rtl: false,
 }
 
-// --- 🔥 INICIALIZACIÓN ASÍNCRONA DE LA APP 🔥 ---
-async function initializeApp() {
-  const app = createApp(App)
+// --- 🔥 INICIALIZACIÓN ASÍNCRONA CON SSG 🔥 ---
+export const createApp = ViteSSG(
+  App,
+  { routes },
+  async ({ app, router, routes, isClient, initialState }) => {
+    app.component('font-awesome-icon', FontAwesomeIcon)
 
-  app.component('font-awesome-icon', FontAwesomeIcon)
+    // 1. Crear e instalar Pinia PRIMERO
+    app.use(createPinia())
 
-  // 1. Crear e instalar Pinia PRIMERO
-  app.use(createPinia())
+    // 2. Configurar los guards del router para proteger rutas (SSG aware)
+    setupRouterGuards(router, isClient)
 
-  // 2. Obtener el store de Auth y LLAMAR A LA INICIALIZACIÓN
-  //    (Esto debe pasar DESPUÉS de app.use(createPinia()))
-  const authStore = useAuthStore()
-  await authStore.initializeAuth() // <-- ¡La magia está aquí!
-
-  // 3. Ahora que la sesión está lista, usar el router.
-  //    El router guard (beforeEach) se ejecutará y encontrará
-  //    la 'authReadyPromise' ya resuelta.
-  app.use(router)
-
-  // 4. Usar el resto de plugins
-  app.use(Toast, toastOptions)
-
-  // 5. Montar la app
-  app.mount('#app')
-}
-
-// Llamar a la función asíncrona para iniciar todo
-initializeApp()
+    // 3. Obtener el store de Auth e inicializar SOLO EN EL CLIENTE
+    // En SSG build (Node.js), window/localStorage no existen, así que 
+    // pasamos de largo para generar el HTML base correctamente.
+    if (isClient) {
+      const authStore = useAuthStore()
+      await authStore.initializeAuth() // <-- ¡La magia está aquí!
+      
+      // Mover Toast aquí para evitar que intente acceder al DOM durante SSR
+      app.use(Toast, toastOptions)
+    }
+  }
+)

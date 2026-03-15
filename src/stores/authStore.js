@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import { supabase } from '@/lib/supabaseClient'
-import router from '@/router'
 import { useCartStore } from './storeCart'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -190,7 +189,7 @@ export const useAuthStore = defineStore('auth', () => {
       userProfile.value = null
       localStorage.removeItem('cached_user_role')
       cartStore.clearCart()
-      router.push({ name: 'login' })
+      if (typeof window !== 'undefined') window.location.href = '/ingreso'
     }
 
     // USER_UPDATED

@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production'
 
   return {
+    ssr: {
+      noExternal: ['vue-toastification']
+    },
     plugins: [
       vue({
         template: {
@@ -23,6 +26,12 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
+    },
+    // Opciones para vite-plugin-ssg
+    ssgOptions: {
+      script: 'async',
+      formatting: 'minify',
+      mock: true
     },
     // AÑADIR ESTA SECCIÓN 'build'
     build: {

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite-ssg build",
     "preview": "vite preview",
     "lint": "eslint . --fix",
     "format": "prettier --write src/"
@@ -18,6 +18,7 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.49.4",
     "@vueup/vue-quill": "^1.2.0",
+    "@vueuse/head": "^2.0.0",
     "aframe-troika-text": "^0.14.0",
     "dotenv": "^17.2.3",
     "interactjs": "^1.10.27",
@@ -46,6 +47,8 @@
     "prettier": "3.5.3",
     "terser": "^5.39.2",
     "vite": "^6.2.4",
-    "vite-plugin-vue-devtools": "^7.7.2"
+    "vite-plugin-ssg": "^0.1.0",
+    "vite-plugin-vue-devtools": "^7.7.2",
+    "vite-ssg": "^28.3.0"
   }
 }
