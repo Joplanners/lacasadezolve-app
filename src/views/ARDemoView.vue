@@ -76,6 +76,14 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabaseClient'
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Demo de Realidad Aumentada',
+  description:
+    'Prueba nuestras experiencias de Realidad Aumentada sin necesidad de registrarte. ¡Descubre la magia AR de La Casa de Zolve!',
+  url: '/demo',
+})
 
 const router = useRouter()
 const publicMarkers = ref([])

@@ -1,5 +1,12 @@
 <script setup>
 import { RouterLink } from 'vue-router'
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Página No Encontrada',
+  description: 'La página que buscas no existe en La Casa de Zolve.',
+  robots: 'noindex, nofollow',
+})
 </script>
 
 <template>

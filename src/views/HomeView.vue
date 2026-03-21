@@ -7,6 +7,14 @@ import BannerCarousel from '@/components/BannerCarousel.vue'
 import SectionFeaturedProducts from '@/components/SectionFeaturedProducts.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome' // <-- CAMBIO: Importamos el componente de íconos
 import { faVolumeUp, faVolumeMute } from '@fortawesome/free-solid-svg-icons' // <-- CAMBIO: Importamos los íconos de volumen
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Inicio — Papelería, K-Pop y Realidad Aumentada',
+  description:
+    'Tu espacio de personalización y K-Pop en Chile. Papelería, regalos con Realidad Aumentada, merchandising y comunidad. ¡Descubre La Casa de Zolve!',
+  url: '/',
+})
 
 const toast = useToast()
 

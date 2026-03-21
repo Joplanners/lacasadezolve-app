@@ -1,6 +1,14 @@
 <script setup>
 // No se necesita script complejo aquí por ahora
 import { RouterLink } from 'vue-router' // Importar si necesitas enlaces internos
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Términos y Condiciones',
+  description:
+    'Consulta los términos y condiciones de La Casa de Zolve SpA para el uso de nuestro sitio web y la compra de productos.',
+  url: '/terminos-y-condiciones',
+})
 </script>
 
 <template>

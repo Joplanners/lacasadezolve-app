@@ -2,8 +2,16 @@
 import { ref, onMounted, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useProductsStore } from '@/stores/storeProducts'
+import { useSeoMeta } from '@/composables/useSeoMeta'
 
 const productsStore = useProductsStore()
+
+useSeoMeta({
+  title: 'Tienda — Productos de Papelería y K-Pop',
+  description:
+    'Explora nuestra tienda online con productos de papelería, K-Pop, regalos personalizables y merchandising con Realidad Aumentada.',
+  url: '/tienda',
+})
 
 // --- ESTADO PARA LA PAGINACIÓN ---
 const currentPage = ref(1)

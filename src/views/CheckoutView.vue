@@ -12,6 +12,14 @@ import { useToast } from 'vue-toastification'
 import { isValidRut } from '@/utils/validation.js'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidv4 } from 'uuid'
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Finalizar Compra',
+  description: 'Completa tu pedido en La Casa de Zolve.',
+  url: '/finalizar-compra',
+  robots: 'noindex, nofollow',
+})
 
 const router = useRouter()
 const cartStore = useCartStore()

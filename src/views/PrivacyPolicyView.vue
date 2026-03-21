@@ -1,5 +1,13 @@
 <script setup>
 import { RouterLink } from 'vue-router' // Importar si necesitas enlaces internos
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Política de Privacidad',
+  description:
+    'Conoce cómo La Casa de Zolve SpA protege tu información personal, tus datos y tu privacidad en nuestro sitio web.',
+  url: '/politica-de-privacidad',
+})
 </script>
 
 <template>

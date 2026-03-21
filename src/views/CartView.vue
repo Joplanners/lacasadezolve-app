@@ -7,6 +7,14 @@ import { useToast } from 'vue-toastification'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabaseClient'
 import { storeToRefs } from 'pinia'
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Tu Carrito de Compras',
+  description: 'Revisa los productos en tu carrito de compras en La Casa de Zolve.',
+  url: '/carrito',
+  robots: 'noindex, nofollow',
+})
 
 const cartStore = useCartStore()
 const productsStore = useProductsStore()

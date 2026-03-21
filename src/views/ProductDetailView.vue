@@ -1,11 +1,12 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProductsStore } from '@/stores/storeProducts'
 import { useCartStore } from '@/stores/storeCart'
 import { useToast } from 'vue-toastification'
 import FileUploads from '@/components/FileUploads.vue'
 import RelatedProducts from '@/components/RelatedProducts.vue'
+import { useSeoMeta } from '@/composables/useSeoMeta'
 
 // Imports para compartir
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
@@ -22,6 +23,26 @@ const loading = ref(true)
 const errorMsg = ref('')
 const mainImageUrl = ref('')
 const selectedQuantity = ref(1)
+
+// --- SEO DINÁMICO ---
+const seoTitle = computed(() => product.value?.name || 'Producto')
+const seoDescription = computed(() => {
+  if (!product.value?.description) return 'Descubre este producto en La Casa de Zolve.'
+  // Extraer texto plano del HTML de la descripción
+  const text = product.value.description.replace(/<[^>]*>/g, '').trim()
+  return text.length > 160 ? text.substring(0, 157) + '...' : text
+})
+const seoImage = computed(() =>
+  product.value?.image_urls?.length > 0 ? product.value.image_urls[0] : undefined
+)
+
+useSeoMeta({
+  title: seoTitle,
+  description: seoDescription,
+  image: seoImage,
+  url: computed(() => `/producto/${route.params.id}`),
+  type: 'product',
+})
 
 // --- 🔥 INICIO: LÓGICA DE PRECIOS Y OFERTAS ---
 

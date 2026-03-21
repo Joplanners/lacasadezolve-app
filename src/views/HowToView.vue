@@ -1,5 +1,13 @@
 <script setup>
 import { RouterLink } from 'vue-router'
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Cómo Usar la Realidad Aumentada',
+  description:
+    'Aprende a usar la Realidad Aumentada de La Casa de Zolve. Dale vida a tus productos con experiencias AR interactivas desde tu dispositivo.',
+  url: '/como-usar-ar',
+})
 </script>
 
 <template>

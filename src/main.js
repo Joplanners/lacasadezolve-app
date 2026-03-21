@@ -1,4 +1,5 @@
 import { ViteSSG } from 'vite-ssg'
+import { createHead } from '@vueuse/head'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import { routes, setupRouterGuards } from './router'
@@ -63,6 +64,10 @@ export const createApp = ViteSSG(
   { routes },
   async ({ app, router, routes, isClient, initialState }) => {
     app.component('font-awesome-icon', FontAwesomeIcon)
+
+    // 0. Instalar @vueuse/head para meta tags SEO
+    const head = createHead()
+    app.use(head)
 
     // 1. Crear e instalar Pinia PRIMERO
     app.use(createPinia())

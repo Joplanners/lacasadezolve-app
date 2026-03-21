@@ -1,5 +1,13 @@
 <script setup>
 import { RouterLink } from 'vue-router'
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Política de Cookies',
+  description:
+    'Información sobre las cookies que utiliza La Casa de Zolve, sus fines y cómo puedes gestionarlas.',
+  url: '/politica-de-cookies',
+})
 </script>
 
 <template>

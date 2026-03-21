@@ -4,6 +4,14 @@ import { supabase } from '@/lib/supabaseClient.js'
 import PasswordInput from '@/components/PasswordInput.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter } from 'vue-router'
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Iniciar Sesión o Registrarse',
+  description: 'Inicia sesión o crea tu cuenta en La Casa de Zolve para acceder a todas las funciones.',
+  url: '/ingreso',
+  robots: 'noindex, nofollow',
+})
 
 const authStore = useAuthStore()
 const router = useRouter()
