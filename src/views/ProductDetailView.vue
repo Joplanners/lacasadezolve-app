@@ -227,8 +227,8 @@ function handleBuyNow() {
 onMounted(async () => {
   const productId = route.params.id
   if (!productId) {
-    errorMsg.value = 'No se especificó un producto.'
-    loading.value = false
+    // Si no hay ID, redirigir a 404
+    router.replace({ name: 'NotFound' })
     return
   }
   // Asegúrate que fetchProductById traiga la nueva columna 'requires_customization_notes'
@@ -241,7 +241,9 @@ onMounted(async () => {
       mainImageUrl.value = '/Zolve_Logo.png' // Imagen por defecto
     }
   } else {
-    errorMsg.value = '¡Ups! No pudimos encontrar este producto.'
+    // Producto no encontrado → redirigir a la página 404
+    router.replace({ name: 'NotFound' })
+    return
   }
   loading.value = false
 })

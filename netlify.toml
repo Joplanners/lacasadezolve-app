@@ -10,6 +10,10 @@
   # Opcional: si necesitas una versión específica de Node.js para tus funciones
   # node_version = "18" # o "20", etc.
 
+# SPA fallback: rutas dinámicas (como /producto/:id) cargan index.html
+# para que Vue Router se encargue del enrutamiento del lado del cliente.
+# Netlify sirve los archivos estáticos pre-renderizados por vite-ssg primero;
+# esta regla solo aplica cuando NO existe un archivo .html estático.
 [[redirects]]
   from = "/*"
   to = "/index.html"
