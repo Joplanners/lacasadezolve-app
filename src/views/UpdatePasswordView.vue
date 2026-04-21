@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onUnmounted, watch } from 'vue'
+import { ref, computed, onUnmounted, watch, onMounted } from 'vue'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from 'vue-toastification'
@@ -43,20 +43,32 @@ const passwordsMatch = computed(() => {
   return newPassword.value === confirmPassword.value
 })
 
-// Watcher que espera la señal del store
+// Verificación en el montaje del componente
+onMounted(async () => {
+  // Esperar a que Supabase termine de validar el token / código PKCE de la URL
+  await authStore.authReadyPromise
+  
+  // En Supabase v2 con PKCE, a veces se emite SIGNED_IN en lugar de PASSWORD_RECOVERY
+  // Si inició sesión o está en modo recuperación, permitimos el cambio
+  if (authStore.isPasswordRecoveryMode || authStore.isLoggedIn) {
+    showForm.value = true
+    verificationError.value = ''
+  } else {
+    showForm.value = false
+    verificationError.value =
+      'El enlace es inválido o ha expirado. Por favor, solicita uno nuevo.'
+  }
+})
+
+// Watcher reactivo por si el evento de Supabase tarda un milisegundo extra
 const unwatch = watch(
-  () => authStore.isPasswordRecoveryMode,
-  (isRecovery) => {
-    if (isRecovery) {
+  () => [authStore.isPasswordRecoveryMode, authStore.isLoggedIn],
+  ([isRecovery, isLoggedIn]) => {
+    if (isRecovery || isLoggedIn) {
       showForm.value = true
       verificationError.value = ''
-    } else {
-      showForm.value = false
-      verificationError.value =
-        'El enlace es inválido o ha expirado. Por favor, solicita uno nuevo.'
     }
-  },
-  { immediate: true },
+  }
 )
 
 onUnmounted(() => {
