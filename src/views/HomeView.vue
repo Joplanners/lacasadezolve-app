@@ -144,7 +144,9 @@ onUnmounted(() => {
               <img src="/ZolveImpresión.png" alt="Zolve Impresión" class="clickable-logo" />
               <h3>Servicio de Impresiones</h3>
               <p>¿Tienes textos de estudio y/o necesitas imprimir? Tenemos lo que necesitas al mejor precio y llega directo a tu casa. ¡Cotiza con nosotros!.</p>
-              <RouterLink to="/tienda" class="btn btn-secondary mt-auto">Ver más</RouterLink>
+              <a href="https://wa.me/56936649482" target="_blank" rel="noopener noreferrer" class="btn btn-secondary mt-auto">
+                Cotizar al WhatsApp
+              </a>
             </div>
           </div>
         </div>
