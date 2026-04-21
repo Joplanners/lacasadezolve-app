@@ -112,7 +112,16 @@ const handleUpdatePassword = async () => {
       window.location.href = '/ingreso'
     }, 500)
   } catch (error) {
-    errorMsg.value = `Error: ${error.message}`
+    // Traducir errores comunes de Supabase al español
+    const msg = error.message?.toLowerCase() || ''
+    if (msg.includes('same') || msg.includes('different from the old')) {
+      errorMsg.value = 'La nueva contraseña no puede ser igual a la que ya tenías. Por favor, elige una diferente.'
+    } else if (msg.includes('weak') || msg.includes('too short')) {
+      errorMsg.value = 'La contraseña es demasiado débil. Intenta con una más segura.'
+    } else {
+      errorMsg.value = `Ocurrió un error al actualizar la contraseña. Inténtalo de nuevo.`
+    }
+    console.error('UpdatePassword error:', error.message)
     toast.error(errorMsg.value)
     loading.value = false
   }
