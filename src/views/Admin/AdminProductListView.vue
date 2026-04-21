@@ -2,9 +2,30 @@
 import { onMounted } from 'vue' // <-- Solo importamos lo que vamos a usar
 import { RouterLink } from 'vue-router' // <-- RouterLink es suficiente, no necesitamos useRouter
 import { useProductsStore } from '@/stores/storeProducts'
+import { supabase } from '@/lib/supabaseClient'
+import { useToast } from 'vue-toastification'
 
 // Creamos la instancia del store, que sí se usa en el template y en onMounted
 const productsStore = useProductsStore()
+const toast = useToast()
+
+async function deleteProduct(id, name) {
+  if (!confirm(`¿Estás súper segura de querer eliminar "${name}"? ¡Esto no se puede deshacer!`)) return
+  
+  try {
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (error) {
+      if (error.code === '23503') {
+        throw new Error('Alerta: Este producto ya tiene compras o personas con él en su carrito. Es más seguro Editarlo y quitarle el "Producto Activo".')
+      }
+      throw error
+    }
+    toast.success('Producto eliminado permanentemente.')
+    productsStore.fetchAllProducts() // Actualizar lista
+  } catch (err) {
+    toast.error(err.message || 'Error al eliminar el producto.')
+  }
+}
 
 // Usamos onMounted para pedir los productos en cuanto el componente se carga
 onMounted(() => {
@@ -62,13 +83,16 @@ onMounted(() => {
                 {{ product.is_active ? 'Sí' : 'No' }}
               </span>
             </td>
-            <td>
+            <td class="action-buttons">
               <router-link
                 :to="{ name: 'admin-product-edit', params: { id: product.id } }"
                 class="btn btn-edit"
               >
                 Editar
               </router-link>
+              <button @click="deleteProduct(product.id, product.name)" class="btn btn-delete">
+                Eliminar
+              </button>
             </td>
           </tr>
         </tbody>
@@ -124,6 +148,18 @@ onMounted(() => {
 }
 .btn-edit:hover {
   background-color: #e0a800;
+}
+.btn-delete {
+  background-color: #dc3545;
+  color: white;
+}
+.btn-delete:hover {
+  background-color: #c82333;
+}
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .status-badge {
   padding: 4px 10px;

@@ -23,6 +23,7 @@ export const routes = [
       }, 
     },
     // 👆 FIN DE LA NUEVA RUTA 👆
+
     {
       path: '/ingreso',
       name: 'login',
@@ -47,10 +48,17 @@ export const routes = [
       component: OrderDetail,
       meta: { requiresAuth: true },
     },
+    // --- AR ROUTES COMENTADAS TEMPORALMENTE ---
+    // {
+    //   path: '/como-usar-ar',
+    //   name: 'how-to',
+    //   component: () => import('../views/HowToView.vue'),
+    //   meta: { requiresAuth: false },
+    // },
     {
-      path: '/como-usar-ar',
-      name: 'how-to',
-      component: () => import('../views/HowToView.vue'),
+      path: '/bts-chile',
+      name: 'bts-chile',
+      component: () => import('../views/BTSChileView.vue'),
       meta: { requiresAuth: false },
     },
     {
@@ -102,26 +110,27 @@ export const routes = [
         blankLayout: true,
       },
     },
-    {
-      path: '/demo',
-      name: 'ar-demo',
-      component: () => import('../views/ARDemoView.vue'),
-      meta: { requiresAuth: false },
-    },
-    {
-      path: '/experiencia-ar/demo/:markerId',
-      name: 'ar-experience-demo',
-      component: () => import('../views/ARExperienceView.vue'),
-      props: true,
-      meta: { requiresAuth: false, blankLayout: true },
-    },
-    {
-      path: '/experiencia-ar/:markerId',
-      name: 'ar-experience',
-      component: () => import('../views/ARExperienceView.vue'),
-      props: true,
-      meta: { requiresAuth: true, blankLayout: true },
-    },
+    // {
+    //   path: '/demo',
+    //   name: 'ar-demo',
+    //   component: () => import('../views/ARDemoView.vue'),
+    //   meta: { requiresAuth: false },
+    // },
+    // {
+    //   path: '/experiencia-ar/demo/:markerId',
+    //   name: 'ar-experience-demo',
+    //   component: () => import('../views/ARExperienceView.vue'),
+    //   props: true,
+    //   meta: { requiresAuth: false, blankLayout: true },
+    // },
+    // {
+    //   path: '/experiencia-ar/:markerId',
+    //   name: 'ar-experience',
+    //   component: () => import('../views/ARExperienceView.vue'),
+    //   props: true,
+    //   meta: { requiresAuth: true, blankLayout: true },
+    // },
+    // --- FIN AR ROUTES ---
     {
       path: '/mi-perfil',
       name: 'profile',

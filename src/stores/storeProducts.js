@@ -184,7 +184,7 @@ export const useProductsStore = defineStore('products', () => {
         .select(
           `
           id, name, price, offer_price, discount_percentage,
-          discount_start_date, discount_end_date, image_urls, stock
+          discount_start_date, discount_end_date, image_urls, stock, is_event_ticket
         `,
         ) // Traemos el stock también, ¡vital para el carrito!
         .in('id', idArray) // Busca todos los productos EN el array

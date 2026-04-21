@@ -1,89 +1,45 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
-import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
-import { useCartStore } from './stores/storeCart'
 import { storeToRefs } from 'pinia'
 import VueCookieAcceptDecline from 'vue-cookie-accept-decline'
 import 'vue-cookie-accept-decline/dist/vue-cookie-accept-decline.css'
 import ZolveBotChat from './components/ZolveBotChat.vue'
-import { supabase } from '@/lib/supabaseClient'
 import AppFooter from './components/AppFooter.vue'
+import AppNavbar from './components/AppNavbar.vue'
+import { supabase } from '@/lib/supabaseClient'
 
 const authStore = useAuthStore()
-const cartStore = useCartStore()
 const router = useRouter()
-const route = useRoute() // <-- ¡Perfecto que ya lo tenías!
+const route = useRoute()
 
-// =======================================================================
-// <-- ¡CAMBIO CLAVE AQUÍ! -->
-// Importamos el userDisplayName DIRECTAMENTE del store.
-const { isLoggedIn, isPasswordRecoveryMode, userRole, userDisplayName } = storeToRefs(authStore)
-// =======================================================================
+const { isLoggedIn, isPasswordRecoveryMode } = storeToRefs(authStore)
 
-const cartItemCount = computed(() => cartStore.cartItemCount)
-
-const isMobileMenuOpen = ref(false)
-const isMobileView = ref(window.innerWidth < 768)
+// --- Layout visibility ---
+const isMobileView = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
 const isLandscape = ref(false)
 
-const isARExperienceActive = computed(() => ['ar-experience', 'ar-experience-demo'].includes(route.name))
+const isARExperienceActive = computed(() =>
+  ['ar-experience', 'ar-experience-demo'].includes(route.name),
+)
 const isOverlayPhotoCaptureActive = computed(() => route.name === 'overlay-photo-capture')
 
-const appHeaderRef = ref(null)
-const navContainerRef = ref(null)
-const navbarCombinedHeight = ref(0)
-const appHeaderActualHeight = ref(0)
-
-// =======================================================================
-// <-- ¡HEMOS ELIMINADO EL userDisplayName LOCAL DE AQUÍ! -->
-// Ya no es necesario, porque lo traemos directamente del store.
-// =======================================================================
-
-const calculateNavbarHeights = () => {
-  let totalCombinedH = 0
-  let currentHeaderH = 0
-  if (showNavbar.value) {
-    if (appHeaderRef.value && typeof appHeaderRef.value.offsetHeight === 'number') {
-      currentHeaderH = appHeaderRef.value.offsetHeight
-      totalCombinedH += currentHeaderH
-    }
-    if (navContainerRef.value && typeof navContainerRef.value.offsetHeight === 'number') {
-      if (navContainerRef.value.offsetParent !== null) {
-        const navStyle = getComputedStyle(navContainerRef.value)
-        if (navStyle.display !== 'none' && navStyle.visibility !== 'hidden') {
-          totalCombinedH += navContainerRef.value.offsetHeight
-        }
-      }
-    }
-  }
-  navbarCombinedHeight.value = totalCombinedH
-  appHeaderActualHeight.value = currentHeaderH
-  if (currentHeaderH > 0 && showNavbar.value) {
-    document.documentElement.style.setProperty('--app-header-actual-height', `${currentHeaderH}px`)
-  }
-}
-
 const showNavbar = computed(() => {
-  // 🔥 =================== ¡AQUÍ ESTÁ EL CAMBIO! =================== 🔥
-  // Si la ruta pide un layout "en blanco" (como payment-return),
-  // ocultamos el navbar y no seguimos revisando.
   if (route.meta.blankLayout) return false
-  // 🔥 ============================================================= 🔥
-
   if (isPasswordRecoveryMode.value && route.name !== 'update-password') return false
   const publicRoutesWithNavbar = [
     'home',
     'login',
-    'how-to',
-    'ar-demo',
+    // 'how-to',   // AR - comentado temporalmente
+    // 'ar-demo',  // AR - comentado temporalmente
     'store',
+    'bts-chile',
     'terms-conditions',
     'privacy-policy',
     'cookies-policy',
     'product-detail',
     'cart',
-    // 'payment-return', // <-- Lo quitamos de aquí, ahora lo maneja blankLayout
   ]
   if (!isLoggedIn.value) return publicRoutesWithNavbar.includes(route.name)
   if (isARExperienceActive.value) return !isMobileView.value || !isLandscape.value
@@ -91,31 +47,22 @@ const showNavbar = computed(() => {
 })
 
 const showFooter = computed(() => {
-  // 🔥 =================== ¡AQUÍ ESTÁ EL CAMBIO! =================== 🔥
   if (route.meta.blankLayout) return false
-  // 🔥 ============================================================= 🔥
-
   return !isARExperienceActive.value && !isOverlayPhotoCaptureActive.value
 })
 
 const showZolveBot = computed(() => {
-  // 🔥 =================== ¡AQUÍ ESTÁ EL CAMBIO! =================== 🔥
   if (route.meta.blankLayout) return false
-  // 🔥 ============================================================= 🔥
-
   return !isARExperienceActive.value && !isOverlayPhotoCaptureActive.value
 })
 
+// --- Session inactivity ---
 let lastActiveTime = Date.now()
 const MAX_INACTIVE_TIME = 30 * 60 * 1000
 
 const resetInactivityTimer = () => {
   lastActiveTime = Date.now()
 }
-window.addEventListener('mousemove', resetInactivityTimer)
-window.addEventListener('keydown', resetInactivityTimer)
-window.addEventListener('scroll', resetInactivityTimer)
-window.addEventListener('click', resetInactivityTimer)
 
 const handleVisibilityChange = async () => {
   if (document.visibilityState === 'visible') {
@@ -138,73 +85,7 @@ const handleVisibilityChange = async () => {
   }
 }
 
-onMounted(() => {
-  handleResizeAndOrientation()
-  window.addEventListener('resize', handleResizeAndOrientation)
-  document.addEventListener('visibilitychange', handleVisibilityChange)
-  if (screen.orientation) {
-    screen.orientation.addEventListener('change', handleResizeAndOrientation)
-  } else {
-    const mediaQuery = window.matchMedia('(orientation: landscape)')
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleResizeAndOrientation)
-    } else {
-      mediaQuery.addListener(handleResizeAndOrientation)
-    }
-  }
-  nextTick(calculateNavbarHeights)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResizeAndOrientation)
-  document.removeEventListener('visibilitychange', handleVisibilityChange)
-  if (screen.orientation) {
-    screen.orientation.removeEventListener('change', handleResizeAndOrientation)
-  } else {
-    const mediaQuery = window.matchMedia('(orientation: landscape)')
-    if (mediaQuery.removeEventListener) {
-      mediaQuery.removeEventListener('change', handleResizeAndOrientation)
-    } else {
-      mediaQuery.removeListener(handleResizeAndOrientation)
-    }
-  }
-})
-
-function toggleMobileMenu() {
-  isMobileMenuOpen.value = !isMobileMenuOpen.value
-  nextTick(calculateNavbarHeights)
-}
-
-function closeMobileMenu() {
-  if (isMobileMenuOpen.value) {
-    isMobileMenuOpen.value = false
-    nextTick(calculateNavbarHeights)
-  }
-}
-
-watch(
-  () => route.path,
-  () => {
-    if (isMobileMenuOpen.value) closeMobileMenu()
-  },
-)
-
-const handleLogout = async () => {
-  closeMobileMenu()
-  await authStore.signOut()
-  router.push({ name: 'home' })
-}
-
-function cookieStatus() {}
-function cookieRemoved() {}
-
-const mainContentPaddingTop = computed(() => {
-  if (isOverlayPhotoCaptureActive.value || (isARExperienceActive.value && showNavbar.value)) {
-    return `${navbarCombinedHeight.value}px`
-  }
-  return ''
-})
-
+// --- Resize / orientation ---
 function handleResizeAndOrientation() {
   isMobileView.value = window.innerWidth < 768
   if (screen.orientation && typeof screen.orientation.type !== 'undefined') {
@@ -212,8 +93,55 @@ function handleResizeAndOrientation() {
   } else {
     isLandscape.value = window.matchMedia('(orientation: landscape)').matches
   }
-  nextTick(calculateNavbarHeights)
 }
+
+// --- Navbar height for special views ---
+const navbarHeight = ref(0)
+function onNavbarHeightChange(height) {
+  navbarHeight.value = height
+}
+
+const mainContentPaddingTop = computed(() => {
+  if (isOverlayPhotoCaptureActive.value || (isARExperienceActive.value && showNavbar.value)) {
+    return `${navbarHeight.value}px`
+  }
+  return ''
+})
+
+// --- Lifecycle ---
+onMounted(() => {
+  handleResizeAndOrientation()
+  window.addEventListener('resize', handleResizeAndOrientation)
+  window.addEventListener('mousemove', resetInactivityTimer)
+  window.addEventListener('keydown', resetInactivityTimer)
+  window.addEventListener('scroll', resetInactivityTimer)
+  window.addEventListener('click', resetInactivityTimer)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  if (screen.orientation) {
+    screen.orientation.addEventListener('change', handleResizeAndOrientation)
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResizeAndOrientation)
+  window.removeEventListener('mousemove', resetInactivityTimer)
+  window.removeEventListener('keydown', resetInactivityTimer)
+  window.removeEventListener('scroll', resetInactivityTimer)
+  window.removeEventListener('click', resetInactivityTimer)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  if (screen.orientation) {
+    screen.orientation.removeEventListener('change', handleResizeAndOrientation)
+  }
+})
+
+// --- Handlers ---
+const handleLogout = async () => {
+  await authStore.signOut()
+  router.push({ name: 'home' })
+}
+
+function cookieStatus() {}
+function cookieRemoved() {}
 </script>
 
 <template>
@@ -224,62 +152,14 @@ function handleResizeAndOrientation() {
       'overlay-photo-mode-active': isOverlayPhotoCaptureActive,
     }"
   >
-    <header ref="appHeaderRef" class="app-header" v-if="showNavbar">
-      <div class="logo-container">
-        <RouterLink :to="{ name: 'home' }" class="logo-link-header" @click="closeMobileMenu">
-          <img src="/LogoZolve.png" alt="Logo Zolve" class="header-logo-img" />
-        </RouterLink>
-      </div>
-
-      <div class="user-actions">
-        <div class="user-info" v-if="isLoggedIn">
-          Hola <strong>{{ userDisplayName }}</strong>
-        </div>
-
-        <router-link to="/carrito" class="cart-widget" aria-label="Ver carrito de compras">
-          <font-awesome-icon :icon="['fas', 'shopping-cart']" />
-          <span v-if="cartItemCount > 0" class="cart-count">{{ cartItemCount }}</span>
-        </router-link>
-
-        <button v-if="isLoggedIn" @click="handleLogout" class="btn-logout-header">
-          Cerrar Sesión
-        </button>
-      </div>
-    </header>
-
-    <div ref="navContainerRef" class="nav-container" v-if="showNavbar">
-      <button
-        class="mobile-menu-toggle"
-        @click="toggleMobileMenu"
-        :aria-expanded="isMobileMenuOpen.toString()"
-        aria-label="Toggle navigation"
-      >
-        <span class="hamburger-icon"><span></span><span></span><span></span></span>
-      </button>
-      <nav class="main-nav" :class="{ 'mobile-menu-active': isMobileMenuOpen }">
-        <router-link :to="{ name: 'home' }" @click="closeMobileMenu">Inicio</router-link>
-        <router-link :to="{ name: 'how-to' }" @click="closeMobileMenu">Cómo Usar</router-link>
-        <router-link :to="{ name: 'ar-demo' }" @click="closeMobileMenu">Demo AR</router-link>
-        <router-link :to="{ name: 'store' }" @click="closeMobileMenu">Tienda</router-link>
-        <router-link v-if="!isLoggedIn" :to="{ name: 'login' }" @click="closeMobileMenu"
-          >Login/Registro</router-link
-        >
-        <template v-if="isLoggedIn">
-          <router-link
-            v-if="userRole === 'admin'"
-            :to="{ name: 'admin-dashboard' }"
-            @click="closeMobileMenu"
-            >Panel Admin</router-link
-          >
-          <router-link v-else :to="{ name: 'profile' }" @click="closeMobileMenu"
-            >Mi Perfil</router-link
-          >
-        </template>
-      </nav>
-    </div>
+    <AppNavbar
+      :showNavbar="showNavbar"
+      @logout="handleLogout"
+      @navbar-height-change="onNavbarHeightChange"
+    />
 
     <main class="main-content" :style="{ paddingTop: mainContentPaddingTop }">
-      <RouterView />
+      <RouterView :key="$route.fullPath" />
     </main>
 
     <AppFooter v-if="showFooter" />
@@ -307,79 +187,72 @@ function handleResizeAndOrientation() {
 </template>
 
 <style>
+/* Cookie banner — compact bottom bar */
 #cookieConsentBanner {
-  background-color: var(--vt-c-black-soft) !important;
-  color: var(--vt-c-white-soft) !important;
-  padding: 15px 25px !important;
-  font-size: 0.9em !important;
+  background-color: rgba(34, 34, 34, 0.95) !important;
+  backdrop-filter: blur(8px) !important;
+  color: #f0f0f0 !important;
+  padding: 12px 24px !important;
+  font-size: 0.88em !important;
   line-height: 1.4 !important;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3) !important;
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  flex-wrap: wrap !important;
-  gap: 15px !important;
+  box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.2) !important;
   z-index: 2000 !important;
+  overflow: visible !important;
 }
-#cookieConsentBanner .cookie__text {
-  margin-right: 15px;
-  flex-grow: 1;
+
+/* Text content */
+#cookieConsentBanner,
+#cookieConsentBanner p,
+#cookieConsentBanner span,
+#cookieConsentBanner div {
+  color: #f0f0f0 !important;
 }
-#cookieConsentBanner .cookie__link {
-  color: var(--brand-turquoise) !important;
+
+/* Cookie policy link */
+#cookieConsentBanner a {
+  color: #4db6ac !important;
   text-decoration: underline !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
 }
-#cookieConsentBanner .cookie__link:hover {
-  color: var(--brand-pink) !important;
+#cookieConsentBanner a:hover {
+  color: #ff6b87 !important;
 }
-#cookieConsentBanner .cookie__button {
-  background-color: var(--brand-pink) !important;
-  color: var(--vt-c-white) !important;
+
+/* ALL buttons inside the banner — accept button (pink) */
+#cookieConsentBanner button {
+  background-color: #ff6b87 !important;
+  color: #ffffff !important;
   border: none !important;
-  border-radius: 5px !important;
-  padding: 10px 20px !important;
-  font-weight: var(--font-weight-medium) !important;
+  border-radius: 4px !important;
+  padding: 7px 16px !important;
+  font-weight: 600 !important;
+  font-size: 0.9em !important;
   cursor: pointer !important;
-  margin-left: 10px !important;
   white-space: nowrap !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
-#cookieConsentBanner .cookie__button:hover {
+#cookieConsentBanner button:hover {
   background-color: #e65c7a !important;
 }
-#cookieConsentBanner .cookie__button_decline {
-  background-color: #6c757d !important;
-  color: var(--vt-c-white) !important;
-  border: none !important;
-  border-radius: 5px !important;
-  padding: 10px 20px !important;
-  font-weight: var(--font-weight-medium) !important;
-  cursor: pointer !important;
-  white-space: nowrap !important;
+
+/* Decline button — second button override (transparent with border) */
+#cookieConsentBanner button:first-of-type {
+  background-color: transparent !important;
+  color: #f0f0f0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
 }
-#cookieConsentBanner .cookie__button_decline:hover {
-  background-color: #5a6268 !important;
+#cookieConsentBanner button:first-of-type:hover {
+  border-color: rgba(255, 255, 255, 0.7) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
+
 @media (max-width: 767px) {
   #cookieConsentBanner {
-    flex-direction: column !important;
-    padding: 15px !important;
-    text-align: center !important;
-  }
-  #cookieConsentBanner .cookie__text {
-    margin-right: 0 !important;
-    margin-bottom: 10px !important;
-  }
-  #cookieConsentBanner .cookie__buttons {
-    display: flex !important;
-    gap: 10px !important;
-    width: 100% !important;
+    flex-wrap: wrap !important;
     justify-content: center !important;
-  }
-  #cookieConsentBanner .cookie__button,
-  #cookieConsentBanner .cookie__button_decline {
-    margin-left: 0 !important;
-    flex-grow: 1;
+    padding: 12px 15px !important;
+    text-align: center !important;
   }
 }
 </style>
@@ -394,12 +267,6 @@ function handleResizeAndOrientation() {
   color: var(--color-text);
 }
 
-.app-header,
-.nav-container {
-  width: 100%;
-  flex-shrink: 0;
-}
-
 .main-content {
   flex-grow: 1;
   width: 100%;
@@ -409,197 +276,13 @@ function handleResizeAndOrientation() {
   box-sizing: border-box;
 }
 
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 20px;
-  background-color: var(--color-background-soft);
-  border-bottom: 1px solid var(--color-border);
-  box-sizing: border-box;
-}
-.header-logo-img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-.btn-logout-header {
-  padding: 6px 14px;
-  background-color: var(--vt-c-indigo);
-  color: var(--vt-c-white);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.nav-container {
-  background-color: var(--color-background-mute);
-  border-bottom: 1px solid var(--color-border);
-  padding: 0 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  min-height: 50px;
-  box-sizing: border-box;
-}
-.mobile-menu-toggle {
-  display: none;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 15px;
-}
-.hamburger-icon {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  width: 24px;
-  height: 18px;
-}
-.hamburger-icon span {
-  display: block;
-  width: 100%;
-  height: 3px;
-  background-color: var(--color-heading);
-  border-radius: 1px;
-  transition: all 0.3s ease-in-out;
-}
-.main-nav {
-  display: flex;
-  justify-content: center;
-  padding: 10px 0;
-  flex-wrap: wrap;
-  width: 100%;
-}
-.main-nav a {
-  margin: 5px 15px;
-  text-decoration: none;
-  color: var(--color-link);
-  font-weight: 700;
-  padding: 8px 0;
-  border-bottom: 2px solid transparent;
-}
-.main-nav a:hover {
-  color: var(--color-link-hover);
-}
-.main-nav a.router-link-exact-active {
-  color: var(--color-link-hover);
-  border-bottom-color: var(--color-link);
-}
-
-/* --- ESTILOS PARA LAS ACCIONES DE USUARIO Y CARRITO --- */
-.user-actions {
-  display: flex;
-  align-items: center;
-  gap: 20px; /* Espacio entre saludo, carrito y logout */
-}
-
-.user-info {
-  color: var(--color-text);
-}
-.user-info strong {
-  color: var(--color-heading);
-  font-weight: var(--font-weight-medium);
-}
-
-.cart-widget {
-  position: relative;
-  font-size: 1.5rem;
-  color: var(--brand-pink);
-  text-decoration: none;
-  transition: transform 0.2s ease;
-}
-.cart-widget:hover {
-  transform: scale(1.1);
-}
-
-.cart-count {
-  position: absolute;
-  top: -5px;
-  right: -10px;
-  background-color: var(--brand-turquoise);
-  color: white;
-  border-radius: 50%;
-  width: 22px;
-  height: 22px;
-  font-size: 0.75rem;
-  font-weight: bold;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border: 2px solid var(--color-background-soft); /* Borde del color de fondo del header */
-}
-/* --- FIN DE ESTILOS NUEVOS --- */
-
-/* --- BLOQUE RESPONSIVE CORREGIDO --- */
 @media (max-width: 767px) {
   .main-content {
     padding: 2rem 15px;
   }
-
-  /* El logo se queda a la izquierda, las acciones a la derecha */
-  .logo-container {
-    margin-left: 0;
-  }
-  .user-actions {
-    margin-right: 0;
-  }
-  .user-info {
-    display: none; /* Ocultamos saludo en móvil */
-  }
-
-  /* Movemos el botón de logout al final dentro de las acciones */
-  .btn-logout-header {
-    order: 3; /* Le damos orden alto para que quede al final */
-    margin-left: 0; /* Reseteamos margen */
-  }
-
-  .nav-container {
-    justify-content: flex-start; /* Alinea hamburguesa a la izquierda */
-  }
-  .mobile-menu-toggle {
-    display: flex;
-  }
-  .main-nav {
-    display: none;
-    flex-direction: column;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background-color: var(--color-background-soft);
-    border: 1px solid var(--color-border);
-    border-top: none;
-    z-index: 1000;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
-  .main-nav.mobile-menu-active {
-    display: flex;
-  }
-  .main-nav a {
-    margin: 0;
-    padding: 15px 20px;
-    border-bottom: 1px solid var(--color-border);
-  }
-  .main-nav a:last-child {
-    border-bottom: none;
-  }
-  .main-nav a.router-link-exact-active {
-    border-bottom: 1px solid var(--color-border);
-    background-color: var(--color-background-mute);
-  }
-  .mobile-menu-toggle[aria-expanded='true'] .hamburger-icon span:nth-child(1) {
-    transform: translateY(7px) rotate(45deg);
-  }
-  .mobile-menu-toggle[aria-expanded='true'] .hamburger-icon span:nth-child(2) {
-    opacity: 0;
-  }
-  .mobile-menu-toggle[aria-expanded='true'] .hamburger-icon span:nth-child(3) {
-    transform: translateY(-7px) rotate(-45deg);
-  }
 }
-/* --- FIN DEL BLOQUE RESPONSIVE --- */
+
+/* AR mode overrides */
 .ar-mode-active {
   background-color: transparent !important;
 }
@@ -607,8 +290,6 @@ function handleResizeAndOrientation() {
   padding: 0 !important;
   max-width: none !important;
 }
-
-/* Force transparency on root elements when AR is active */
 body:has(.ar-mode-active),
 html:has(body .ar-mode-active) {
   background-color: transparent !important;

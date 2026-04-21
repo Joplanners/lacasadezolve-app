@@ -90,8 +90,9 @@ async function fetchOrderDetail() {
         `
         quantity,
         price_at_purchase,
+        metadata,
         product:products (id, name, image_urls, sku)
-      `,
+      `
       )
       .eq('order_id', orderId.value)
 
@@ -133,6 +134,17 @@ function statusClass(status) {
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, '_')
   return `status-${safeStatus}`
+}
+
+function getTicketStyleLabel(style) {
+  if (style === 'datos') return '(Con Datos)'
+  if (style === 'grafica_1') return '(Gráfica 1)'
+  if (style === 'grafica_2') return '(Gráfica 2)'
+  return '(Con Datos)'
+}
+
+function isGraphicalTicket(style) {
+  return style && style.startsWith('grafica')
 }
 
 function goBack() {
@@ -265,6 +277,25 @@ function goBack() {
                 <p class="item-price-qty">
                   {{ item.quantity }} x {{ formatPrice(item.price_at_purchase) }}
                 </p>
+                <!-- 🔥 Mostrar metadata si existe -->
+                <div v-if="item.metadata" class="item-metadata-info">
+                  <p v-if="item.metadata.size" class="meta-detail">Talla: <strong>{{ item.metadata.size }}</strong></p>
+                  <p v-if="item.metadata.giveaway_ig" class="meta-detail" style="color: #d81b60;">Sorteo IG: <strong>{{ item.metadata.giveaway_ig }}</strong></p>
+                  
+                  <div v-if="item.metadata.isTicket && item.metadata.tickets" class="tickets-detail-box">
+                    <p class="ticket-header"><strong>🎟️ Entradas ({{ item.metadata.tickets.length }})</strong></p>
+                    <div v-for="(ticket, idx) in item.metadata.tickets" :key="idx" class="ticket-attendee-info">
+                      <p><strong>#{{ idx + 1 }} {{ getTicketStyleLabel(ticket.style) }}</strong></p>
+                      <ul class="ticket-data-list">
+                        <li v-if="!isGraphicalTicket(ticket.style)"><span>Nombre:</span> {{ ticket.name || '(Sin Nombre)' }}</li>
+                        <li v-if="!isGraphicalTicket(ticket.style)"><span>RUT:</span> {{ ticket.rut || '(Sin RUT)' }}</li>
+                        <li><span>IG:</span> {{ ticket.ig }}</li>
+                        <li><span>Fecha:</span> {{ ticket.date }}</li>
+                        <li><span>Sector:</span> {{ ticket.sector }}</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div class="item-subtotal">
                 {{ formatPrice(item.quantity * item.price_at_purchase) }}
@@ -552,5 +583,54 @@ h2 {
 .files-list li a:hover {
   background-color: var(--color-border);
   text-decoration: underline;
+}
+
+/* 🔥 Estilos para metadata en items de orden */
+.item-metadata-info {
+  margin-top: 8px;
+  font-size: 0.85em;
+  background-color: #f8f9fa;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+.meta-detail {
+  margin: 0 0 5px 0;
+  color: #495057;
+}
+.tickets-detail-box {
+  margin-top: 8px;
+}
+.ticket-header {
+  margin: 0 0 5px 0;
+  color: var(--brand-pink);
+}
+.ticket-attendee-info {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #dee2e6;
+}
+.ticket-attendee-info:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.ticket-attendee-info p {
+  margin: 0 0 3px 0;
+  color: #343a40;
+}
+.ticket-data-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.ticket-data-list li {
+  display: flex;
+  margin-bottom: 2px;
+}
+.ticket-data-list li span {
+  font-weight: 600;
+  min-width: 50px;
+  color: #6c757d;
 }
 </style>

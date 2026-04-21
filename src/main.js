@@ -61,7 +61,13 @@ const toastOptions = {
 // --- 🔥 INICIALIZACIÓN ASÍNCRONA CON SSG 🔥 ---
 export const createApp = ViteSSG(
   App,
-  { routes },
+  {
+    routes,
+    scrollBehavior(to, from, savedPosition) {
+      if (savedPosition) return savedPosition
+      return { top: 0 }
+    },
+  },
   async ({ app, router, routes, isClient, initialState }) => {
     app.component('font-awesome-icon', FontAwesomeIcon)
 

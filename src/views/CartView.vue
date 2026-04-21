@@ -82,6 +82,21 @@ function getPriceInfo(product) {
 const processedCartItems = computed(() => {
   return cartProductsDetails.value.map((item) => {
     const priceInfo = getPriceInfo(item.product)
+    
+    // 🔥 Override finalPrice if it's a ticket
+    if (item.metadata?.isTicket) {
+      const qty = item.quantity
+      const ticketTotal = Math.floor(qty / 2) * 4000 + (qty % 2) * 2500
+      return {
+        ...item,
+        finalPrice: ticketTotal / qty, // Para que el subtotal matemáticamente funcione
+        originalPrice: 2500,
+        onOffer: true,
+        isTicket: true,
+        ticketTotal: ticketTotal
+      }
+    }
+
     return {
       ...item,
       ...priceInfo,
@@ -119,7 +134,7 @@ async function loadCartProductDetails() {
         toast.warning(
           `Stock insuficiente para "${item.product.name}". Ajustado a ${item.product.stock} unidades.`,
         )
-        cartStore.updateItemQuantity(item.product_id, item.product.stock)
+        cartStore.updateItemQuantity(item.id, item.product.stock)
         item.quantity = item.product.stock
       }
     })
@@ -238,8 +253,8 @@ function removeCoupon(couponCode) {
   toast.info('Cupón eliminado.')
 }
 
-async function handleUpdateQuantity(productId, newQuantity) {
-  const item = cartProductsDetails.value.find((item) => item.product_id === productId)
+async function handleUpdateQuantity(itemId, newQuantity) {
+  const item = cartProductsDetails.value.find((item) => item.id === itemId)
   if (!item) return
 
   const stock = item.product.stock
@@ -255,13 +270,13 @@ async function handleUpdateQuantity(productId, newQuantity) {
 
   try {
     if (finalQuantity === 0) {
-      await cartStore.removeItem(productId)
+      await cartStore.removeItem(itemId)
       cartProductsDetails.value = cartProductsDetails.value.filter(
-        (i) => i.product_id !== productId,
+        (i) => i.id !== itemId,
       )
       toast.info(`"${item.product.name}" eliminado del carrito.`)
     } else {
-      await cartStore.updateItemQuantity(productId, finalQuantity)
+      await cartStore.updateItemQuantity(itemId, finalQuantity)
     }
   } catch (error) {
     console.error('Error updating cart item:', error)
@@ -270,12 +285,12 @@ async function handleUpdateQuantity(productId, newQuantity) {
   }
 }
 
-async function handleRemoveItem(productId, productName) {
+async function handleRemoveItem(itemId, productName) {
   const originalItems = [...cartProductsDetails.value]
-  cartProductsDetails.value = cartProductsDetails.value.filter((i) => i.product_id !== productId)
+  cartProductsDetails.value = cartProductsDetails.value.filter((i) => i.id !== itemId)
 
   try {
-    await cartStore.removeItem(productId)
+    await cartStore.removeItem(itemId)
     toast.info(`"${productName}" eliminado del carrito.`)
   } catch (error) {
     console.error('Error removing cart item:', error)
@@ -320,7 +335,7 @@ function formatPrice(value) {
 
     <div v-else class="cart-layout">
       <div class="product-list">
-        <div v-for="item in processedCartItems" :key="item.product_id" class="cart-item">
+        <div v-for="item in processedCartItems" :key="item.id" class="cart-item">
           <img
             :src="
               item.product.image_urls && item.product.image_urls.length > 0
@@ -333,9 +348,15 @@ function formatPrice(value) {
           <div class="item-details">
             <h3 class="item-name">{{ item.product.name }}</h3>
 
+            <div v-if="item.metadata && (item.metadata.size || item.metadata.isTicket)" class="item-metadata-labels">
+              <span v-if="item.metadata.size" class="meta-label">Talla: <strong>{{ item.metadata.size }}</strong></span>
+              <span v-if="item.metadata.isTicket" class="meta-label">Detalles de {{ item.metadata.tickets?.length }} Entrada(s) incluidos</span>
+            </div>
+
             <p class="item-price">
-              <span class="final-item-price">{{ formatPrice(item.finalPrice) }} c/u</span>
-              <span v-if="item.onOffer" class="original-item-price">
+              <span v-if="item.isTicket" class="final-item-price promo-text">¡Promo Entradas! ✨</span>
+              <span v-else class="final-item-price">{{ formatPrice(item.finalPrice) }} c/u</span>
+              <span v-if="item.onOffer && !item.isTicket" class="original-item-price">
                 {{ formatPrice(item.originalPrice) }}
               </span>
             </p>
@@ -354,7 +375,7 @@ function formatPrice(value) {
 
           <div class="item-quantity-selector">
             <button
-              @click="handleUpdateQuantity(item.product_id, item.quantity - 1)"
+              @click="handleUpdateQuantity(item.id, item.quantity - 1)"
               :disabled="item.quantity <= 1"
               class="quantity-btn"
               aria-label="Disminuir cantidad"
@@ -363,7 +384,7 @@ function formatPrice(value) {
             </button>
             <span class="quantity-display">{{ item.quantity }}</span>
             <button
-              @click="handleUpdateQuantity(item.product_id, item.quantity + 1)"
+              @click="handleUpdateQuantity(item.id, item.quantity + 1)"
               :disabled="item.product.stock !== null && item.quantity >= item.product.stock"
               class="quantity-btn"
               aria-label="Aumentar cantidad"
@@ -377,7 +398,7 @@ function formatPrice(value) {
           </div>
 
           <button
-            @click="handleRemoveItem(item.product_id, item.product.name)"
+            @click="handleRemoveItem(item.id, item.product.name)"
             class="remove-item-btn"
             title="Eliminar producto"
           >
@@ -596,6 +617,24 @@ function formatPrice(value) {
 }
 .item-stock-warning.out-of-stock {
   color: #d93025;
+}
+
+.item-metadata-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.meta-label {
+  background-color: #f1f3f4;
+  color: #5f6368;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid #dadce0;
+}
+.promo-text {
+  color: var(--brand-pink) !important;
 }
 
 /* Selector de cantidad +/- */

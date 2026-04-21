@@ -98,6 +98,38 @@ async function deleteCategory(category) {
   }
 }
 
+// Edita una categoría existente
+async function editCategory(category) {
+  const newName = prompt('Ingrese el nuevo nombre para la categoría:', category.name)
+  if (newName === null) return // El usuario canceló
+  
+  const trimmedName = newName.trim()
+  if (!trimmedName || trimmedName === category.name) return // No cambió nada o está vacío
+
+  try {
+    const { error } = await supabase
+      .from('product_categories')
+      .update({ name: trimmedName })
+      .eq('id', category.id)
+
+    if (error) throw error
+
+    // Actualizamos la categoría en nuestra lista local
+    const index = categories.value.findIndex(c => c.id === category.id)
+    if (index !== -1) {
+      categories.value[index].name = trimmedName
+      categories.value.sort((a, b) => a.name.localeCompare(b.name)) // Reordenamos
+    }
+    toast.success(`Categoría actualizada a "${trimmedName}".`)
+  } catch (error) {
+    if (error.code === '23505') {
+      toast.error(`La categoría "${trimmedName}" ya existe en el sistema.`)
+    } else {
+      toast.error(`Error al editar la categoría: ${error.message}`)
+    }
+  }
+}
+
 // Cuando el componente se monta, cargamos las categorías
 onMounted(() => {
   fetchCategories()
@@ -142,7 +174,13 @@ onMounted(() => {
           <tr v-for="category in categories" :key="category.id">
             <td>{{ category.name }}</td>
             <td>{{ category.id }}</td>
-            <td>
+            <td class="action-buttons">
+              <button
+                @click="editCategory(category)"
+                class="btn btn-edit"
+              >
+                Editar
+              </button>
               <button
                 @click="deleteCategory(category)"
                 class="btn btn-delete"
@@ -235,12 +273,24 @@ onMounted(() => {
 .btn-add:hover:not(:disabled) {
   background-color: #218838;
 }
+.btn-edit {
+  background-color: #ffc107;
+  color: #212529 !important;
+}
+.btn-edit:hover:not(:disabled) {
+  background-color: #e0a800;
+}
 .btn-delete {
   background-color: #dc3545;
   color: white !important;
 }
 .btn-delete:hover:not(:disabled) {
   background-color: #c82333;
+}
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .btn:disabled {
   background-color: #cccccc;

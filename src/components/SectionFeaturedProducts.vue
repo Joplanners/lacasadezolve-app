@@ -74,9 +74,7 @@ const goToProduct = (productId) => {
       </div>
     </div>
 
-    <div class="cta-container">
-      <button @click="goToStore" class="btn btn-secondary">¡Vamos a vitrinear!</button>
-    </div>
+
   </section>
 </template>
 
@@ -127,15 +125,17 @@ const goToProduct = (productId) => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   transition:
     transform 0.3s ease,
-    box-shadow 0.3s ease;
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
   cursor: pointer;
   max-width: 280px;
-  /* La línea 'margin: 0 auto;' ha sido eliminada */
+  border: 2px solid var(--brand-turquoise);
 }
 
 .product-card:hover {
   transform: translateY(-6px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  border-color: var(--brand-pink);
 }
 
 /* IMAGEN DEL PRODUCTO */
@@ -239,6 +239,11 @@ const goToProduct = (productId) => {
   .product-cards-container {
     grid-template-columns: 1fr;
     gap: 15px;
+  }
+
+  .product-card {
+    max-width: 100%;
+    width: 100%;
   }
 
   .product-image {

@@ -23,7 +23,11 @@ const formData = ref({
   stock: 0,
   is_active: true,
   is_customizable: false,
-  requires_customization_notes: false, // 🔥 Campo añadido
+  requires_customization_notes: false,
+  has_sizes: false,
+  requires_ig_for_giveaway: false,
+  available_sizes: [],
+  is_event_ticket: false, // 🔥 Nuevo flag explícito de ticket
   category_id: null,
   image_urls: [],
   discount_percentage: null,
@@ -91,7 +95,11 @@ async function fetchProductData(productId) {
   try {
     const { data, error } = await supabase.from('products').select('*').eq('id', productId).single()
     if (error) throw error
-    data.requires_customization_notes = data.requires_customization_notes ?? false // Asegura valor por defecto
+    data.requires_customization_notes = data.requires_customization_notes ?? false
+    data.has_sizes = data.has_sizes ?? false
+    data.requires_ig_for_giveaway = data.requires_ig_for_giveaway ?? false
+    data.is_event_ticket = data.is_event_ticket ?? false
+    data.available_sizes = data.available_sizes || []
     if (!data.image_urls) data.image_urls = []
     if (data.discount_start_date) data.discount_start_date = data.discount_start_date.slice(0, 16)
     if (data.discount_end_date) data.discount_end_date = data.discount_end_date.slice(0, 16)
@@ -107,6 +115,19 @@ async function fetchProductData(productId) {
 function cleanupPreviews() {
   newImagePreviews.value.forEach((url) => URL.revokeObjectURL(url))
   newImagePreviews.value = []
+}
+
+// 🔥 Manejo de Tallas
+const sizeInput = ref('')
+function addSize() {
+  const size = sizeInput.value.trim().toUpperCase()
+  if (size && !formData.value.available_sizes.includes(size)) {
+    formData.value.available_sizes.push(size)
+  }
+  sizeInput.value = ''
+}
+function removeSize(index) {
+  formData.value.available_sizes.splice(index, 1)
 }
 
 function handleFileChange(event) {
@@ -143,7 +164,11 @@ async function saveProduct() {
       stock: formData.value.stock,
       is_active: formData.value.is_active,
       is_customizable: formData.value.is_customizable,
-      requires_customization_notes: formData.value.requires_customization_notes, // 🔥 Se incluye aquí
+      requires_customization_notes: formData.value.requires_customization_notes,
+      requires_ig_for_giveaway: formData.value.requires_ig_for_giveaway,
+      has_sizes: formData.value.has_sizes,
+      available_sizes: formData.value.has_sizes ? formData.value.available_sizes : [],
+      is_event_ticket: formData.value.is_event_ticket,
       category_id: formData.value.category_id,
       image_urls: finalImageUrls,
       offer_price:
@@ -185,6 +210,24 @@ async function saveProduct() {
     cleanupPreviews()
     imageFileInputKey.value = Date.now()
     selectedImageFiles.value = []
+  }
+}
+
+async function deleteProduct() {
+  if (!confirm(`¿Estás súper segura de querer eliminar "${formData.value.name}"? ¡Esto no se puede deshacer!`)) return
+  
+  try {
+    const { error } = await supabase.from('products').delete().eq('id', formData.value.id)
+    if (error) {
+      if (error.code === '23503') {
+        throw new Error('Alerta: Este producto ya tiene compras o personas con él en su carrito. Es más seguro simplemente desmarcar la opción "Producto Activo".')
+      }
+      throw error
+    }
+    toast.success('Producto eliminado permanentemente.')
+    router.push({ name: 'admin-products' })
+  } catch (err) {
+    toast.error(err.message || 'Error al eliminar el producto.')
   }
 }
 
@@ -389,6 +432,60 @@ onUnmounted(() => {
         >
       </div>
 
+      <div class="form-group checkbox-group sub-option" style="border-top: 1px dashed #ddd; padding-top: 10px; margin-top: 10px;">
+        <input type="checkbox" id="requiresIG" v-model="formData.requires_ig_for_giveaway" />
+        <label for="requiresIG">Habilitar caja de Usuario IG (Para Sorteos)</label>
+        <small class="tooltip"
+          >(?)<span class="tooltip-text"
+            >El cliente verá un campo para dejar su Instagram multiplicando sus opciones de ganar.</span
+          ></small
+        >
+      </div>
+
+      <!-- 🔥 Tallas UI -->
+      <div class="form-group checkbox-group">
+        <input type="checkbox" id="hasSizes" v-model="formData.has_sizes" />
+        <label for="hasSizes">Este producto requiere selección de Talla (Ej: Ropa)</label>
+      </div>
+
+      <div v-if="formData.has_sizes" class="form-group sub-option">
+        <label>Tallas Estándar Rápida:</label>
+        <div class="standard-sizes-container">
+          <label class="size-check-label" v-for="size in ['XS', 'S', 'M', 'L', 'XL', 'XXL']" :key="size">
+            <input type="checkbox" :value="size" v-model="formData.available_sizes" />
+            <span class="size-text">{{ size }}</span>
+          </label>
+        </div>
+        
+        <label style="margin-top: 15px;">Añadir Talla Especial / Otra:</label>
+        <div class="sizes-input-group">
+          <input 
+            type="text" 
+            v-model="sizeInput" 
+            placeholder="Ej: Niño 12, 3XL, etc." 
+            @keydown.enter.prevent="addSize"
+          />
+          <button type="button" @click="addSize" class="btn-secondary">Añadir</button>
+        </div>
+        
+        <div class="sizes-list" v-if="formData.available_sizes.length > 0">
+          <span v-for="(size, index) in formData.available_sizes" :key="index" class="size-badge">
+            {{ size }}
+            <button type="button" @click="removeSize(index)" title="Eliminar talla">&times;</button>
+          </span>
+        </div>
+      </div>
+
+      <!-- 🔥 Configuración de Entradas -->
+      <div class="form-group checkbox-group" style="padding-top: 15px; border-top: 1px solid #ddd;">
+        <input type="checkbox" id="isEventTicket" v-model="formData.is_event_ticket" />
+        <label for="isEventTicket">Configurar exclusivamente como "Entrada Promocional"</label>
+      </div>
+      
+      <div v-if="formData.is_event_ticket" class="info-box ticket-info">
+        <p><strong>🎟️ ¡Atención!</strong> Al marcar esta opción, el producto obligará a elegir a tus asistentes Sector, fecha, y RUT, y aplicará tu descuento matemático (Pares a $4.000 e impares sueltos a $2.500) en el carrito sin importar el precio base ingresado arriba.</p>
+      </div>
+
       <div class="form-group checkbox-group">
         <input type="checkbox" id="isActive" v-model="formData.is_active" />
         <label for="isActive">Producto Activo (visible en la tienda)</label>
@@ -397,6 +494,15 @@ onUnmounted(() => {
       <div class="form-actions">
         <button type="submit" class="btn btn-save" :disabled="saving">
           {{ saving ? 'Guardando...' : 'Guardar Producto' }}
+        </button>
+        <button 
+          v-if="isEditMode" 
+          type="button" 
+          @click="deleteProduct" 
+          class="btn btn-delete" 
+          :disabled="saving"
+        >
+          🗑️ Eliminar Producto
         </button>
         <router-link
           :to="{ name: 'admin-products' }"
@@ -515,6 +621,13 @@ h3 {
 }
 .btn-cancel:hover {
   background-color: #5a6268;
+}
+.btn-delete {
+  background-color: #dc3545;
+  color: #fff;
+}
+.btn-delete:hover {
+  background-color: #c82333;
 }
 .btn:disabled,
 .btn.disabled {
@@ -675,6 +788,81 @@ hr {
 .sub-option {
   margin-left: 25px;
   margin-top: 5px;
+}
+/* 🔥 Tallas */
+.standard-sizes-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  background-color: #fff;
+  padding: 10px 15px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.size-check-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-weight: normal !important;
+}
+.size-check-label input {
+  width: auto !important;
+}
+.sizes-input-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.sizes-input-group input {
+  width: auto;
+  flex-grow: 1;
+}
+.btn-secondary {
+  background-color: #607d8b;
+  color: #fff;
+  border-radius: 4px;
+  padding: 8px 15px;
+  border: none;
+  cursor: pointer;
+}
+.sizes-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.size-badge {
+  background-color: #e0f2f1;
+  color: #00695c;
+  padding: 5px 12px;
+  border-radius: 15px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.size-badge button {
+  background: none;
+  border: none;
+  color: #004d40;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1.2em;
+  padding: 0;
+  line-height: 1;
+}
+.info-box.ticket-info {
+  background-color: #e8f4fd;
+  border-left: 4px solid #2196f3;
+  padding: 12px 15px;
+  margin: 25px 0 15px 0;
+  border-radius: 4px;
+}
+.info-box.ticket-info p {
+  margin: 0;
+  font-size: 0.9em;
+  color: #0c5460;
+  line-height: 1.4;
 }
 @media (max-width: 600px) {
   .form-grid {

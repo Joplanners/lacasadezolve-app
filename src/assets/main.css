@@ -76,3 +76,38 @@ a {
 a:hover {
   color: var(--color-link-hover);
 }
+
+/* ===== SHARED BUTTON STYLES =====
+   Centralized here to avoid duplication across components.
+   Use: class="btn btn-primary" / "btn btn-secondary" / "btn btn-orange"
+*/
+.btn {
+  padding: 12px 25px;
+  border-radius: 5px;
+  text-decoration: none;
+  display: inline-block;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 1rem;
+  font-family: var(--font-family-base);
+  transition: all 0.2s ease;
+  color: var(--vt-c-white);
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  opacity: 0.9;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background-color: var(--brand-pink);
+}
+.btn-secondary {
+  background-color: var(--brand-turquoise);
+}
+.btn-orange {
+  background-color: var(--brand-orange);
+}

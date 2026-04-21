@@ -125,13 +125,91 @@ const discountBadgeText = computed(() => {
 
 // --- 🔥 FIN: LÓGICA DE PRECIOS Y OFERTAS ---
 
-// 🔥 Refs para personalización
+// 🔥 Refs para personalización y metadata
 const customizationFiles = ref([])
-const customizationNotes = ref('') // 🔥 NUEVO: Ref para las notas
+const customizationNotes = ref('')
+const giveawayIg = ref('') // 🔥 Nuevo campo para el IG del Sorteo
+const selectedSizesQty = ref({}) // 🔥 Para escoger cantidades de cada talla
+const ticketForms = ref([{ name: '', rut: '', date: '', sector: '', style: '' }])
+
+// Identificar si es entrada
+const isTicket = computed(() => {
+  if (!product.value) return false
+  return product.value.is_event_ticket
+})
+
+// Fechas y sectores hardcodeados
+const ticketDates = ['14 de Octubre 2026', '16 de Octubre 2026', '17 de Octubre 2026']
+const ticketSectors = [
+  'Pacífico Medio', 'Cancha Pacífico', 'Cancha Andes', 'Pacífico Alto',
+  'Pacífico Bajo', 'Movilidad Reducida', 'Andes Bajo Centro',
+  'Andes Bajo Norte', 'Andes Bajo Sur', 'Andes Alto Centro',
+  'Andes Alto Norte', 'Andes Alto Sur', 'Galería Norte',
+  'Galería Sur', 'Pacífico Lateral Norte', 'Pacífico Lateral Sur'
+]
+
+watch(selectedQuantity, (newVal) => {
+  if (isTicket.value) {
+    const currentLength = ticketForms.value.length
+    if (newVal > currentLength) {
+      for (let i = currentLength; i < newVal; i++) {
+        ticketForms.value.push({ name: '', rut: '', date: '', sector: '', style: '' })
+      }
+    } else if (newVal < currentLength) {
+      ticketForms.value.splice(newVal)
+    }
+  }
+})
+
+// Precio especial entradas
+const ticketTotalPrice = computed(() => {
+  const qty = selectedQuantity.value
+  return Math.floor(qty / 2) * 4000 + (qty % 2) * 2500
+})
 
 const changeMainImage = (url) => {
   mainImageUrl.value = url
 }
+
+// 🔥 INICIO: LÓGICA DE LIGHTBOX
+const isLightboxOpen = ref(false)
+const lightboxIndex = ref(0)
+
+const openLightbox = () => {
+  if (!product.value?.image_urls?.length) return
+  const index = product.value.image_urls.findIndex((url) => url === mainImageUrl.value)
+  lightboxIndex.value = index !== -1 ? index : 0
+  isLightboxOpen.value = true
+}
+
+const closeLightbox = () => {
+  isLightboxOpen.value = false
+}
+
+const nextLightboxImage = (e) => {
+  if (e) e.stopPropagation()
+  if (!product.value?.image_urls) return
+  if (lightboxIndex.value < product.value.image_urls.length - 1) {
+    lightboxIndex.value++
+  } else {
+    lightboxIndex.value = 0
+  }
+}
+
+const prevLightboxImage = (e) => {
+  if (e) e.stopPropagation()
+  if (!product.value?.image_urls) return
+  if (lightboxIndex.value > 0) {
+    lightboxIndex.value--
+  } else {
+    lightboxIndex.value = product.value.image_urls.length - 1
+  }
+}
+
+const currentLightboxUrl = computed(() => {
+  return product.value?.image_urls?.[lightboxIndex.value] || mainImageUrl.value
+})
+// 🔥 FIN: LÓGICA DE LIGHTBOX
 
 // 🔥 Función que recibe los archivos del componente FileUploads
 const handleFilesUpdate = (updatedFiles) => {
@@ -143,84 +221,216 @@ const handleFilesUpdate = (updatedFiles) => {
 }
 
 // 🔥 MODIFICADO: handleAddToCart ahora pasa notas Y archivos
-function handleAddToCart() {
+async function handleAddToCart() {
   if (!product.value) return
-  const quantityToAdd = Number(selectedQuantity.value)
+  let totalQtyToAdd = 0
 
-  // Validaciones de cantidad y stock
-  if (isNaN(quantityToAdd) || quantityToAdd < 1) {
-    toast.error('Por favor, ingresa una cantidad válida (mínimo 1).')
-    selectedQuantity.value = 1
-    return
+  if (isTicket.value || !product.value.has_sizes) {
+    totalQtyToAdd = Number(selectedQuantity.value)
+    if (isNaN(totalQtyToAdd) || totalQtyToAdd < 1) {
+      toast.error('Por favor, ingresa una cantidad válida (mínimo 1).')
+      selectedQuantity.value = 1
+      return
+    }
+  } else {
+    totalQtyToAdd = Object.values(selectedSizesQty.value).reduce((a, b) => a + (Number(b) || 0), 0)
+    if (totalQtyToAdd < 1) {
+      toast.error('Por favor, selecciona la cantidad para al menos una talla.')
+      return
+    }
   }
+
+  // Validación de entradas
+  if (isTicket.value) {
+    for (let i = 0; i < ticketForms.value.length; i++) {
+      const f = ticketForms.value[i]
+      if (!f.style) {
+        toast.error(`Por favor, selecciona qué tipo de entrada quieres para la entrada #${i + 1}.`)
+        return
+      }
+      if (f.style === 'datos') {
+        if (!f.name || !f.rut || !f.date || !f.sector) {
+          toast.error(`Por favor, completa todos los datos para la entrada #${i + 1}.`)
+          return
+        }
+      } else {
+        if (!f.date || !f.sector) {
+          toast.error(`Por favor, completa Fecha y Sector para la entrada #${i + 1}.`)
+          return
+        }
+      }
+    }
+  }
+
+  // Validación Stock Global
   const stock = product.value.stock
   if (stock !== null && stock !== undefined) {
     if (stock <= 0) {
       toast.error('Lo sentimos, este producto está agotado.')
-      selectedQuantity.value = 1
       return
     }
-    if (quantityToAdd > stock) {
-      toast.error(`Lo sentimos, solo quedan ${stock} unidades disponibles.`)
-      selectedQuantity.value = stock
+    if (totalQtyToAdd > stock) {
+      toast.error(`Lo sentimos, el stock global es de ${stock} unidades y seleccionaste ${totalQtyToAdd}.`)
       return
     }
   }
 
-  // Pasa archivos Y notas al store
-  cartStore.addToCart(
+  // Si tiene tallas y NO es ticket, agregamos un item por capa talla
+  if (product.value.has_sizes && !isTicket.value) {
+    const promises = []
+    for (const [size, qty] of Object.entries(selectedSizesQty.value)) {
+      if (qty > 0) {
+        promises.push(
+          cartStore.addToCart(
+            product.value.id,
+            qty,
+            customizationFiles.value,
+            customizationNotes.value,
+            { size: size, giveaway_ig: giveawayIg.value || null }
+          )
+        )
+      }
+    }
+    await Promise.all(promises)
+    toast.success(`${totalQtyToAdd} productos añadidos al carrito!`)
+    
+    // Limpia cantidades
+    Object.keys(selectedSizesQty.value).forEach(k => selectedSizesQty.value[k] = 0)
+    customizationFiles.value = []
+    customizationNotes.value = ''
+    giveawayIg.value = ''
+    return
+  }
+
+  // Si es ticket o producto sin tallas
+  const metadata = {}
+  if (isTicket.value) {
+    metadata.tickets = JSON.parse(JSON.stringify(ticketForms.value))
+    metadata.isTicket = true // flag para el carrito
+  }
+
+  await cartStore.addToCart(
     product.value.id,
-    quantityToAdd,
+    totalQtyToAdd,
     customizationFiles.value,
     customizationNotes.value,
+    metadata
   )
 
-  toast.success(`"${product.value.name}" (x${quantityToAdd}) añadido al carrito!`)
+  toast.success(`"${product.value.name}" (x${totalQtyToAdd}) añadido al carrito!`)
 
   // Limpia archivos Y notas
   customizationFiles.value = []
   customizationNotes.value = ''
+  giveawayIg.value = ''
   // Aquí podríamos necesitar llamar a un método 'reset' en FileUploads si exponemos uno
 }
 
-// 🔥 MODIFICADO: handleBuyNow ahora pasa notas Y archivos
-function handleBuyNow() {
+// 🔥 MODIFICADO: handleBuyNow ahora usa la misma lógica
+async function handleBuyNow() {
   if (!product.value) return
-  const quantityToAdd = Number(selectedQuantity.value)
+  let totalQtyToAdd = 0
 
-  // Validaciones de cantidad y stock
-  if (isNaN(quantityToAdd) || quantityToAdd < 1) {
-    toast.error('Por favor, ingresa una cantidad válida (mínimo 1).')
-    selectedQuantity.value = 1
-    return
+  if (isTicket.value || !product.value.has_sizes) {
+    totalQtyToAdd = Number(selectedQuantity.value)
+    if (isNaN(totalQtyToAdd) || totalQtyToAdd < 1) {
+      toast.error('Por favor, ingresa una cantidad válida (mínimo 1).')
+      selectedQuantity.value = 1
+      return
+    }
+  } else {
+    totalQtyToAdd = Object.values(selectedSizesQty.value).reduce((a, b) => a + (Number(b) || 0), 0)
+    if (totalQtyToAdd < 1) {
+      toast.error('Por favor, selecciona la cantidad para al menos una talla.')
+      return
+    }
   }
+
+  // Validación de entradas
+  if (isTicket.value) {
+    for (let i = 0; i < ticketForms.value.length; i++) {
+      const f = ticketForms.value[i]
+      if (!f.style) {
+        toast.error(`Por favor, selecciona qué tipo de entrada quieres para la entrada #${i + 1}.`)
+        return
+      }
+      if (f.style === 'datos') {
+        if (!f.name || !f.rut || !f.date || !f.sector) {
+          toast.error(`Por favor, completa todos los datos para la entrada #${i + 1}.`)
+          return
+        }
+      } else {
+        if (!f.date || !f.sector) {
+          toast.error(`Por favor, completa Fecha y Sector para la entrada #${i + 1}.`)
+          return
+        }
+      }
+    }
+  }
+
+  // Validación Global de Stock
   const stock = product.value.stock
   if (stock !== null && stock !== undefined) {
     if (stock <= 0) {
       toast.error('Lo sentimos, este producto está agotado.')
-      selectedQuantity.value = 1
       return
     }
-    if (quantityToAdd > stock) {
-      toast.error(`Lo sentimos, solo quedan ${stock} unidades disponibles.`)
-      selectedQuantity.value = stock
+    if (totalQtyToAdd > stock) {
+      toast.error(`Lo sentimos, el stock global es de ${stock} unidades y seleccionaste ${totalQtyToAdd}.`)
       return
     }
   }
 
-  // Pasa archivos Y notas al store
-  cartStore.addToCart(
+  // Comprar Múltiples Tallas
+  if (product.value.has_sizes && !isTicket.value) {
+    const promises = []
+    for (const [size, qty] of Object.entries(selectedSizesQty.value)) {
+      if (qty > 0) {
+        promises.push(
+          cartStore.addToCart(
+            product.value.id,
+            qty,
+            customizationFiles.value,
+            customizationNotes.value,
+            { size: size, giveaway_ig: giveawayIg.value || null }
+          )
+        )
+      }
+    }
+    await Promise.all(promises)
+    toast.info(`Agregados. Redirigiendo...`)
+    customizationFiles.value = []
+    customizationNotes.value = ''
+    giveawayIg.value = ''
+    router.push({ name: 'cart' })
+    return
+  }
+
+  // Comprar Ticket / Sin Tallas
+  const metadata = {}
+  if (isTicket.value) {
+    metadata.tickets = JSON.parse(JSON.stringify(ticketForms.value))
+    metadata.isTicket = true
+  }
+
+  if (product.value.requires_ig_for_giveaway && giveawayIg.value) {
+    metadata.giveaway_ig = giveawayIg.value
+  }
+
+  await cartStore.addToCart(
     product.value.id,
-    quantityToAdd,
+    totalQtyToAdd,
     customizationFiles.value,
     customizationNotes.value,
+    metadata
   )
 
-  toast.info(`"${product.value.name}" (x${quantityToAdd}) añadido. Redirigiendo...`)
+  toast.info(`"${product.value.name}" añadido. Redirigiendo...`)
 
   // Limpia archivos Y notas
   customizationFiles.value = []
   customizationNotes.value = ''
+  giveawayIg.value = ''
   router.push({ name: 'cart' })
 }
 
@@ -235,6 +445,14 @@ onMounted(async () => {
   const fetchedProduct = await productsStore.fetchProductById(productId)
   if (fetchedProduct) {
     product.value = fetchedProduct
+    
+    // Inicializar cantides por talla
+    if (fetchedProduct.has_sizes && fetchedProduct.available_sizes) {
+      fetchedProduct.available_sizes.forEach(size => {
+        selectedSizesQty.value[size] = 0
+      })
+    }
+    
     if (fetchedProduct.image_urls && fetchedProduct.image_urls.length > 0) {
       mainImageUrl.value = fetchedProduct.image_urls[0]
     } else {
@@ -298,8 +516,9 @@ const pinterestShareUrl = computed(() => {
     <template v-else-if="product">
       <div class="product-layout">
         <div class="product-image-gallery">
-          <div class="main-image-wrapper">
+          <div class="main-image-wrapper" @click="openLightbox">
             <img :src="mainImageUrl" :alt="product.name" class="main-image" />
+            <div class="zoom-hint"><span class="zoom-icon">🔍</span></div>
           </div>
           <div v-if="hasMultipleImages" class="thumbnails">
             <button
@@ -320,7 +539,7 @@ const pinterestShareUrl = computed(() => {
 
           <div class="product-description-html" v-html="product.description"></div>
 
-          <div class="price-detail">
+          <div v-if="!isTicket" class="price-detail">
             <span class="display-price">{{ displayPrice }}</span>
 
             <span v-if="originalPrice" class="original-price-striked">
@@ -331,7 +550,12 @@ const pinterestShareUrl = computed(() => {
               {{ discountBadgeText }}
             </span>
           </div>
-          <div class="quantity-selector">
+          
+          <div v-else class="price-detail ticket-promo-price">
+            <span class="display-price">{{ formatPrice(ticketTotalPrice) }}</span>
+            <span class="ticket-promo-badge">Promo 2x $4.000 (Subtotal)</span>
+          </div>
+          <div class="quantity-selector" v-if="!product.has_sizes || isTicket">
             <label for="quantity">Cantidad:</label>
             <input
               type="number"
@@ -340,6 +564,71 @@ const pinterestShareUrl = computed(() => {
               min="1"
               :max="product.stock > 0 ? product.stock : undefined"
             />
+          </div>
+
+          <!-- 🔥 Selector de Cnatidad Múltiple por Tallas -->
+          <div v-if="product.has_sizes && !isTicket" class="sizes-quantity-grid">
+            <label class="sizes-grid-label">Selecciona Cantidad por Talla:</label>
+            <div class="sizes-grid">
+              <div v-for="size in product.available_sizes" :key="size" class="size-qty-row">
+                <span class="size-label">{{ size }}</span>
+                <div class="qty-controls">
+                  <button 
+                    type="button" 
+                    @click="selectedSizesQty[size] > 0 ? selectedSizesQty[size]-- : null"
+                    class="qty-btn"
+                  >-</button>
+                  <input type="number" min="0" v-model.number="selectedSizesQty[size]" class="qty-input" />
+                  <button 
+                    type="button" 
+                    @click="selectedSizesQty[size]++"
+                    class="qty-btn"
+                  >+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 🔥 Formularios de Entradas dinámicas -->
+          <div v-if="isTicket" class="ticket-forms-container">
+            <h3>Datos de los Asistentes</h3>
+            <div v-for="(form, index) in ticketForms" :key="index" class="ticket-form">
+              <h4>Entrada #{{ index + 1 }}</h4>
+              
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Tipo de Entrada</label>
+                  <select v-model="form.style" required>
+                    <option value="" disabled>Selecciona el tipo...</option>
+                    <option value="datos">Entrada con Datos</option>
+                    <option value="grafica_1">Entrada Gráfica 1</option>
+                    <option value="grafica_2">Entrada Gráfica 2</option>
+                  </select>
+                </div>
+                <div class="form-group" v-if="form.style === 'datos'">
+                  <label>Nombre y Apellido</label>
+                  <input type="text" v-model="form.name" placeholder="Ej: Juan Pérez" :required="form.style === 'datos'">
+                </div>
+                <div class="form-group" v-if="form.style === 'datos'">
+                  <label>RUT</label>
+                  <input type="text" v-model="form.rut" placeholder="12.345.678-9" :required="form.style === 'datos'">
+                </div>
+                <div class="form-group">
+                  <label>Fecha Evento</label>
+                  <select v-model="form.date" required>
+                    <option value="" disabled>Seleccionar Fecha</option>
+                    <option v-for="date in ticketDates" :key="date" :value="date">{{ date }}</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Sector</label>
+                  <select v-model="form.sector" required>
+                    <option value="" disabled>Seleccionar Sector</option>
+                    <option v-for="sec in ticketSectors" :key="sec" :value="sec">{{ sec }}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="stock-display" v-if="product.stock !== null && product.stock !== undefined">
             <p v-if="product.stock > 10" class="stock-info">
@@ -357,6 +646,18 @@ const pinterestShareUrl = computed(() => {
             class="file-uploader"
             @update:files="handleFilesUpdate"
           />
+          
+          <div v-if="product.requires_ig_for_giveaway" class="giveaway-ig-section" style="margin-bottom: 20px;">
+            <label for="giveawayIg" style="display: block; margin-bottom: 8px; font-weight: 500; color: #d81b60;">🎁 Déjanos tu usuario de Instagram para tener triple (x3) posibilidad de ganar en el sorteo (Opcional):</label>
+            <input
+              type="text"
+              id="giveawayIg"
+              v-model="giveawayIg"
+              placeholder="@tu_usuario_ig"
+              class="ig-input"
+              style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;"
+            />
+          </div>
 
           <div v-if="product.requires_customization_notes" class="customization-notes-section">
             <label for="customNotes">Detalles Adicionales:</label>
@@ -424,6 +725,33 @@ const pinterestShareUrl = computed(() => {
         :current-product-id="product.id"
       />
     </template>
+
+    <!-- LIGHTBOX -->
+    <div v-if="isLightboxOpen" class="lightbox-overlay" @click="closeLightbox">
+      <button class="lightbox-close" @click="closeLightbox">&times;</button>
+      
+      <button 
+        v-if="hasMultipleImages" 
+        class="lightbox-nav lightbox-prev" 
+        @click="prevLightboxImage"
+      >
+        &#10094;
+      </button>
+
+      <img :src="currentLightboxUrl" class="lightbox-img" @click.stop />
+
+      <button 
+        v-if="hasMultipleImages" 
+        class="lightbox-nav lightbox-next" 
+        @click="nextLightboxImage"
+      >
+        &#10095;
+      </button>
+      
+      <div v-if="hasMultipleImages" class="lightbox-counter">
+        {{ lightboxIndex + 1 }} / {{ product.image_urls.length }}
+      </div>
+    </div>
   </div>
 </template>
 
@@ -475,17 +803,130 @@ const pinterestShareUrl = computed(() => {
   flex-direction: column;
 }
 .main-image-wrapper {
+  position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--color-border);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  cursor: zoom-in;
+}
+.zoom-hint {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 45px;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  font-size: 1.2rem;
+}
+.main-image-wrapper:hover .zoom-hint {
+  opacity: 1;
+  transform: scale(1.1);
 }
 .main-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* =========================================
+   LIGHTBOX STYLES
+========================================= */
+.lightbox-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
+.lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  user-select: none;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 45px;
+  cursor: pointer;
+  z-index: 10001;
+  transition: color 0.2s;
+}
+.lightbox-close:hover {
+  color: var(--brand-pink);
+}
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: white;
+  font-size: 24px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.1s;
+  z-index: 10001;
+  backdrop-filter: blur(4px);
+}
+.lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.4);
+  color: black;
+  transform: translateY(-50%) scale(1.05);
+}
+.lightbox-nav:active {
+  transform: translateY(-50%) scale(0.95);
+}
+.lightbox-prev {
+  left: 30px;
+}
+.lightbox-next {
+  right: 30px;
+}
+.lightbox-counter {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 1.1rem;
+  background: rgba(0,0,0,0.6);
+  padding: 6px 18px;
+  border-radius: 20px;
+  font-weight: 500;
 }
 .thumbnails {
   display: flex;
@@ -627,6 +1068,128 @@ const pinterestShareUrl = computed(() => {
   border-radius: 5px;
   font-size: 1rem;
   font-family: var(--font-family-base);
+}
+/* Tallas Múltiples Grid */
+.sizes-quantity-grid {
+  margin-bottom: 25px;
+  background-color: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  padding: 15px;
+  border-radius: 8px;
+}
+.sizes-grid-label {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 12px;
+  color: var(--color-heading);
+}
+.sizes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 15px;
+}
+.size-qty-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: white;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+}
+.size-label {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: var(--brand-turquoise);
+}
+.qty-controls {
+  display: flex;
+  align-items: center;
+}
+.qty-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #ccc;
+  background-color: #f1f3f4;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.qty-btn:hover {
+  background-color: #e2e6e9;
+}
+.qty-input {
+  width: 40px;
+  height: 30px;
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin: 0 5px;
+  -moz-appearance: textfield;
+}
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Entradas */
+.ticket-promo-badge {
+  background-color: var(--brand-pink);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+.ticket-forms-container {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
+}
+.ticket-forms-container h3 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  color: var(--color-heading);
+}
+.ticket-form {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  margin-bottom: 15px;
+}
+.ticket-form h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: var(--brand-turquoise);
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .actions-container {
   width: 100%;

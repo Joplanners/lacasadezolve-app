@@ -91,6 +91,20 @@ function getPriceInfo(product) {
 const processedCartItems = computed(() => {
   return cartProductDetails.value.map((item) => {
     const priceInfo = getPriceInfo(item.product)
+    
+    if (item.metadata?.isTicket) {
+      const qty = item.quantity
+      const ticketTotal = Math.floor(qty / 2) * 4000 + (qty % 2) * 2500
+      return {
+        ...item,
+        finalPrice: ticketTotal / qty,
+        originalPrice: 2500,
+        onOffer: true,
+        isTicket: true,
+        ticketTotal: ticketTotal
+      }
+    }
+
     return {
       ...item,
       ...priceInfo,
@@ -112,7 +126,10 @@ const customerData = ref({
   addressStreet: '',
   addressNumber: '',
   addressDetail: '',
+  instagramUser: '', // IG opcional para sorteos
 })
+
+const isContestActive = ref(false)
 
 const regions = ref(regionesComunasData)
 const communes = ref([])
@@ -161,8 +178,19 @@ const discountAmount = computed(() => {
   return (subtotal.value * totalPercent) / 100
 })
 
+// 🔥 MODIFICADO: Calculamos costo de envío
+const isFreeShippingRM = computed(() => {
+  return Math.max(0, subtotal.value - discountAmount.value) >= 35000
+})
+
+const shippingCost = computed(() => {
+  if (selectedShippingMethod.value !== 'rm_rapido') return 0
+  return isFreeShippingRM.value ? 0 : 3590
+})
+
 const finalTotal = computed(() => {
-  return Math.max(0, subtotal.value - discountAmount.value)
+  const result = Math.max(0, subtotal.value - discountAmount.value) + shippingCost.value
+  return result
 })
 
 // --- Watchers ---
@@ -431,13 +459,19 @@ async function handleCheckoutSubmit() {
       product_id: item.product_id,
       quantity: item.quantity,
       price_at_purchase: item.finalPrice,
+      metadata: item.metadata || {},
     }))
 
     const allNotes = cartItems.value
       .map((item) => item.customizationNotes)
       .filter(Boolean)
       .join('\n---\n')
-    const notesFromCart = allNotes
+    
+    let notesFromCart = allNotes
+    if (customerData.value.instagramUser) {
+      if (notesFromCart) notesFromCart += '\n---\n'
+      notesFromCart += `[INSTAGRAM EVENTOS/SORTEO: ${customerData.value.instagramUser}]`
+    }
 
     const orderData = {
       user_id: authStore.user?.id || null,
@@ -447,7 +481,9 @@ async function handleCheckoutSubmit() {
       customer_email: customerData.value.email,
       customer_name: customerData.value.fullName,
       customer_phone: customerData.value.phone || null,
-      shipping_method: selectedShippingMethod.value,
+      shipping_method: selectedShippingMethod.value === 'rm_rapido' 
+        ? (isFreeShippingRM.value ? 'Envío RM (Gratis)' : 'Envío RM ($3.590)') 
+        : selectedShippingMethod.value,
       payment_method: selectedPaymentMethod.value,
       applied_coupon_code: appliedCoupons.value.map((c) => c.code).join(', ') || null,
       discount_amount: discountAmount.value > 0 ? discountAmount.value : null,
@@ -589,13 +625,25 @@ async function handleCheckoutSubmit() {
 }
 
 // --- Lifecycle Hooks ---
-onMounted(() => {
+onMounted(async () => {
   setTimeout(() => {
     if (cartItems.value.length === 0 && !isSubmitting.value) router.replace({ name: 'store' })
   }, 500)
   loadCartDetailsForSummary()
   if (authStore.isLoggedIn) loadUserProfile()
   window.addEventListener('message', handlePaymentMessage)
+
+  // Cargar estado del concurso
+  try {
+    const { data } = await supabase
+      .from('store_settings')
+      .select('value')
+      .eq('key', 'is_contest_active')
+      .single()
+    if (data) isContestActive.value = data.value === 'true' || data.value === true
+  } catch (err) {
+    console.warn('Error cargando configuración del concurso:', err)
+  }
 })
 
 onUnmounted(() => {
@@ -679,6 +727,18 @@ onUnmounted(() => {
                 required
                 autocomplete="tel"
                 placeholder="+56 9 1234 5678"
+              />
+            </div>
+            
+            <div class="form-group span-2 contest-highlight" v-if="isContestActive">
+              <label for="ig" class="highlight-label">
+                🌟 Usuario de Instagram <small>(Opcional - P/Participar en Sorteos)</small>
+              </label>
+              <input
+                type="text"
+                id="ig"
+                v-model.trim="customerData.instagramUser"
+                placeholder="Ej: @tunombre. ¡Toda compra suma opciones!"
               />
             </div>
           </div>
@@ -816,17 +876,21 @@ onUnmounted(() => {
             </label>
             <label
               class="shipping-option"
-              :class="{ selected: selectedShippingMethod === 'presencial' }"
+              :class="{ selected: selectedShippingMethod === 'rm_rapido' }"
             >
               <input
                 type="radio"
                 name="shippingMethod"
-                value="presencial"
+                value="rm_rapido"
                 v-model="selectedShippingMethod"
               />
-              <font-awesome-icon :icon="faHandshake" class="shipping-icon" />
-              <span>Entrega Presencial (Gratis)</span>
-              <small>Metro Einstein o La Cisterna.</small>
+              <font-awesome-icon :icon="faTruck" class="shipping-icon" />
+              <span>
+                Envío en RM 
+                <span v-if="isFreeShippingRM" style="color: var(--brand-turquoise); font-weight: bold;">(¡GRATIS!)</span>
+              </span>
+              <small v-if="isFreeShippingRM">¡Tu compra aplica para envío gratis!</small>
+              <small v-else>$3.590 - (¡Envío gratis por compras sobre $35.000!)</small>
             </label>
           </div>
         </fieldset>
@@ -925,6 +989,12 @@ onUnmounted(() => {
                 <span>- {{ formatPrice(discountAmount) }}</span>
               </p>
             </template>
+
+            <!-- Costo de envío -->
+            <p v-if="shippingCost > 0" class="shipping-row">
+              <span>Costo de Envío (RM)</span>
+              <span>+ {{ formatPrice(shippingCost) }}</span>
+            </p>
 
             <div class="final-total">
               <p>
@@ -1501,5 +1571,16 @@ onUnmounted(() => {
   .form-section legend {
     font-size: 1.1rem;
   }
+}
+
+.contest-highlight {
+  background-color: rgba(200, 162, 212, 0.1);
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px dashed rgba(123, 45, 142, 0.4);
+}
+.highlight-label {
+  color: #7b2d8e;
+  font-weight: 700;
 }
 </style>

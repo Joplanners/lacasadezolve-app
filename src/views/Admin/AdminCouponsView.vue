@@ -9,6 +9,44 @@ const coupons = ref([])
 const loading = ref(true)
 const error = ref(null)
 
+// --- ESTADO GLOBAL DEL PROYECTO (CONCURSO) ---
+const isContestActive = ref(false)
+const settingLoading = ref(true)
+
+async function fetchStoreSettings() {
+  settingLoading.value = true
+  try {
+    const { data, error } = await supabase
+      .from('store_settings')
+      .select('value')
+      .eq('key', 'is_contest_active')
+      .single()
+    if (data) {
+      isContestActive.value = data.value === 'true' || data.value === true
+    }
+  } catch (err) {
+    console.warn('No se pudo cargar el estado del concurso', err)
+  } finally {
+    settingLoading.value = false
+  }
+}
+
+async function handleToggleContest() {
+  const newValue = !isContestActive.value
+  try {
+    const { error } = await supabase
+      .from('store_settings')
+      .update({ value: newValue })
+      .eq('key', 'is_contest_active')
+    
+    if (error) throw error
+    isContestActive.value = newValue
+    toast.success(`Sorteo/Concurso ${newValue ? 'ACTIVADO' : 'DESACTIVADO'}.`)
+  } catch (err) {
+    toast.error('Error al cambiar el estado del concurso.')
+  }
+}
+
 const newCoupon = reactive({
   code: '',
   discount_percent: 10,
@@ -75,7 +113,10 @@ async function handleToggleActive(couponId, currentStatus) {
   }
 }
 
-onMounted(fetchCoupons)
+onMounted(() => {
+  fetchCoupons()
+  fetchStoreSettings()
+})
 
 function formatDate(dateString) {
   if (!dateString) return 'Nunca'
@@ -89,7 +130,26 @@ function formatDate(dateString) {
 
 <template>
   <div class="admin-coupons-view">
-    <h3>Gestión de Cupones de Descuento</h3>
+    <h3>Promociones y Cupones</h3>
+
+    <!-- PANEL DEL CONCURSO GLOBAL -->
+    <div class="contest-panel coupon-form">
+      <div class="contest-panel-header">
+        <div>
+          <h4 style="margin-bottom: 0;">Interruptor Global del Concurso</h4>
+          <p style="font-size: 0.9rem; color: #555; margin-top: 5px;">
+            Enciende o apaga la cajita de Instagram en el proceso de pago.
+          </p>
+        </div>
+        <button 
+          @click="handleToggleContest" 
+          :disabled="settingLoading"
+          :class="isContestActive ? 'btn-active-contest' : 'btn-inactive-contest'"
+        >
+          {{ isContestActive ? '🟢 Concurso ACTIVO' : '🔴 Concurso INACTIVO' }}
+        </button>
+      </div>
+    </div>
 
     <!-- Formulario para crear cupón -->
     <form @submit.prevent="handleCreateCoupon" class="coupon-form">
@@ -237,5 +297,23 @@ button {
   padding: 8px 12px;
   border-radius: 4px;
   border: 1px solid transparent;
+}
+
+.contest-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.btn-active-contest {
+  background-color: #e6f4ea;
+  color: #1e8e3e;
+  border: 1px solid #1e8e3e;
+  font-weight: bold;
+}
+.btn-inactive-contest {
+  background-color: #fce8e6;
+  color: #d93025;
+  border: 1px solid #d93025;
+  font-weight: bold;
 }
 </style>

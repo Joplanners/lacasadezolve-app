@@ -49,10 +49,18 @@ async function fetchOrders() {
     }
 
     if (activeFilter.value === 'pendientes') {
-      query = query.eq('status', 'pending_verification')
+      // 🧠 AHORA ATRAPAMOS LOS DOS ESTADOS TRAMPOSOS: pending Y pending_verification
+      query = query.in('status', ['pending', 'pending_verification'])
+    }
+    if (activeFilter.value === 'pendientes') {
+      // 🧠 AHORA ATRAPAMOS LOS DOS ESTADOS TRAMPOSOS: pending Y pending_verification
+      query = query.in('status', ['pending', 'pending_verification'])
     }
     if (activeFilter.value === 'listos') {
       query = query.in('status', ['paid', 'processing'])
+    }
+    if (activeFilter.value === 'completados') {
+      query = query.in('status', ['shipped', 'delivered'])
     }
 
     const { data, error: fetchError, count } = await query
@@ -198,6 +206,9 @@ function statusClass(status) {
         <button @click="activeFilter = 'listos'" :class="{ active: activeFilter === 'listos' }">
           Listos para Preparar
         </button>
+        <button @click="activeFilter = 'completados'" :class="{ active: activeFilter === 'completados' }">
+          Enviados / Historial
+        </button>
         <button @click="activeFilter = 'todos'" :class="{ active: activeFilter === 'todos' }">
           Todos los Pedidos
         </button>
@@ -264,20 +275,39 @@ function statusClass(status) {
               class="status-select"
               title="Cambiar Estado"
             >
-              <option :value="order.status" disabled>Cambiar estado...</option>
-              <option v-if="order.status === 'pending_verification'" value="paid">
-                ✅ Marcar Pagado
-              </option>
+              <option :value="order.status" disabled>Mover estado hacia...</option>
+              
+              <!-- A Procesando -->
               <option
-                v-if="['paid', 'pending_verification'].includes(order.status)"
+                v-if="['pending', 'pending_verification', 'paid'].includes(order.status)"
                 value="processing"
               >
-                ⏳ A Procesando
+                ⏳ Preparar / Procesar
               </option>
-              <option v-if="['paid', 'processing'].includes(order.status)" value="shipped">
-                🚚 Marcar Enviado
+
+              <!-- A Enviado -->
+              <option 
+                v-if="['paid', 'processing'].includes(order.status)" 
+                value="shipped"
+              >
+                🚚 Marcar como Enviado
               </option>
-              <option value="cancelled">❌ Cancelar Pedido</option>
+
+              <!-- A Entregado -->
+              <option 
+                v-if="order.status === 'shipped'" 
+                value="delivered"
+              >
+                📦 Marcar como Entregado
+              </option>
+
+              <!-- Cancelar (Solo si no ha sido enviado/entregado) -->
+              <option 
+                v-if="!['shipped', 'delivered', 'cancelled', 'failed'].includes(order.status)" 
+                value="cancelled"
+              >
+                ❌ Cancelar Pedido
+              </option>
             </select>
           </div>
         </div>

@@ -2,10 +2,11 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthStore } from './authStore'
+import { v4 as uuidv4 } from 'uuid'
 
 export const useCartStore = defineStore('cart', () => {
   // Estado
-  const items = ref([]) // { product_id, quantity, customizationFiles?, customizationNotes? }
+  const items = ref([]) // { id, product_id, quantity, metadata, customizationFiles?, customizationNotes? }
   const loading = ref(false)
   const appliedCoupons = ref([]) // Array para múltiples cupones
 
@@ -19,18 +20,20 @@ export const useCartStore = defineStore('cart', () => {
     const authStore = useAuthStore()
 
     if (authStore.user) {
-      // Prepara datos para Supabase (SOLO product_id y quantity)
+      // Prepara datos para Supabase (id, product_id, quantity y metadata)
       const itemsToUpsert = items.value
         .filter((item) => item.quantity > 0)
         .map((item) => ({
+          id: item.id,
           user_id: authStore.user.id,
           product_id: item.product_id,
           quantity: item.quantity,
+          metadata: item.metadata || {},
         }))
 
       const itemsToRemove = items.value
         .filter((item) => item.quantity <= 0)
-        .map((item) => item.product_id)
+        .map((item) => item.id)
 
       // Upsert en Supabase
       if (itemsToUpsert.length > 0) {
@@ -44,19 +47,21 @@ export const useCartStore = defineStore('cart', () => {
           .from('cart_items')
           .delete()
           .eq('user_id', authStore.user.id)
-          .in('product_id', itemsToRemove)
+          .in('id', itemsToRemove)
         if (deleteError) console.error('Error deleting from Supabase cart:', deleteError)
       }
 
       // Limpia estado local (mantiene archivos/notas en memoria)
       items.value = items.value.filter((item) => item.quantity > 0)
     } else {
-      // Guarda en localStorage (SOLO product_id y quantity)
+      // Guarda en localStorage
       const validItemsForStorage = items.value
         .filter((item) => item.quantity > 0)
         .map((item) => ({
+          id: item.id,
           product_id: item.product_id,
           quantity: item.quantity,
+          metadata: item.metadata || {},
         }))
 
       localStorage.setItem('guestCart', JSON.stringify(validItemsForStorage))
@@ -76,7 +81,7 @@ export const useCartStore = defineStore('cart', () => {
     try {
       const { data, error } = await supabase
         .from('cart_items')
-        .select('product_id, quantity')
+        .select('id, product_id, quantity, metadata')
         .eq('user_id', authStore.user.id)
         .gt('quantity', 0)
 
@@ -85,6 +90,7 @@ export const useCartStore = defineStore('cart', () => {
       // Inicializa items con campos vacíos para archivos/notas
       items.value = (data || []).map((item) => ({
         ...item,
+        metadata: item.metadata || {},
         customizationFiles: [],
         customizationNotes: '',
       }))
@@ -106,6 +112,8 @@ export const useCartStore = defineStore('cart', () => {
               .filter((item) => item.quantity > 0)
               .map((item) => ({
                 ...item,
+                id: item.id || uuidv4(),
+                metadata: item.metadata || {},
                 customizationFiles: [],
                 customizationNotes: '',
               }))
@@ -134,13 +142,17 @@ export const useCartStore = defineStore('cart', () => {
     await fetchUserCart()
 
     guestItems.forEach((guestItem) => {
-      const dbItemIndex = items.value.findIndex((item) => item.product_id === guestItem.product_id)
+      // Busca si existe en DB mismo producto y misma metadata
+      const dbItemIndex = items.value.findIndex(
+        (item) => item.product_id === guestItem.product_id && JSON.stringify(item.metadata || {}) === JSON.stringify(guestItem.metadata || {})
+      )
 
       if (dbItemIndex > -1) {
         items.value[dbItemIndex].quantity += guestItem.quantity
       } else {
         items.value.push({
           ...guestItem,
+          id: uuidv4(), // Regenerar ID al subir al carrito de logged in para evitar conflictos
           customizationFiles: [],
           customizationNotes: '',
         })
@@ -157,8 +169,11 @@ export const useCartStore = defineStore('cart', () => {
     quantity = 1,
     customizationFiles = [],
     customizationNotes = '',
+    metadata = {}
   ) {
-    const existingItemIndex = items.value.findIndex((item) => item.product_id === productId)
+    const existingItemIndex = items.value.findIndex(
+      (item) => item.product_id === productId && JSON.stringify(item.metadata || {}) === JSON.stringify(metadata || {})
+    )
 
     if (existingItemIndex > -1) {
       items.value[existingItemIndex].quantity += quantity
@@ -166,8 +181,10 @@ export const useCartStore = defineStore('cart', () => {
       items.value[existingItemIndex].customizationNotes = customizationNotes || ''
     } else {
       items.value.push({
+        id: uuidv4(),
         product_id: productId,
         quantity,
+        metadata: metadata || {},
         customizationFiles: customizationFiles || [],
         customizationNotes: customizationNotes || '',
       })
@@ -176,11 +193,11 @@ export const useCartStore = defineStore('cart', () => {
     await persistCart()
   }
 
-  async function updateItemQuantity(productId, newQuantity) {
+  async function updateItemQuantity(itemId, newQuantity) {
     const quantity = Number(newQuantity)
     if (isNaN(quantity) || quantity < 0) return
 
-    const itemIndex = items.value.findIndex((item) => item.product_id === productId)
+    const itemIndex = items.value.findIndex((item) => item.id === itemId)
 
     if (itemIndex > -1) {
       if (quantity === 0) {
@@ -194,8 +211,8 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
-  async function removeItem(productId) {
-    const itemIndex = items.value.findIndex((item) => item.product_id === productId)
+  async function removeItem(itemId) {
+    const itemIndex = items.value.findIndex((item) => item.id === itemId)
 
     if (itemIndex > -1) {
       items.value[itemIndex].quantity = 0
