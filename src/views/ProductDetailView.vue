@@ -7,6 +7,7 @@ import { useToast } from 'vue-toastification'
 import FileUploads from '@/components/FileUploads.vue'
 import RelatedProducts from '@/components/RelatedProducts.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import DOMPurify from 'isomorphic-dompurify'
 
 // Imports para compartir
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
@@ -124,6 +125,12 @@ const discountBadgeText = computed(() => {
 })
 
 // --- 🔥 FIN: LÓGICA DE PRECIOS Y OFERTAS ---
+
+// Sanitización de la descripción del producto para prevenir XSS
+const sanitizedDescription = computed(() => {
+  if (!product.value?.description) return ''
+  return DOMPurify.sanitize(product.value.description)
+})
 
 // 🔥 Refs para personalización y metadata
 const customizationFiles = ref([])
@@ -537,7 +544,7 @@ const pinterestShareUrl = computed(() => {
           <p class="product-category-detail">{{ product.category?.name || 'General' }}</p>
           <h1>{{ product.name }}</h1>
 
-          <div class="product-description-html" v-html="product.description"></div>
+          <div class="product-description-html" v-html="sanitizedDescription"></div>
 
           <div v-if="!isTicket" class="price-detail">
             <span class="display-price">{{ displayPrice }}</span>

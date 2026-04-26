@@ -1,4 +1,10 @@
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /mi-perfil/
+Disallow: /actualizar-contrasena
+Disallow: /finalizar-compra
+Disallow: /payment/
+Disallow: /foto-magica/
 
 Sitemap: https://lacasadezolve.com/sitemap.xml

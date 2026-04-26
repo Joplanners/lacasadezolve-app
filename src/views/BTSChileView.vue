@@ -97,8 +97,8 @@ onUnmounted(() => destroyStacking())
           <h3>🏆 El Gran Premio</h3>
           <p style="margin-bottom: 1.5rem; color: #e2c0e8;">Un solo ganador se llevará el Pack Definitivo:</p>
           <ul style="margin-bottom: 2rem;">
-            <li><strong>1 Planner Diario BTS:</strong> 100% Personalizable.</li>
-            <li><strong>1 Polera Temática:</strong> Diseño conmemorativo personalizable.</li>
+            <li><strong>1 Planner Diario BTS:</strong> Portadas Personalizables.</li>
+            <li><strong>1 Polera Temática:</strong> Diseño conmemorativo.</li>
             <li><strong>1 Regalo Sorpresa:</strong> ¡Exclusivo de de parte de Zolve!</li>
           </ul>
 

@@ -3,8 +3,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { storeToRefs } from 'pinia'
-import VueCookieAcceptDecline from 'vue-cookie-accept-decline'
-import 'vue-cookie-accept-decline/dist/vue-cookie-accept-decline.css'
+
 import ZolveBotChat from './components/ZolveBotChat.vue'
 import AppFooter from './components/AppFooter.vue'
 import AppNavbar from './components/AppNavbar.vue'
@@ -140,8 +139,7 @@ const handleLogout = async () => {
   router.push({ name: 'home' })
 }
 
-function cookieStatus() {}
-function cookieRemoved() {}
+
 </script>
 
 <template>
@@ -164,98 +162,12 @@ function cookieRemoved() {}
 
     <AppFooter v-if="showFooter" />
 
-    <vue-cookie-accept-decline
-      :elementId="'cookieConsentBanner'"
-      @status="cookieStatus"
-      @removed="cookieRemoved"
-      position="bottom"
-      type="floating"
-      transitionName="slideFromBottom"
-    >
-      <template #message>
-        Usamos cookies para mejorar tu experiencia.
-        <router-link :to="{ name: 'cookies-policy' }" class="cookie-link"
-          >Más información</router-link
-        >
-      </template>
-      <template #acceptContent>Entendido!</template>
-      <template #declineContent>Rechazar</template>
-    </vue-cookie-accept-decline>
 
     <ZolveBotChat v-if="showZolveBot" />
   </div>
 </template>
 
-<style>
-/* Cookie banner — compact bottom bar */
-#cookieConsentBanner {
-  background-color: rgba(34, 34, 34, 0.95) !important;
-  backdrop-filter: blur(8px) !important;
-  color: #f0f0f0 !important;
-  padding: 12px 24px !important;
-  font-size: 0.88em !important;
-  line-height: 1.4 !important;
-  box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.2) !important;
-  z-index: 2000 !important;
-  overflow: visible !important;
-}
 
-/* Text content */
-#cookieConsentBanner,
-#cookieConsentBanner p,
-#cookieConsentBanner span,
-#cookieConsentBanner div {
-  color: #f0f0f0 !important;
-}
-
-/* Cookie policy link */
-#cookieConsentBanner a {
-  color: #4db6ac !important;
-  text-decoration: underline !important;
-  font-weight: 600 !important;
-}
-#cookieConsentBanner a:hover {
-  color: #ff6b87 !important;
-}
-
-/* ALL buttons inside the banner — accept button (pink) */
-#cookieConsentBanner button {
-  background-color: #ff6b87 !important;
-  color: #ffffff !important;
-  border: none !important;
-  border-radius: 4px !important;
-  padding: 7px 16px !important;
-  font-weight: 600 !important;
-  font-size: 0.9em !important;
-  cursor: pointer !important;
-  white-space: nowrap !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-#cookieConsentBanner button:hover {
-  background-color: #e65c7a !important;
-}
-
-/* Decline button — second button override (transparent with border) */
-#cookieConsentBanner button:first-of-type {
-  background-color: transparent !important;
-  color: #f0f0f0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.4) !important;
-}
-#cookieConsentBanner button:first-of-type:hover {
-  border-color: rgba(255, 255, 255, 0.7) !important;
-  background-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-@media (max-width: 767px) {
-  #cookieConsentBanner {
-    flex-wrap: wrap !important;
-    justify-content: center !important;
-    padding: 12px 15px !important;
-    text-align: center !important;
-  }
-}
-</style>
 
 <style scoped>
 #app-container {

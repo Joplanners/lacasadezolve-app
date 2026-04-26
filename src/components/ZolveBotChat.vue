@@ -58,6 +58,7 @@
 import { ref, nextTick, watch, computed, onMounted } from 'vue'
 import { useProductsStore } from '@/stores/storeProducts'
 import { useCouponsStore } from '@/stores/storeCoupons'
+import DOMPurify from 'isomorphic-dompurify'
 
 const productsStore = useProductsStore()
 const couponsStore = useCouponsStore()
@@ -161,7 +162,9 @@ ${dynamicProductList.value}
    - WebPay (Débito/Crédito) y Transferencia Bancaria.
 
 3. **Envíos:**
-   - Domicilio (Starken por pagar) o Retiro (Metro La Cisterna/Einstein).
+   - A todo Chile vía Starken (por pagar).
+   - Región Metropolitana (RM): $3.590.
+   - 🔥 ¡Envío GRATIS en la RM por compras superiores a $35.000!
 
 4. **Tiempos:**
    - 3 días hábiles de confección.
@@ -259,7 +262,7 @@ const formatMessage = (text) => {
     // Saltos de línea
     .replace(/\n/g, '<br>')
 
-  return formatted
+  return DOMPurify.sanitize(formatted)
 }
 
 const handleSendMessage = async () => {

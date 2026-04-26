@@ -113,7 +113,7 @@ onUnmounted(() => {
           <div class="news-card">
             <div class="card-inner-flex">
               <RouterLink to="/bts-chile">
-                <img src="/images/bts/ZolveBTS.png" alt="Zolve BTS Logo" class="clickable-logo" />
+                <img src="/images/bts/ZolveBTS.png" alt="Zolve BTS Logo" class="clickable-logo" loading="lazy" />
               </RouterLink>
               <h3>¡Visita nuestra página de Evento!</h3>
               <p>Nuestra colección exclusiva de BTS TOUR 2026</p>
@@ -133,6 +133,7 @@ onUnmounted(() => {
                   frameborder="0"
                   scrolling="no"
                   allowtransparency="true"
+                  loading="lazy"
                 ></iframe>
               </div>
             </div>
@@ -141,7 +142,7 @@ onUnmounted(() => {
           <!-- Card 3: Servicio Impresiones -->
           <div class="news-card">
             <div class="card-inner-flex">
-              <img src="/ZolveImpresión.png" alt="Zolve Impresión" class="clickable-logo" />
+              <img src="/ZolveImpresión.png" alt="Zolve Impresión" class="clickable-logo" loading="lazy" />
               <h3>Servicio de Impresiones</h3>
               <p>¿Tienes textos de estudio y/o necesitas imprimir? Tenemos lo que necesitas al mejor precio y llega directo a tu casa. ¡Cotiza con nosotros!.</p>
               <a href="https://wa.me/56936649482" target="_blank" rel="noopener noreferrer" class="btn btn-secondary mt-auto">
