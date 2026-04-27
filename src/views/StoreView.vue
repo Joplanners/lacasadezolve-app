@@ -186,7 +186,7 @@ onMounted(() => {
                     :src="
                       product.image_urls && product.image_urls.length > 0
                         ? product.image_urls[0]
-                        : '/Zolve_Logo.png'
+                        : '/Zolve_Logo.webp'
                     "
                     :alt="product.name"
                     class="product-image"

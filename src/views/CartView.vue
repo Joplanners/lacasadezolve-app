@@ -340,7 +340,7 @@ function formatPrice(value) {
             :src="
               item.product.image_urls && item.product.image_urls.length > 0
                 ? item.product.image_urls[0]
-                : '/Zolve_Logo.png'
+                : '/Zolve_Logo.webp'
             "
             :alt="item.product.name"
             class="item-image"

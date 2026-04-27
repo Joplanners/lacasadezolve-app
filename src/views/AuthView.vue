@@ -223,7 +223,7 @@ const switchToLoginRegister = () => {
     <div v-if="isForgotPasswordMode">
       <h1>Restablecer Contraseña</h1>
       <div class="logo-image-container">
-        <img src="/Zolve_Logo.png" alt="Logo Zolve" class="auth-logo" />
+        <img src="/Zolve_Logo.webp" alt="Logo Zolve" class="auth-logo" />
       </div>
       <form @submit.prevent="handleSendResetLink">
         <p class="forgot-password-instructions">
@@ -265,7 +265,7 @@ const switchToLoginRegister = () => {
       <h1>{{ isRegistering ? 'Crear Cuenta Nueva' : 'Bienvenido a Zolve' }}</h1>
 
       <div class="logo-image-container">
-        <img src="/Zolve_Logo.png" alt="Logo Zolve" class="auth-logo" />
+        <img src="/Zolve_Logo.webp" alt="Logo Zolve" class="auth-logo" />
       </div>
 
       <form @submit.prevent="isRegistering ? handleRegister() : handleLogin()">

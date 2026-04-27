@@ -84,7 +84,7 @@ function onLogout() {
     <!-- Left: Logo -->
     <div class="navbar-left">
       <RouterLink :to="{ name: 'home' }" class="logo-link" @click="closeMobileMenu">
-        <img src="/LogoZolve.png" alt="Logo Zolve" class="navbar-logo" />
+        <img src="/LogoZolve.webp" alt="Logo Zolve" class="navbar-logo" />
       </RouterLink>
     </div>
 

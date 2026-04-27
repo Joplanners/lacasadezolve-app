@@ -4,7 +4,7 @@
     <transition name="chat-window-fade">
       <div v-if="isChatOpen" class="chat-window">
         <div class="chat-header">
-          <img src="/zolve-chat-icon.png" alt="Zolve Icon" class="header-icon" />
+          <img src="/zolve-chat-icon.webp" alt="Zolve Icon" class="header-icon" />
           <span>Zolve Bot</span>
           <div class="header-controls">
             <button @click="minimizeChat" class="control-btn minimize-btn" aria-label="Minimizar chat">−</button>
@@ -47,7 +47,7 @@
         <div class="fab-text">¿Tienes preguntas?</div>
 
         <button class="chat-fab" aria-label="Abrir chat de ZolveBot">
-          <img src="/zolve-chat-icon.png" alt="Abrir Chat" />
+          <img src="/zolve-chat-icon.webp" alt="Abrir Chat" />
         </button>
       </div>
     </transition>

@@ -12,7 +12,7 @@ useSeoMeta({
 <template>
   <div class="not-found-container">
     <div class="not-found-content">
-      <img src="/Zolve404.png" alt="Zolve el zorro está perdido" class="zolve-image" />
+      <img src="/Zolve404.webp" alt="Zolve el zorro está perdido" class="zolve-image" />
       <h1>¡Ups! Página No Encontrada</h1>
       <p class="subtitle">
         Parece que Zolve se aventuró por un camino que no existía. ¡No te preocupes, te ayudamos a

@@ -463,7 +463,7 @@ onMounted(async () => {
     if (fetchedProduct.image_urls && fetchedProduct.image_urls.length > 0) {
       mainImageUrl.value = fetchedProduct.image_urls[0]
     } else {
-      mainImageUrl.value = '/Zolve_Logo.png' // Imagen por defecto
+      mainImageUrl.value = '/Zolve_Logo.webp' // Imagen por defecto
     }
   } else {
     // Producto no encontrado → redirigir a la página 404

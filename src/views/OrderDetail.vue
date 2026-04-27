@@ -122,7 +122,7 @@ onMounted(() => {
         <div class="product-list">
           <div v-for="item in order.order_items" :key="item.product.id" class="product-item">
             <img
-              :src="item.product?.image_urls?.[0] || '/Zolve_Logo.png'"
+              :src="item.product?.image_urls?.[0] || '/Zolve_Logo.webp'"
               :alt="item.product.name"
               class="product-image"
             />

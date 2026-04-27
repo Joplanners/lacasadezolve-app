@@ -46,7 +46,7 @@ const openLink = (url) => {
   <div class="linktree-container">
     <div class="profile-section">
       <div class="avatar">
-        <img src="/zolveNavidad.png" alt="Zolve Avatar" />
+        <img src="/zolveNavidad.webp" alt="Zolve Avatar" />
       </div>
       <h1>@lacasadezolve</h1>
       <p>Papelería personalizada • Tecnología • K-pop 🦊✨</p>

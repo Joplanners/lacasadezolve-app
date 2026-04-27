@@ -51,7 +51,7 @@ onUnmounted(() => destroyStacking())
       <div class="hero-content">
         <div class="hero-top">
           <div class="hero-logo">
-            <img src="/images/bts/ZolveBTS.png" alt="Zolve BTS" class="hero-logo-img" />
+            <img src="/images/bts/ZolveBTS.webp" alt="Zolve BTS" class="hero-logo-img" />
           </div>
           <div class="hero-text-block">
             <h2 class="hero-title">BTS ARIRANG TOUR 2026</h2>
@@ -87,7 +87,7 @@ onUnmounted(() => destroyStacking())
 
         <div class="contest-block contest-banner">
           <img
-            src="/images/bts/concert-bg.png"
+            src="/images/bts/concert-bg.webp"
             alt="Banner concurso BTS"
             class="contest-banner-img"
           />
@@ -152,7 +152,7 @@ onUnmounted(() => destroyStacking())
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg, #1a0a2e 0%, #4a1a54 40%, #7b2d8e 70%, #c8a2d4 100%);
-  background-image: url('/images/bts/hero-bg.png');
+  background-image: url('/images/bts/hero-bg.webp');
   background-size: cover;
   background-position: center;
   z-index: 0;

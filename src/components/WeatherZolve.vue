@@ -139,7 +139,7 @@ onMounted(() => {
   <div class="weather-zolve-widget">
     <!-- Initial state: Show button to request weather -->
     <div v-if="!hasRequested && !weatherData && !isLoading" class="weather-initial">
-      <img src="/zolveClima.png" alt="Zolve Clima" class="zolve-icon" />
+      <img src="/zolveClima.webp" alt="Zolve Clima" class="zolve-icon" />
       <div class="weather-prompt">
         <p class="weather-prompt-text">Consulta el clima de tu zona</p>
         <button @click="hasRequested = true; requestWeather()" class="retry-button">
@@ -150,14 +150,14 @@ onMounted(() => {
 
     <div v-else-if="isLoading" class="weather-loading"><p>Obteniendo tu clima...</p></div>
     <div v-else-if="errorMsg && !weatherData" class="weather-error">
-      <img src="/zolveClima.png" alt="Zolve Clima" class="zolve-icon-error" />
+      <img src="/zolveClima.webp" alt="Zolve Clima" class="zolve-icon-error" />
       <p>{{ errorMsg }}</p>
       <button @click="requestWeather" class="retry-button" v-if="geolocationFailedOrDenied">
         Intentar usar mi ubicación
       </button>
     </div>
     <div v-else-if="weatherData" class="weather-content">
-      <img src="/zolveClima.png" alt="Zolve Clima" class="zolve-icon" />
+      <img src="/zolveClima.webp" alt="Zolve Clima" class="zolve-icon" />
       <div class="weather-info">
         <p class="weather-location">
           Clima para hoy en <strong>{{ weatherData.city }}</strong
@@ -189,7 +189,7 @@ onMounted(() => {
       </div>
     </div>
     <div v-else class="weather-error">
-      <img src="/zolveClima.png" alt="Zolve Clima" class="zolve-icon-error" />
+      <img src="/zolveClima.webp" alt="Zolve Clima" class="zolve-icon-error" />
       <p>Zorry 🦊, no se pudo cargar la información del clima.</p>
     </div>
   </div>

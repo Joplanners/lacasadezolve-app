@@ -76,7 +76,7 @@ onUnmounted(() => {
       <div class="hero-content">
         <div class="hero-top">
           <div class="hero-logo">
-            <img src="/Zolve_Logo.png" alt="La Casa de Zolve" class="hero-logo-img" />
+            <img src="/Zolve_Logo.webp" alt="La Casa de Zolve" class="hero-logo-img" />
           </div>
           <div class="hero-text-block">
             <h2 class="hero-title" data-typewriter>Bienvenidos a La Casa de Zolve</h2>
@@ -113,7 +113,7 @@ onUnmounted(() => {
           <div class="news-card">
             <div class="card-inner-flex">
               <RouterLink to="/bts-chile">
-                <img src="/images/bts/ZolveBTS.png" alt="Zolve BTS Logo" class="clickable-logo" loading="lazy" />
+                <img src="/images/bts/ZolveBTS.webp" alt="Zolve BTS Logo" class="clickable-logo" loading="lazy" />
               </RouterLink>
               <h3>¡Visita nuestra página de Evento!</h3>
               <p>Nuestra colección exclusiva de BTS TOUR 2026</p>
@@ -142,7 +142,7 @@ onUnmounted(() => {
           <!-- Card 3: Servicio Impresiones -->
           <div class="news-card">
             <div class="card-inner-flex">
-              <img src="/ZolveImpresión.png" alt="Zolve Impresión" class="clickable-logo" loading="lazy" />
+              <img src="/ZolveImpresión.webp" alt="Zolve Impresión" class="clickable-logo" loading="lazy" />
               <h3>Servicio de Impresiones</h3>
               <p>¿Tienes textos de estudio y/o necesitas imprimir? Tenemos lo que necesitas al mejor precio y llega directo a tu casa. ¡Cotiza con nosotros!.</p>
               <a href="https://wa.me/56936649482" target="_blank" rel="noopener noreferrer" class="btn btn-secondary mt-auto">
@@ -215,7 +215,7 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg, #1a0a2e 0%, #4a1a54 40%, #7b2d8e 70%, #c8a2d4 100%);
-  background-image: url('/images/bts/product-bg.png');
+  background-image: url('/images/bts/product-bg.webp');
   background-size: cover;
   background-position: center;
   z-index: 0;

@@ -958,7 +958,7 @@ onUnmounted(() => {
           <div class="summary-items">
             <div v-for="item in processedCartItems" :key="item.product_id" class="summary-item">
               <img
-                :src="item.product.image_urls?.[0] || '/Zolve_Logo.png'"
+                :src="item.product.image_urls?.[0] || '/Zolve_Logo.webp'"
                 class="item-thumb"
                 alt=""
               />

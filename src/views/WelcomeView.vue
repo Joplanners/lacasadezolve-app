@@ -33,7 +33,7 @@ onMounted(() => {
 
 <template>
   <div class="welcome-container">
-    <img src="/Zolve_Logo.png" alt="Logo Zolve" class="welcome-logo" />
+    <img src="/Zolve_Logo.webp" alt="Logo Zolve" class="welcome-logo" />
     <h1>¡Hola {{ userName }}!</h1>
     <h2>Bienvenido/a a La Casa de Zolve</h2>
     <p>Estamos preparándolo todo...</p>

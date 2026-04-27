@@ -267,7 +267,7 @@ function goBack() {
               class="order-item-detail"
             >
               <img
-                :src="item.product?.image_urls?.[0] || '/Zolve_Logo.png'"
+                :src="item.product?.image_urls?.[0] || '/Zolve_Logo.webp'"
                 :alt="item.product?.name || 'Producto'"
                 class="item-thumbnail"
               />

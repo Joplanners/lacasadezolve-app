@@ -8,7 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
     <div class="footer-main-content">
       <div class="footer-column footer-branding">
         <router-link :to="{ name: 'home' }">
-          <img src="/Zolve_Logo.png" alt="Logo La Casa de Zolve" class="footer-logo" width="100" height="100" />
+          <img src="/Zolve_Logo.webp" alt="Logo La Casa de Zolve" class="footer-logo" width="100" height="100" />
         </router-link>
         <div class="footer-legal-info">
           <p><strong>La Casa de Zolve</strong></p>
