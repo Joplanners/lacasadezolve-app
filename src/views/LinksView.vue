@@ -10,10 +10,11 @@ const links = ref([
     class: 'primary'
   },
   { 
-    title: '📅 Planner App (Solo Chile)', 
-    url: 'https://planner.lacasadezolve.com', 
-    icon: '✨',
-    class: 'accent' // Para destacarlo
+    title: 'BTS Chile 2025', 
+    url: 'https://lacasadezolve.com/bts-chile', 
+    icon: '',
+    image: '/images/bts/ZolveBTS.webp',
+    class: 'accent'
   },
   { 
     title: '📸 Instagram', 
@@ -46,7 +47,7 @@ const openLink = (url) => {
   <div class="linktree-container">
     <div class="profile-section">
       <div class="avatar">
-        <img src="/zolveNavidad.webp" alt="Zolve Avatar" />
+        <img src="/Zolve_logo_con Nombre.png" alt="La Casa de Zolve" />
       </div>
       <h1>@lacasadezolve</h1>
       <p>Papelería personalizada • Tecnología • K-pop 🦊✨</p>
@@ -60,7 +61,8 @@ const openLink = (url) => {
         :class="link.class"
         @click="openLink(link.url)"
       >
-        <span class="icon">{{ link.icon }}</span>
+        <img v-if="link.image" :src="link.image" :alt="link.title" class="link-logo" />
+        <span v-else class="icon">{{ link.icon }}</span>
         <span class="text">{{ link.title }}</span>
       </button>
     </div>
@@ -88,13 +90,12 @@ const openLink = (url) => {
   justify-content: center;
 }
 
-/* Avatar del Zorrito */
+/* Logo de Zolve */
 .avatar img {
   width: 100px;
   height: 100px;
   border-radius: 50%;
-  /* AQUÍ EL CAMBIO: Usamos tu rosado de marca para el borde */
-  border: 4px solid var(--brand-pink); 
+  border: 4px solid var(--brand-pink);
   object-fit: cover;
   margin-bottom: 10px;
   box-shadow: 0 4px 10px rgba(0,0,0,0.1);
@@ -148,6 +149,15 @@ p {
   position: absolute;
   left: 20px;
   font-size: 1.2rem;
+}
+
+.link-btn .link-logo {
+  position: absolute;
+  left: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: contain;
 }
 
 /* --- VARIACIONES DE COLORES --- */
