@@ -45,7 +45,7 @@
     "@vue/eslint-config-prettier": "^10.2.0",
     "eslint": "^9.22.0",
     "eslint-plugin-vue": "~10.9.1",
-    "globals": "^16.0.0",
+    "globals": "^17.6.0",
     "prettier": "3.8.3",
     "terser": "^5.47.1",
     "vite": "^6.2.4",
