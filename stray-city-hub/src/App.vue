@@ -10,10 +10,10 @@
     <section class="hero-section">
       <div class="hero-bg"></div>
       <div class="container hero-content">
-        <p class="hero-kicker">STRAY KIDS WORLD TOUR 2026 — LATAM</p>
+        <p class="hero-kicker">MANIFESTANDO STRAY CITY EN CHILE Y LATAM</p>
         <h2 class="hero-title glow-text">
-          DOMINACIÓN<br />
-          <span class="hero-accent">LATAM</span>
+          STRAY CITY<br />
+          <span class="hero-accent">CHILE</span>
         </h2>
         <p class="hero-subtitle">
           El muro de manifestación más poderoso del fandom.<br />
