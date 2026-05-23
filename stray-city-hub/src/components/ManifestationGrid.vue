@@ -12,7 +12,8 @@
         </button>
       </div>
 
-      <div class="masonry-grid" ref="gridRef">
+      <div class="mural-scroll-container">
+        <div class="masonry-grid" ref="gridRef">
         <div
           v-for="(msg, index) in messages"
           :key="msg.id"
@@ -32,6 +33,7 @@
             <span class="msg-author">— {{ msg.author }}</span>
             <span class="msg-date">{{ formatDate(msg.created_at || msg.timestamp) }}</span>
           </div>
+        </div>
         </div>
       </div>
     </div>
@@ -147,6 +149,35 @@ onMounted(() => {
 .add-icon {
   font-size: 1.3rem;
   font-weight: 300;
+}
+
+.add-icon {
+  font-size: 1.3rem;
+  font-weight: 300;
+}
+
+/* Scroll Container */
+.mural-scroll-container {
+  max-height: 650px;
+  overflow-y: auto;
+  padding-right: 15px;
+  padding-bottom: 20px;
+}
+
+/* Custom Scrollbar */
+.mural-scroll-container::-webkit-scrollbar {
+  width: 8px;
+}
+.mural-scroll-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+.mural-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--border-grunge);
+  border-radius: 10px;
+}
+.mural-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-blood);
 }
 
 /* Masonry Grid */

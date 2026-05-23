@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 const rateLimits = new Map()
 const RATE_WINDOW_MS = 60 * 60 * 1000 // 1 hora
 const MAX_MESSAGES_PER_HOUR = 5
-const MAX_CANDLES_PER_HOUR = 30
+const MAX_CANDLES_PER_HOUR = 10
 
 function hashIP(ip) {
   return createHash('sha256').update(ip || 'unknown').digest('hex')
