@@ -30,7 +30,7 @@
           <!-- Footer -->
           <div class="msg-footer">
             <span class="msg-author">— {{ msg.author }}</span>
-            <span class="msg-date">{{ formatDate(msg.timestamp) }}</span>
+            <span class="msg-date">{{ formatDate(msg.created_at || msg.timestamp) }}</span>
           </div>
         </div>
       </div>
@@ -73,8 +73,16 @@ function tapeStyle(index) {
 }
 
 function formatDate(dateStr) {
+  if (!dateStr) return ''
   const date = new Date(dateStr)
-  return date.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })
+  return new Intl.DateTimeFormat('es-CL', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  }).format(date)
 }
 
 onMounted(() => {
