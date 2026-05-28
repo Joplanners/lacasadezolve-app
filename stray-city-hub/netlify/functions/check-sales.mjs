@@ -121,6 +121,7 @@ export default async (req, context) => {
     ])
 
     const summary = results.map((r) => (r.status === 'fulfilled' ? r.value : r.reason))
+    console.log('[check-sales] RESULTADO FINAL:', JSON.stringify(summary, null, 2))
     return new Response(JSON.stringify({ success: true, results: summary }))
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 })
