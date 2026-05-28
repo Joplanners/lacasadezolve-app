@@ -59,13 +59,21 @@
             <span class="countdown-label">días</span>
           </div>
         </div>
+
+        <!-- Espacios reservados para futuros países (invisibles) -->
+        <div class="sale-card card torn-edge ghost-card" v-for="n in ghostSlots" :key="'ghost-' + n">
+          <div class="ghost-content">
+            <span class="ghost-icon">🌎</span>
+            <p class="ghost-text">Próximamente...</p>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 </template>
 
 <script setup>
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { saleEvents as fallbackEvents } from '../data/mockData.js'
 
 // Datos dinámicos de Supabase (inyectados por App.vue)
@@ -81,6 +89,13 @@ const activeEvents = computed(() => {
     }))
   }
   return fallbackEvents
+})
+
+// Espacios fantasma: mostrar hasta completar 6 cards en total
+const ghostSlots = computed(() => {
+  const total = activeEvents.value.length
+  const target = 6
+  return Math.max(0, target - total)
 })
 
 function formatSaleDate(dateStr) {
@@ -274,8 +289,44 @@ function barText(event) {
   animation: flicker 2s infinite;
 }
 
-.status-bar-fill.sold {
+.status-bar-fill.sold,
+.status-bar-fill.sold_out {
   background: var(--text-muted);
+}
+
+/* Ghost cards (invisibles para el usuario) */
+.ghost-card {
+  opacity: 0.15;
+  pointer-events: none;
+  user-select: none;
+  border-style: dashed !important;
+  border-color: var(--border-dark) !important;
+  background: transparent !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.ghost-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.ghost-icon {
+  font-size: 2.5rem;
+  opacity: 0.5;
+}
+
+.ghost-text {
+  font-family: var(--font-grunge);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .bar-label {

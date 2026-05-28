@@ -31,7 +31,7 @@
           </div>
           <div class="stat-divider"></div>
           <div class="stat-item">
-            <span class="stat-number">3</span>
+            <span class="stat-number">{{ countryCount }}</span>
             <span class="stat-label">Países</span>
           </div>
         </div>
@@ -75,7 +75,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, provide } from 'vue'
+import { ref, computed, onMounted, provide } from 'vue'
 import AppHeader from './components/AppHeader.vue'
 import SalesTracker from './components/SalesTracker.vue'
 import AltarLatam from './components/AltarLatam.vue'
@@ -93,6 +93,14 @@ const saleEvents = ref(null) // null = usar datos estáticos del componente
 // Compartir candleCount con AltarLatam
 provide('candleCount', candleCount)
 provide('saleEvents', saleEvents)
+
+// Conteo dinámico de países (sin duplicados por segunda fecha)
+const countryCount = computed(() => {
+  const events = saleEvents.value || []
+  if (!events.length) return 3
+  const unique = new Set(events.map(e => e.country?.replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '').trim()))
+  return unique.size
+})
 
 // Cargar datos desde la API al montar
 onMounted(async () => {

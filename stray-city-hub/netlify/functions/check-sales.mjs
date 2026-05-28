@@ -117,14 +117,18 @@ export default async (req, context) => {
     const month = localNow.getMonth()
     const year = localNow.getFullYear()
 
-    const isActiveSaleDay = year === 2026 && month === 4 && (day === 27 || day === 29)
+    const isActiveSaleDay = year === 2026 && (
+      (month === 4 && (day === 27 || day === 29)) ||  // Mayo: Colombia/Argentina + México
+      (month === 5 && day === 1)                       // Junio: Argentina fecha 2
+    )
     if (!isActiveSaleDay) {
       return new Response(JSON.stringify({ skipped: true, reason: 'No es día de venta' }))
     }
 
     const results = await Promise.allSettled([
-      ...(day === 27 ? [] : []),
-      ...(day === 29 ? [processCountry('mexico', 'México', SALE_URLS.mexico)] : []),
+      ...(month === 4 && day === 27 ? [] : []),
+      ...(month === 4 && day === 29 ? [processCountry('mexico', 'México', SALE_URLS.mexico)] : []),
+      ...(month === 5 && day === 1 ? [processCountry('argentina_2', 'Argentina (Segunda Fecha)', SALE_URLS.argentina)] : []),
     ])
 
     const summary = results.map((r) => (r.status === 'fulfilled' ? r.value : r.reason))
@@ -136,5 +140,5 @@ export default async (req, context) => {
 }
 
 export const config = {
-  schedule: '*/15 * 27,28,29,30 5 *',
+  schedule: '*/15 * 27,28,29,30 5,6 *',
 }
