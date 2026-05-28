@@ -1,15 +1,14 @@
 async function test() {
-  const url = 'https://www.ticketmaster.co/event/stray-kids-straycity-2026';
+  const url = 'https://www.allaccess.com.ar/event/stray-kids';
   try {
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       }
     });
-    console.log("Status:", res.status);
     const text = await res.text();
-    console.log("Text length:", text.length);
-    console.log("Sample:", text.substring(0, 200));
+    console.log("Sample:", text.substring(0, 500));
+    console.log("Sold out mention:", text.toLowerCase().includes('sold out') || text.toLowerCase().includes('agotad'));
   } catch(e) {
     console.error(e);
   }

@@ -26,8 +26,9 @@ function extractVisibleText(html) {
 
 async function analyzeWithGemini(country, scrapedText) {
   const prompt = `Actúa como un analizador de datos. Tu objetivo es leer el texto extraído de la página web de venta de entradas para el concierto de Stray Kids en ${country} y determinar el estado actual de las entradas. 
-Responde ÚNICAMENTE con un objeto JSON válido con esta estructura estricta: 
-{ "status": "upcoming" | "on_sale" | "hot" | "sold_out", "status_detail": "Breve frase de 5 palabras sobre lo que dice la página (ej: 'Fila virtual activa' o 'Entradas agotadas')" }. 
+REGLA DE ORO: Si encuentras palabras como "Agotado", "Sold Out", "Sin disponibilidad", "Tickets no disponibles" en CUALQUIER PARTE del texto, el status DEBE ser obligatoriamente "sold_out", sin importar qué más diga la página.
+Si la página menciona "Fila virtual", "Queue", o "Próximamente" pero hoy es el día de venta, considera que la venta está activa ("hot" o "on_sale").
+Responde en modo JSON con la estructura: { "status": "upcoming" | "on_sale" | "hot" | "sold_out", "status_detail": "Frase de máximo 5 palabras (ej: '¡Entradas totalmente agotadas!')" }
 Texto extraído de la web: """ ${scrapedText} """`
 
   const response = await fetch(GEMINI_URL, {
@@ -135,5 +136,5 @@ export default async (req, context) => {
 }
 
 export const config = {
-  schedule: '*/15 * 27,29 5 *',
+  schedule: '*/15 * 27,28,29,30 5 *',
 }
