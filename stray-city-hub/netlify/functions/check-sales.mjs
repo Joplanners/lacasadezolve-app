@@ -35,7 +35,10 @@ Texto extraído de la web: """ ${scrapedText} """`
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 150 },
+      generationConfig: { 
+        temperature: 0.1,
+        responseMimeType: "application/json"
+      },
     }),
   })
 
@@ -43,10 +46,13 @@ Texto extraído de la web: """ ${scrapedText} """`
 
   const data = await response.json()
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  const jsonMatch = rawText.match(/\{[\s\S]*?\}/)
-  if (!jsonMatch) throw new Error(`No JSON from Gemini: ${rawText}`)
-
-  const parsed = JSON.parse(jsonMatch[0])
+  
+  let parsed;
+  try {
+    parsed = JSON.parse(rawText)
+  } catch (err) {
+    throw new Error(`Failed to parse Gemini JSON: ${rawText}`)
+  }
   return {
     status: parsed.status,
     status_detail: String(parsed.status_detail || '').substring(0, 100),
