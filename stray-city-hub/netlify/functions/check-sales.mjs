@@ -123,7 +123,7 @@ export default async (req, context) => {
     }
 
     const results = await Promise.allSettled([
-      ...(day === 27 ? [processCountry('colombia', 'Colombia', SALE_URLS.colombia), processCountry('argentina', 'Argentina', SALE_URLS.argentina)] : []),
+      ...(day === 27 ? [] : []),
       ...(day === 29 ? [processCountry('mexico', 'México', SALE_URLS.mexico)] : []),
     ])
 
