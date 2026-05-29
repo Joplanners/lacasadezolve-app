@@ -105,6 +105,9 @@ function formatSaleDate(dateStr) {
 }
 
 function getDaysLeft(event) {
+  // Si ya está en venta o agotado, no quedan días de espera
+  if (['on_sale', 'hot', 'sold_out'].includes(event.status)) return 0
+
   const saleDate = event.sale_date || null
   if (!saleDate) return event.daysLeft || '?'
   const now = new Date()
