@@ -60,4 +60,15 @@ export const saleEvents = [
     daysLeft: 0,
     flag: '🇲🇽',
   },
+  {
+    id: 'mexico_2',
+    country: 'México 🇲🇽',
+    city: 'Ciudad de México',
+    date: '28 de Mayo, 2026',
+    venue: 'Estadio GNP Seguros',
+    status: 'on_sale',
+    statusDetail: 'Segunda fecha — ¡Venta activa!',
+    daysLeft: 0,
+    flag: '🇲🇽',
+  },
 ]

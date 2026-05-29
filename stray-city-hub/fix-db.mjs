@@ -18,33 +18,23 @@ async function supaFetch(path, method = 'GET', body = null) {
 }
 
 async function run() {
-  // 1. Agregar segunda fecha de Argentina
-  console.log("Agregando Argentina Fecha 2...");
-  const ar2 = await supaFetch('skz_sale_events', 'POST', {
-    id: 'argentina_2',
-    country: 'Argentina 🇦🇷',
-    city: 'Buenos Aires',
-    venue: 'Hipódromo San Isidro',
-    sale_date: '2026-06-01',
-    status: 'upcoming',
-    status_detail: 'Segunda fecha — Venta 1 de Junio',
+  console.log("Agregando México Fecha 2...");
+  const mx2 = await supaFetch('skz_sale_events', 'POST', {
+    id: 'mexico_2',
+    country: 'México 🇲🇽',
+    city: 'Ciudad de México',
+    venue: 'Estadio GNP Seguros',
+    sale_date: '2026-05-28',
+    status: 'on_sale',
+    status_detail: 'Segunda fecha — ¡Venta activa!',
     ai_last_response: null,
     last_checked_at: null
   });
-  console.log("Argentina 2:", ar2);
+  console.log("México 2:", mx2);
 
-  // 2. Actualizar México a on_sale
-  console.log("Actualizando México a on_sale...");
-  await supaFetch('skz_sale_events?id=eq.mexico', 'PATCH', {
-    status: 'on_sale',
-    status_detail: '¡Venta de entradas activa!',
-    updated_at: new Date().toISOString()
-  });
-  console.log("México actualizado.");
-
-  // 3. Verificar todos los eventos
-  console.log("\n--- Estado final de todos los eventos ---");
-  const all = await supaFetch('skz_sale_events?select=*&order=sale_date.asc');
+  // Verificar
+  console.log("\n--- Estado final ---");
+  const all = await supaFetch('skz_sale_events?select=id,country,sale_date,status,status_detail&order=sale_date.asc');
   console.log(JSON.stringify(all, null, 2));
 }
 
