@@ -55,14 +55,17 @@ async function downloadFile(orderItemId) {
       body: JSON.stringify({ order_item_id: orderItemId })
     })
     const data = await response.json()
-    if (!response.ok) throw new Error(data.error || 'Error al generar link')
+    if (!response.ok) {
+      throw new Error(JSON.stringify(data.details || data.error))
+    }
     
     // Abrir URL en nueva pestaña
     window.open(data.url, '_blank')
     toast.success(`Descarga iniciada. Te quedan ${data.max_downloads - data.downloads_count} descargas.`)
   } catch (err) {
-    console.error('Error:', err)
-    toast.error(err.message || 'No se pudo descargar el archivo')
+    console.error('Error al descargar:', err)
+    alert('Error detallado del servidor: ' + err.message)
+    toast.error('No se pudo descargar el archivo')
   } finally {
     isDownloading.value = false
   }
