@@ -144,7 +144,24 @@ export const handler = async (event, context) => {
       })
     }
   } catch (error) {
-    console.error('Error generating download URL:', error)
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal Server Error', details: error.message }) }
+    console.error('Error generating download URL:', error, error?.message, error?.stack)
+    
+    // Convertir el error a string seguro para enviarlo al frontend y saber qué falló
+    let safeError = {};
+    if (error instanceof Error) {
+      safeError = { message: error.message, stack: error.stack, name: error.name };
+    } else {
+      safeError = error;
+    }
+    
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ 
+        error: 'Internal Server Error', 
+        details: safeError,
+        raw: String(error)
+      }) 
+    }
   }
 }
