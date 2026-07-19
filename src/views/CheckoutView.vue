@@ -184,6 +184,7 @@ const isFreeShippingRM = computed(() => {
 })
 
 const shippingCost = computed(() => {
+  if (cartStore.hasOnlyDigitalItems) return 0
   if (selectedShippingMethod.value !== 'rm_rapido') return 0
   return isFreeShippingRM.value ? 0 : 3590
 })
@@ -343,7 +344,7 @@ async function handleCheckoutSubmit() {
   paymentHasFailed.value = false
 
   // Validaciones
-  if (!selectedShippingMethod.value) {
+  if (!selectedShippingMethod.value && !cartStore.hasOnlyDigitalItems) {
     toast.error('Selecciona método de envío.')
     return
   }
@@ -364,6 +365,13 @@ async function handleCheckoutSubmit() {
     commune: 'Comuna',
     addressStreet: 'Calle',
     addressNumber: 'Número',
+  }
+
+  if (cartStore.hasOnlyDigitalItems) {
+    delete requiredFields.region;
+    delete requiredFields.commune;
+    delete requiredFields.addressStreet;
+    delete requiredFields.addressNumber;
   }
 
   for (const key in requiredFields) {
@@ -391,6 +399,10 @@ async function handleCheckoutSubmit() {
             details: customerData.value.addressDetail || null,
           }
         : userProfileData.value.shipping_address
+        
+    if (cartStore.hasOnlyDigitalItems) {
+      finalShippingAddress = null;
+    }
 
     // 2. Validar Carrito y Stock
     if (cartItems.value.length === 0) throw new Error('Tu carrito está vacío.')
@@ -481,9 +493,11 @@ async function handleCheckoutSubmit() {
       customer_email: customerData.value.email,
       customer_name: customerData.value.fullName,
       customer_phone: customerData.value.phone || null,
-      shipping_method: selectedShippingMethod.value === 'rm_rapido' 
-        ? (isFreeShippingRM.value ? 'Envío RM (Gratis)' : 'Envío RM ($3.590)') 
-        : selectedShippingMethod.value,
+      shipping_method: cartStore.hasOnlyDigitalItems 
+        ? 'digital'
+        : (selectedShippingMethod.value === 'rm_rapido' 
+          ? (isFreeShippingRM.value ? 'Envío RM (Gratis)' : 'Envío RM ($3.590)') 
+          : selectedShippingMethod.value),
       payment_method: selectedPaymentMethod.value,
       applied_coupon_code: appliedCoupons.value.map((c) => c.code).join(', ') || null,
       discount_amount: discountAmount.value > 0 ? discountAmount.value : null,
@@ -627,7 +641,9 @@ async function handleCheckoutSubmit() {
 // --- Lifecycle Hooks ---
 onMounted(async () => {
   setTimeout(() => {
-    if (cartItems.value.length === 0 && !isSubmitting.value) router.replace({ name: 'store' })
+    if (cartItems.value.length === 0 && !isSubmitting.value) {
+      router.replace({ name: 'store' })
+    }
   }, 500)
   loadCartDetailsForSummary()
   if (authStore.isLoggedIn) loadUserProfile()
@@ -745,7 +761,7 @@ onUnmounted(() => {
         </fieldset>
 
         <fieldset
-          v-if="authStore.isLoggedIn && hasSavedAddress"
+          v-if="!cartStore.hasOnlyDigitalItems && authStore.isLoggedIn && hasSavedAddress"
           class="form-section address-selection"
         >
           <legend>2. Dirección de Envío</legend>
@@ -782,7 +798,7 @@ onUnmounted(() => {
           </div>
         </fieldset>
 
-        <fieldset class="form-section">
+        <fieldset class="form-section" v-if="!cartStore.hasOnlyDigitalItems">
           <legend>
             {{
               authStore.isLoggedIn && hasSavedAddress ? '2.1 Detalle de Envío' : '2. Datos de Envío'
@@ -856,7 +872,7 @@ onUnmounted(() => {
           </div>
         </fieldset>
 
-        <fieldset class="form-section">
+        <fieldset class="form-section" v-if="!cartStore.hasOnlyDigitalItems">
           <legend>3. Método de Envío</legend>
           <p>Elige cómo recibir tu pedido:</p>
           <div class="shipping-options">
@@ -914,6 +930,7 @@ onUnmounted(() => {
               <small>Débito o crédito.</small>
             </label>
             <label
+              v-if="!cartStore.hasOnlyDigitalItems"
               class="payment-option"
               :class="{ selected: selectedPaymentMethod === 'transferencia' }"
             >

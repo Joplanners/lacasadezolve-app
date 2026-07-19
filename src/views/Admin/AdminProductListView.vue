@@ -72,7 +72,10 @@ onMounted(() => {
             <td>{{ product.name }}</td>
             <td>{{ product.category?.name || '-' }}</td>
             <td>${{ product.price?.toLocaleString('es-CL') || '0' }}</td>
-            <td>{{ product.stock }}</td>
+            <td>
+              <span v-if="product.is_downloadable" class="status-badge" style="background: #9c27b0;">Ilimitado</span>
+              <span v-else>{{ product.stock !== null ? product.stock : 'Ilimitado' }}</span>
+            </td>
             <td>
               <span :class="['status-badge', product.is_customizable ? 'yes' : 'no']">
                 {{ product.is_customizable ? 'Sí' : 'No' }}

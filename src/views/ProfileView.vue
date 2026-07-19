@@ -49,6 +49,7 @@ const errorOverlays = ref('')
 const userOrders = ref([])
 const loadingOrders = ref(false)
 const errorOrders = ref('')
+const isDownloading = ref(false)
 
 // --- Estado para Regiones y Comunas ---
 const regions = ref(regionesComunasData)
@@ -137,9 +138,10 @@ async function fetchUserOrders(userId) {
                 total_amount,
                 status,
                 order_items (
+                    id,
                     quantity,
                     price_at_purchase,
-                    product:products ( name, image_urls )
+                    product:products ( id, name, image_urls, is_downloadable )
                 )
             `,
       )
@@ -365,6 +367,51 @@ const userDisplayName = computed(() => {
   }
   return 'Usuario'
 })
+
+const userDigitalItems = computed(() => {
+  const items = []
+  userOrders.value.forEach(order => {
+    if (order.status === 'paid' || order.status === 'processing') {
+      order.order_items?.forEach(item => {
+        if (item.product?.is_downloadable) {
+          items.push({
+            ...item,
+            order_id: order.id,
+            order_date: order.created_at
+          })
+        }
+      })
+    }
+  })
+  return items
+})
+
+async function downloadFile(orderItemId) {
+  isDownloading.value = true
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) throw new Error('Sesión inválida o expirada.')
+    
+    const response = await fetch('/.netlify/functions/generate-download-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ order_item_id: orderItemId })
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Error al generar link')
+    
+    window.open(data.url, '_blank')
+    toast.success(`Descarga iniciada. Te quedan ${data.max_downloads - data.downloads_count} descargas.`)
+  } catch (err) {
+    console.error('Error:', err)
+    toast.error(err.message || 'No se pudo descargar el archivo')
+  } finally {
+    isDownloading.value = false
+  }
+}
 </script>
 
 <template>
@@ -588,6 +635,24 @@ const userDisplayName = computed(() => {
     <!-- SECCIONES ADICIONALES (solo visibles si no se está editando) -->
     <div v-if="!isEditing">
       <hr class="section-divider" />
+
+      <!-- SECCIÓN MIS DESCARGAS -->
+      <section class="downloads-section" v-if="userDigitalItems.length > 0">
+        <h3>📥 Mis Descargas Digitales</h3>
+        <p style="text-align: center; margin-bottom: 20px; color: var(--color-text-mute);">Aquí tienes acceso a los archivos digitales que has comprado.</p>
+        <div class="items-grid downloads-grid">
+          <div v-for="item in userDigitalItems" :key="item.id" class="item-card download-card" style="border: 1px dashed #ce93d8; background: #f3e5f5;">
+            <div class="card-icon-placeholder" style="background: #9c27b0;">📄</div>
+            <h4 class="card-title" style="color: #4a148c;">{{ item.product.name }}</h4>
+            <p class="card-description" style="color: #6a1b9a;">Comprado el: {{ new Date(item.order_date).toLocaleDateString('es-CL') }}</p>
+            <button @click="downloadFile(item.id)" class="btn btn-primary" :disabled="isDownloading" style="background: #8e24aa;">
+              {{ isDownloading ? 'Cargando...' : 'Descargar Archivo' }}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <hr class="section-divider" v-if="userDigitalItems.length > 0" />
 
       <!-- --- SECCIÓN "MIS COMPRAS" CON BOTÓN DE DETALLE --- -->
       <section class="purchases-section">

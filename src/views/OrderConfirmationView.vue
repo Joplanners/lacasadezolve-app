@@ -1,10 +1,16 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { supabase } from '@/lib/supabaseClient'
+import { useAuthStore } from '@/stores/authStore'
+import { useToast } from 'vue-toastification'
 
 const route = useRoute()
 const orderId = route.params.orderId
+
+const authStore = useAuthStore()
+const toast = useToast()
+const isDownloading = ref(false)
 
 const order = ref(null)
 const loading = ref(true)
@@ -14,7 +20,7 @@ onMounted(async () => {
   try {
     const { data, error: orderError } = await supabase
       .from('orders')
-      .select('*')
+      .select('*, order_items(*, product:products(*))')
       .eq('id', orderId)
       .single()
 
@@ -28,6 +34,39 @@ onMounted(async () => {
     loading.value = false
   }
 })
+const digitalItems = computed(() => {
+  if (!order.value || !order.value.order_items) return []
+  return order.value.order_items.filter(item => item.product?.is_downloadable)
+})
+
+async function downloadFile(orderItemId) {
+  isDownloading.value = true
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    const headers = { 'Content-Type': 'application/json' }
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`
+    }
+    
+    const response = await fetch('/.netlify/functions/generate-download-url', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ order_item_id: orderItemId })
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Error al generar link')
+    
+    // Abrir URL en nueva pestaña
+    window.open(data.url, '_blank')
+    toast.success(`Descarga iniciada. Te quedan ${data.max_downloads - data.downloads_count} descargas.`)
+  } catch (err) {
+    console.error('Error:', err)
+    toast.error(err.message || 'No se pudo descargar el archivo')
+  } finally {
+    isDownloading.value = false
+  }
+}
 </script>
 
 <template>
@@ -81,6 +120,25 @@ onMounted(async () => {
         <p>
           📧 Se ha enviado un correo de confirmación a <strong>{{ order.customer_email }}</strong>
         </p>
+      </div>
+
+      <div v-if="digitalItems.length > 0 && (order.status === 'paid' || order.status === 'processing')" class="digital-downloads">
+        <h2>📥 Tus Archivos Digitales</h2>
+        <p>Tu compra incluye archivos digitales que ya puedes descargar.</p>
+        <div class="downloads-list">
+          <div v-for="item in digitalItems" :key="item.id" class="download-item">
+            <span class="download-name">{{ item.product.name }}</span>
+            <button @click="downloadFile(item.id)" class="btn btn-primary" :disabled="isDownloading">
+              {{ isDownloading ? 'Cargando...' : 'Descargar Archivo' }}
+            </button>
+          </div>
+        </div>
+        <p class="download-warning"><small>Nota: Las descargas están limitadas a 5 por archivo y el link expira en 1 hora por seguridad.</small></p>
+        
+        <div v-if="!authStore.isLoggedIn" class="guest-register-invite">
+          <p>💡 <strong>¿Quieres guardar tus descargas para siempre?</strong></p>
+          <p>Crea una cuenta o <router-link to="/ingreso">inicia sesión</router-link> en nuestra tienda y tus compras quedarán seguras en tu Perfil.</p>
+        </div>
       </div>
 
       <div class="actions">
@@ -266,5 +324,64 @@ h1 {
 .btn-secondary:hover {
   background: #f8f9fa;
   transform: translateY(-2px);
+}
+
+.digital-downloads {
+  background: #f3e5f5;
+  padding: 25px;
+  border-radius: 12px;
+  margin-bottom: 30px;
+  border: 1px dashed #ce93d8;
+  text-align: left;
+}
+.digital-downloads h2 {
+  color: #8e24aa;
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+.digital-downloads > p {
+  color: #6a1b9a;
+  margin-bottom: 20px;
+}
+.downloads-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.download-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(156, 39, 176, 0.1);
+}
+.download-name {
+  font-weight: 600;
+  color: #4a148c;
+}
+.download-warning {
+  margin-top: 15px;
+  color: #7b1fa2;
+  font-style: italic;
+  text-align: center;
+}
+.guest-register-invite {
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 20px;
+  text-align: center;
+  color: #e65100;
+}
+.guest-register-invite p {
+  margin: 5px 0;
+}
+.guest-register-invite a {
+  color: #f57c00;
+  font-weight: bold;
+  text-decoration: underline;
 }
 </style>

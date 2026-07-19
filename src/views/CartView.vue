@@ -130,7 +130,7 @@ async function loadCartProductDetails() {
       .filter((item) => item.product !== null)
 
     cartProductsDetails.value.forEach((item) => {
-      if (item.product.stock !== null && item.product.stock < item.quantity) {
+      if (!item.product.is_downloadable && item.product.stock !== null && item.product.stock < item.quantity) {
         toast.warning(
           `Stock insuficiente para "${item.product.name}". Ajustado a ${item.product.stock} unidades.`,
         )
@@ -260,7 +260,7 @@ async function handleUpdateQuantity(itemId, newQuantity) {
   const stock = item.product.stock
   let finalQuantity = Math.max(0, newQuantity)
 
-  if (stock !== null && finalQuantity > stock) {
+  if (!item.product.is_downloadable && stock !== null && finalQuantity > stock) {
     toast.error(`Solo quedan ${stock} unidades de "${item.product.name}".`)
     finalQuantity = stock
   }
@@ -348,7 +348,8 @@ function formatPrice(value) {
           <div class="item-details">
             <h3 class="item-name">{{ item.product.name }}</h3>
 
-            <div v-if="item.metadata && (item.metadata.size || item.metadata.isTicket)" class="item-metadata-labels">
+            <div v-if="item.metadata && (item.metadata.size || item.metadata.isTicket || item.product.is_downloadable)" class="item-metadata-labels">
+              <span v-if="item.product.is_downloadable" class="meta-label" style="background-color: #f3e5f5; color: #9c27b0; border-color: #e1bee7;">📥 Descarga Digital</span>
               <span v-if="item.metadata.size" class="meta-label">Talla: <strong>{{ item.metadata.size }}</strong></span>
               <span v-if="item.metadata.isTicket" class="meta-label">Detalles de {{ item.metadata.tickets?.length }} Entrada(s) incluidos</span>
             </div>
@@ -362,13 +363,13 @@ function formatPrice(value) {
             </p>
             <p
               v-if="
-                item.product.stock !== null && item.product.stock <= 10 && item.product.stock > 0
+                !item.product.is_downloadable && item.product.stock !== null && item.product.stock <= 10 && item.product.stock > 0
               "
               class="item-stock-warning"
             >
               ¡Solo quedan {{ item.product.stock }}!
             </p>
-            <p v-else-if="item.product.stock === 0" class="item-stock-warning out-of-stock">
+            <p v-else-if="!item.product.is_downloadable && item.product.stock === 0" class="item-stock-warning out-of-stock">
               ¡Agotado! (Elimínalo)
             </p>
           </div>
@@ -385,7 +386,7 @@ function formatPrice(value) {
             <span class="quantity-display">{{ item.quantity }}</span>
             <button
               @click="handleUpdateQuantity(item.id, item.quantity + 1)"
-              :disabled="item.product.stock !== null && item.quantity >= item.product.stock"
+              :disabled="!item.product.is_downloadable && item.product.stock !== null && item.quantity >= item.product.stock"
               class="quantity-btn"
               aria-label="Aumentar cantidad"
             >

@@ -80,12 +80,15 @@ const goToProduct = (productId) => {
     >
       <swiper-slide v-for="product in relatedProducts" :key="product.id">
         <div class="product-card" @click="goToProduct(product.id)" tabindex="0" role="link">
-          <div class="product-image">
+          <div class="product-image" style="position: relative;">
             <img
               v-if="product.image_urls && product.image_urls[0]"
               :src="product.image_urls[0]"
               :alt="product.name"
             />
+            <span v-if="product.is_downloadable" style="position: absolute; top: 10px; left: 10px; background-color: #f3e5f5; color: #9c27b0; padding: 5px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; border: 1px solid #e1bee7;">
+              📥 Digital
+            </span>
             <div v-else class="placeholder-image">🦊</div>
           </div>
           <div class="product-info">

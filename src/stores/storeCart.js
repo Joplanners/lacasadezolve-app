@@ -15,6 +15,18 @@ export const useCartStore = defineStore('cart', () => {
     return items.value.reduce((count, item) => count + item.quantity, 0)
   })
 
+  const hasDigitalItems = computed(() => {
+    return items.value.some(item => item.metadata?.is_downloadable)
+  })
+
+  const hasPhysicalItems = computed(() => {
+    return items.value.some(item => !item.metadata?.is_downloadable)
+  })
+
+  const hasOnlyDigitalItems = computed(() => {
+    return items.value.length > 0 && hasDigitalItems.value && !hasPhysicalItems.value
+  })
+
   // --- LÓGICA DE PERSISTENCIA ---
   async function persistCart() {
     const authStore = useAuthStore()
@@ -273,6 +285,9 @@ export const useCartStore = defineStore('cart', () => {
 
     // Getters
     cartItemCount,
+    hasDigitalItems,
+    hasPhysicalItems,
+    hasOnlyDigitalItems,
 
     // Acciones de sincronización
     fetchUserCart,

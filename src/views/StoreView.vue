@@ -199,6 +199,9 @@ onMounted(() => {
                     class="discount-badge"
                     >-{{ getProductDisplayInfo(product).discountPercent }}%</span
                   >
+                  <span v-if="product.is_downloadable" class="discount-badge" style="top: 10px; left: 10px; right: auto; background-color: #f3e5f5; color: #9c27b0; border: 1px solid #e1bee7;">
+                    📥 Digital
+                  </span>
                 </div>
                 <div class="card-info">
                   <p class="product-category">{{ product.category?.name || 'General' }}</p>

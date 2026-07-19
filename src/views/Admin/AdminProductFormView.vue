@@ -28,6 +28,9 @@ const formData = ref({
   requires_ig_for_giveaway: false,
   available_sizes: [],
   is_event_ticket: false, // 🔥 Nuevo flag explícito de ticket
+  is_downloadable: false,
+  downloadable_file_url: null,
+  original_file_name: null,
   category_id: null,
   image_urls: [],
   discount_percentage: null,
@@ -41,6 +44,8 @@ const discount_type = ref('fixed')
 const availableCategories = ref([])
 const selectedImageFiles = ref([])
 const imageFileInputKey = ref(Date.now())
+const selectedDigitalFile = ref(null)
+const digitalFileInputKey = ref(Date.now())
 const loading = ref(false)
 const saving = ref(false)
 const errorMsg = ref('')
@@ -71,6 +76,19 @@ watch(
   { deep: true },
 )
 
+watch(() => formData.value.is_downloadable, (val) => {
+  if (val) {
+    formData.value.is_event_ticket = false;
+    formData.value.has_sizes = false;
+    formData.value.is_customizable = false;
+    formData.value.stock = null;
+  }
+})
+
+watch(() => formData.value.is_event_ticket, (val) => {
+  if (val) formData.value.is_downloadable = false;
+})
+
 // --- Funciones ---
 function removeExistingImage(index) {
   formData.value.image_urls.splice(index, 1)
@@ -99,6 +117,7 @@ async function fetchProductData(productId) {
     data.has_sizes = data.has_sizes ?? false
     data.requires_ig_for_giveaway = data.requires_ig_for_giveaway ?? false
     data.is_event_ticket = data.is_event_ticket ?? false
+    data.is_downloadable = data.is_downloadable ?? false
     data.available_sizes = data.available_sizes || []
     if (!data.image_urls) data.image_urls = []
     if (data.discount_start_date) data.discount_start_date = data.discount_start_date.slice(0, 16)
@@ -136,6 +155,14 @@ function handleFileChange(event) {
   newImagePreviews.value = selectedImageFiles.value.map((file) => URL.createObjectURL(file))
 }
 
+function handleDigitalFileChange(event) {
+  if (event.target.files.length > 0) {
+    selectedDigitalFile.value = event.target.files[0]
+  } else {
+    selectedDigitalFile.value = null
+  }
+}
+
 async function saveProduct() {
   saving.value = true
   errorMsg.value = ''
@@ -157,11 +184,27 @@ async function saveProduct() {
       finalImageUrls.push(...newUrls)
     }
 
+    let finalDownloadableUrl = props.isEditMode ? formData.value.downloadable_file_url : null
+    let finalOriginalFileName = props.isEditMode ? formData.value.original_file_name : null
+
+    if (formData.value.is_downloadable && selectedDigitalFile.value) {
+      toast.info(`Subiendo archivo digital: ${selectedDigitalFile.value.name}...`)
+      const workerUrl = 'https://r2-presigner-worker.jodiabunos.workers.dev'
+      const formDataBody = new FormData()
+      formDataBody.append('file', selectedDigitalFile.value, selectedDigitalFile.value.name)
+      const response = await fetch(workerUrl, { method: 'POST', body: formDataBody })
+      if (!response.ok) throw new Error(`Error al subir archivo digital: ${await response.text()}`)
+      const result = await response.json()
+      if (!result.publicUrl) throw new Error(`Respuesta inválida del worker para archivo digital`)
+      finalDownloadableUrl = result.publicUrl
+      finalOriginalFileName = selectedDigitalFile.value.name
+    }
+
     const productData = {
       name: formData.value.name,
       description: formData.value.description,
       price: formData.value.price,
-      stock: formData.value.stock,
+      stock: formData.value.is_downloadable ? null : formData.value.stock,
       is_active: formData.value.is_active,
       is_customizable: formData.value.is_customizable,
       requires_customization_notes: formData.value.requires_customization_notes,
@@ -169,6 +212,9 @@ async function saveProduct() {
       has_sizes: formData.value.has_sizes,
       available_sizes: formData.value.has_sizes ? formData.value.available_sizes : [],
       is_event_ticket: formData.value.is_event_ticket,
+      is_downloadable: formData.value.is_downloadable,
+      downloadable_file_url: formData.value.is_downloadable ? finalDownloadableUrl : null,
+      original_file_name: formData.value.is_downloadable ? finalOriginalFileName : null,
       category_id: formData.value.category_id,
       image_urls: finalImageUrls,
       offer_price:
@@ -210,6 +256,8 @@ async function saveProduct() {
     cleanupPreviews()
     imageFileInputKey.value = Date.now()
     selectedImageFiles.value = []
+    digitalFileInputKey.value = Date.now()
+    selectedDigitalFile.value = null
   }
 }
 
@@ -281,7 +329,7 @@ onUnmounted(() => {
             step="any"
           />
         </div>
-        <div class="form-group">
+        <div class="form-group" v-if="!formData.is_downloadable">
           <label for="productStock">Stock:</label>
           <input
             type="number"
@@ -410,7 +458,30 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="form-group checkbox-group">
+      <!-- 🔥 Configuración de Producto Digital -->
+      <div class="form-group checkbox-group" style="padding-top: 15px; border-top: 1px solid #ddd;">
+        <input type="checkbox" id="isDownloadable" v-model="formData.is_downloadable" />
+        <label for="isDownloadable">📥 Es un Producto Digital Descargable</label>
+      </div>
+      
+      <div v-if="formData.is_downloadable" class="info-box ticket-info" style="border-left-color: #9c27b0; background-color: #f3e5f5;">
+        <p><strong>📥 Producto Digital:</strong> El stock será ilimitado, no habrá envío y la compra generará un link de descarga seguro.</p>
+        
+        <div class="form-group" style="margin-top: 15px;">
+          <label for="digitalFile">Archivo Digital (PDF u otro):</label>
+          <input
+            type="file"
+            id="digitalFile"
+            @change="handleDigitalFileChange"
+            :key="digitalFileInputKey"
+          />
+          <div v-if="formData.downloadable_file_url" style="margin-top: 5px;">
+            <small>Archivo actual: <a :href="formData.downloadable_file_url" target="_blank">{{ formData.original_file_name || 'Ver archivo' }}</a></small>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group checkbox-group" v-if="!formData.is_downloadable">
         <input type="checkbox" id="isCustomizable" v-model="formData.is_customizable" />
         <label for="isCustomizable">Producto Personalizable (permite subir archivos)</label>
         <small class="tooltip"
@@ -443,7 +514,7 @@ onUnmounted(() => {
       </div>
 
       <!-- 🔥 Tallas UI -->
-      <div class="form-group checkbox-group">
+      <div class="form-group checkbox-group" v-if="!formData.is_downloadable">
         <input type="checkbox" id="hasSizes" v-model="formData.has_sizes" />
         <label for="hasSizes">Este producto requiere selección de Talla (Ej: Ropa)</label>
       </div>
@@ -477,7 +548,7 @@ onUnmounted(() => {
       </div>
 
       <!-- 🔥 Configuración de Entradas -->
-      <div class="form-group checkbox-group" style="padding-top: 15px; border-top: 1px solid #ddd;">
+      <div class="form-group checkbox-group" style="padding-top: 15px; border-top: 1px solid #ddd;" v-if="!formData.is_downloadable">
         <input type="checkbox" id="isEventTicket" v-model="formData.is_event_ticket" />
         <label for="isEventTicket">Configurar exclusivamente como "Entrada Promocional"</label>
       </div>

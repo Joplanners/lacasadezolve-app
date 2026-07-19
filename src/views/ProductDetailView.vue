@@ -145,6 +145,12 @@ const isTicket = computed(() => {
   return product.value.is_event_ticket
 })
 
+// Identificar si es digital
+const isDownloadable = computed(() => {
+  if (!product.value) return false
+  return product.value.is_downloadable
+})
+
 // Fechas y sectores hardcodeados
 const ticketDates = ['14 de Octubre 2026', '16 de Octubre 2026', '17 de Octubre 2026']
 const ticketSectors = [
@@ -271,7 +277,7 @@ async function handleAddToCart() {
 
   // Validación Stock Global
   const stock = product.value.stock
-  if (stock !== null && stock !== undefined) {
+  if (!isDownloadable.value && stock !== null && stock !== undefined) {
     if (stock <= 0) {
       toast.error('Lo sentimos, este producto está agotado.')
       return
@@ -314,6 +320,9 @@ async function handleAddToCart() {
   if (isTicket.value) {
     metadata.tickets = JSON.parse(JSON.stringify(ticketForms.value))
     metadata.isTicket = true // flag para el carrito
+  }
+  if (isDownloadable.value) {
+    metadata.is_downloadable = true
   }
 
   await cartStore.addToCart(
@@ -377,7 +386,7 @@ async function handleBuyNow() {
 
   // Validación Global de Stock
   const stock = product.value.stock
-  if (stock !== null && stock !== undefined) {
+  if (!isDownloadable.value && stock !== null && stock !== undefined) {
     if (stock <= 0) {
       toast.error('Lo sentimos, este producto está agotado.')
       return
@@ -418,6 +427,9 @@ async function handleBuyNow() {
   if (isTicket.value) {
     metadata.tickets = JSON.parse(JSON.stringify(ticketForms.value))
     metadata.isTicket = true
+  }
+  if (isDownloadable.value) {
+    metadata.is_downloadable = true
   }
 
   if (product.value.requires_ig_for_giveaway && giveawayIg.value) {
@@ -543,6 +555,10 @@ const pinterestShareUrl = computed(() => {
         <div class="product-info">
           <p class="product-category-detail">{{ product.category?.name || 'General' }}</p>
           <h1>{{ product.name }}</h1>
+          
+          <div v-if="isDownloadable" class="digital-badge" style="display: inline-block; background: #f3e5f5; color: #9c27b0; padding: 5px 12px; border-radius: 15px; font-size: 0.9em; font-weight: bold; border: 1px solid #e1bee7; margin-bottom: 15px;">
+            📥 Producto Digital Descargable
+          </div>
 
           <div class="product-description-html" v-html="sanitizedDescription"></div>
 
@@ -637,7 +653,7 @@ const pinterestShareUrl = computed(() => {
               </div>
             </div>
           </div>
-          <div class="stock-display" v-if="product.stock !== null && product.stock !== undefined">
+          <div class="stock-display" v-if="!isDownloadable && product.stock !== null && product.stock !== undefined">
             <p v-if="product.stock > 10" class="stock-info">
               Disponibles: <span class="stock-number">{{ product.stock }}</span>
             </p>

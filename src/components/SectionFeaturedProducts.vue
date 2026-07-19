@@ -59,12 +59,15 @@ const goToProduct = (productId) => {
         tabindex="0"
         @keydown.enter="goToProduct(product.id)"
       >
-        <div class="product-image">
+        <div class="product-image" style="position: relative;">
           <img
             v-if="product.image_urls && product.image_urls[0]"
             :src="product.image_urls[0]"
             :alt="product.name"
           />
+          <span v-if="product.is_downloadable" style="position: absolute; top: 10px; left: 10px; background-color: #f3e5f5; color: #9c27b0; padding: 5px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; border: 1px solid #e1bee7;">
+            📥 Digital
+          </span>
           <div v-else class="placeholder-image">🦊</div>
         </div>
         <div class="product-info">
