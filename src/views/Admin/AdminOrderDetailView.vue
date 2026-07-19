@@ -52,6 +52,23 @@ async function approveOrder() {
   }
 }
 
+async function resetDownloads(productId) {
+  if (!confirm('¿Estás segura de querer reiniciar las descargas a 0 para este producto?')) return
+  try {
+    const { error: resetError } = await supabase
+      .from('user_digital_downloads')
+      .update({ downloads_count: 0 })
+      .eq('order_id', orderId.value)
+      .eq('product_id', productId)
+      
+    if (resetError) throw resetError
+    toast.success('¡Descargas restauradas! El cliente vuelve a tener 5 disponibles.')
+  } catch (err) {
+    console.error('Error al restaurar descargas:', err)
+    toast.error('Error: ' + err.message)
+  }
+}
+
 async function fetchOrderDetail() {
   loading.value = true
   error.value = ''
@@ -296,6 +313,14 @@ function goBack() {
                     </div>
                   </div>
                 </div>
+                
+                <!-- 🔥 Botón mágico de restaurar descargas -->
+                <div v-if="item.product?.is_downloadable" style="margin-top: 10px;">
+                  <button @click="resetDownloads(item.product.id)" class="btn btn-tertiary btn-sm" style="border-color: #9c27b0; color: #9c27b0;">
+                    🔄 Restaurar Descargas del Cliente
+                  </button>
+                </div>
+                
               </div>
               <div class="item-subtotal">
                 {{ formatPrice(item.quantity * item.price_at_purchase) }}

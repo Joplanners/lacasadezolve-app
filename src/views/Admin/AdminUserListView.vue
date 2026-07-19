@@ -45,37 +45,47 @@ async function fetchUsers(searchText = '') {
 }
 
 async function updateRole(userId, newRole) {
-  if (!userId || savingRole.value || deleting) return // Evitar concurrencia
-
-  // Opcional: Confirmación extra si se desea, pero el select ya es bastante explícito
-  // if (!confirm(`¿Cambiar el rol del usuario ${userId} a ${newRole}?`)) return;
+  if (!userId || savingRole.value || deleting.value) return // Evitar concurrencia
 
   savingRole.value = userId // Marcar inicio
-  // updateError.value = ''; deleteError.value = ''; updateSuccess.value = ''; // Limpiar estados viejos
   try {
-    console.log(`AdminUserListView: Updating role for ${userId} to ${newRole}`)
-    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId)
+    console.log(`AdminUserListView: Updating role for ${userId} to ${newRole} via RPC`)
+    // Usamos un RPC (función de Supabase) para tener permisos de administrador
+    const { error } = await supabase.rpc('update_user_role_admin', { 
+      target_user_id: userId, 
+      new_role: newRole 
+    })
 
-    if (error) throw error // Lanzar error de Supabase
+    if (error) throw error
 
     // Actualizar rol en la UI local inmediatamente
     const userIndex = users.value.findIndex((u) => u.id === userId)
     if (userIndex !== -1) {
       users.value[userIndex].role = newRole
     }
-    // --- ÉXITO: USAR TOAST ---
-    toast.success(`Rol del usuario ${userId} actualizado a ${newRole}.`)
-    // updateSuccess.value = `Rol actualizado para ${userId}.`; // Reemplazado
+    toast.success(`Rol del usuario actualizado a ${newRole}.`)
   } catch (error) {
-    // --- ERROR: USAR TOAST ---
     const updateErrText = `Error al actualizar rol: ${error.message}`
     toast.error(updateErrText)
-    // updateError.value = updateErrText; // Reemplazado
     console.error('AdminUserListView: Update role error:', error)
-    // Podríamos recargar la lista para revertir visualmente
-    // fetchUsers(searchTerm.value);
   } finally {
     savingRole.value = null // Marcar fin
+  }
+}
+
+async function resetUserDownloads(userId, email) {
+  if (!confirm(`¿Restaurar a 0 todas las descargas digitales asociadas a ${email || userId}?`)) return
+  try {
+    const { error } = await supabase
+      .from('user_digital_downloads')
+      .update({ downloads_count: 0 })
+      .eq('user_id', userId)
+
+    if (error) throw error
+    toast.success(`Descargas de ${email || 'usuario'} reiniciadas exitosamente.`)
+  } catch (err) {
+    console.error('Error al restaurar descargas:', err)
+    toast.error('Error: ' + err.message)
   }
 }
 
@@ -227,6 +237,14 @@ onMounted(() => {
               }}
             </td>
             <td>
+              <button
+                @click="resetUserDownloads(user.id, user.email)"
+                class="btn"
+                style="margin-bottom: 5px; color: #9c27b0; border: 1px solid #9c27b0; background: transparent;"
+                title="Restaurar todas las descargas a 5"
+              >
+                🔄 Restaurar Descargas
+              </button>
               <button
                 @click="deleteUser(user.id, user.email)"
                 class="btn btn-delete"
