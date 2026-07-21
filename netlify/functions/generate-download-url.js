@@ -46,7 +46,8 @@ export const handler = async (event, context) => {
        }
     }
     
-    if (orderItem.order.status !== 'paid' && orderItem.order.status !== 'processing') return { statusCode: 403, headers, body: JSON.stringify({ error: 'Order is not paid' }) }
+    const validStatuses = ['paid', 'processing', 'shipped', 'delivered']
+    if (!validStatuses.includes(orderItem.order.status)) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Order is not paid' }) }
     if (!orderItem.product.is_downloadable || !orderItem.product.downloadable_file_url) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Product is not downloadable' }) }
 
     // Check or Create user_digital_downloads record
