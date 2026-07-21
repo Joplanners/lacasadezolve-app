@@ -6,6 +6,8 @@ const BASE_URL = 'https://lacasadezolve.com'
 const DEFAULT_IMAGE = `${BASE_URL}/Zolve_Logo.webp`
 const DEFAULT_DESCRIPTION =
   'Personaliza tus productos favoritos en La Casa de Zolve.'
+const DEFAULT_KEYWORDS =
+  'k-pop, kpop chile, fan made, fanmade, personalizacion, papeleria creativa, agendas, planners, cuadernos, accesorios, bts, stray kids, twice, impresiones, la casa de zolve'
 
 /**
  * Composable para configurar los meta tags SEO de cada página.
@@ -13,6 +15,7 @@ const DEFAULT_DESCRIPTION =
  * @param {Object} options
  * @param {string|Ref<string>} options.title - Título de la página (se agrega " | La Casa de Zolve")
  * @param {string|Ref<string>} [options.description] - Descripción para SEO
+ * @param {string|Ref<string>} [options.keywords] - Palabras clave para SEO
  * @param {string|Ref<string>} [options.image] - URL de la imagen para OG/Twitter
  * @param {string|Ref<string>} [options.url] - Path relativo (ej: '/tienda')
  * @param {string} [options.type='website'] - Tipo de Open Graph (website, product, article)
@@ -25,6 +28,7 @@ export function useSeoMeta(options) {
   })
 
   const description = computed(() => unref(options.description) || DEFAULT_DESCRIPTION)
+  const keywords = computed(() => unref(options.keywords) || DEFAULT_KEYWORDS)
   const image = computed(() => unref(options.image) || DEFAULT_IMAGE)
   const url = computed(() => {
     const path = unref(options.url) || '/'
@@ -36,6 +40,7 @@ export function useSeoMeta(options) {
     title,
     meta: [
       { name: 'description', content: description },
+      { name: 'keywords', content: keywords },
       // Open Graph
       { property: 'og:title', content: title },
       { property: 'og:description', content: description },

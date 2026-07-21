@@ -7,9 +7,9 @@ import { useSeoMeta } from '@/composables/useSeoMeta'
 const productsStore = useProductsStore()
 
 useSeoMeta({
-  title: 'Tienda — Productos de Papelería y K-Pop',
+  title: 'Tienda — Papelería Creativa, Agendas y K-Pop merch',
   description:
-    'Explora nuestra tienda online con productos de papelería, K-Pop, regalos personalizables y merchandising con Realidad Aumentada.',
+    'Compra online planners, agendas, cuadernos, impresiones y accesorios de tus grupos favoritos de K-Pop como BTS, Stray Kids, Twice y más en Chile.',
   url: '/tienda',
 })
 

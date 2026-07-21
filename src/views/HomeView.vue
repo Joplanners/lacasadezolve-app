@@ -11,7 +11,7 @@ import SectionFeaturedProducts from '@/components/SectionFeaturedProducts.vue'
 useSeoMeta({
   title: 'Personalización, Papelería, K-Pop merch fanmade, Regalos y más',
   description:
-    'Personaliza tus productos favoritos en La Casa de Zolve.',
+    'Tu tienda de papelería creativa y regalos de K-Pop fanmade en Chile. Encuentra agendas, planners, cuadernos, impresiones y accesorios de BTS, Stray Kids, Twice y más.',
   url: '/',
 })
 
