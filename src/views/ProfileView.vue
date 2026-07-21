@@ -371,7 +371,7 @@ const userDisplayName = computed(() => {
 const userDigitalItems = computed(() => {
   const items = []
   userOrders.value.forEach(order => {
-    if (order.status === 'paid' || order.status === 'processing') {
+    if (order.status === 'paid' || order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') {
       order.order_items?.forEach(item => {
         if (item.product?.is_downloadable) {
           items.push({
