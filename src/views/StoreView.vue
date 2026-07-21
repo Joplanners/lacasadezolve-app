@@ -202,6 +202,9 @@ onMounted(() => {
                   <span v-if="product.is_downloadable" class="discount-badge" style="top: 10px; left: 10px; right: auto; background-color: #f3e5f5; color: #9c27b0; border: 1px solid #e1bee7;">
                     📥 Digital
                   </span>
+                  <span v-if="product.is_print_product" class="discount-badge" style="top: 10px; left: 10px; right: auto; background-color: #fff8e1; color: #e65100; border: 1px solid #ffe0b2;">
+                    🖨️ Impresión
+                  </span>
                 </div>
                 <div class="card-info">
                   <p class="product-category">{{ product.category?.name || 'General' }}</p>
@@ -210,7 +213,12 @@ onMounted(() => {
                     <span v-if="getProductDisplayInfo(product).isOnSale" class="original-price">{{
                       getProductDisplayInfo(product).originalPrice
                     }}</span>
-                    <span class="final-price">{{ getProductDisplayInfo(product).finalPrice }}</span>
+                    <template v-if="product.is_print_product">
+                      <span class="final-price">Desde {{ getProductDisplayInfo(product).finalPrice }}</span>
+                    </template>
+                    <template v-else>
+                      <span class="final-price">{{ getProductDisplayInfo(product).finalPrice }}</span>
+                    </template>
                   </div>
                 </div>
               </router-link>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthStore } from '@/stores/authStore'
 // --- NUEVA IMPORTACIÓN ---
@@ -19,6 +19,28 @@ const deleting = ref(null)
 const authStore = useAuthStore()
 // --- NUEVA INSTANCIA ---
 const toast = useToast()
+
+// --- PAGINACIÓN ---
+const currentPage = ref(1)
+const itemsPerPage = ref(10)
+
+const totalPages = computed(() => {
+  return Math.ceil(users.value.length / itemsPerPage.value) || 1
+})
+
+const paginatedUsers = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return users.value.slice(start, end)
+})
+
+function nextPage() {
+  if (currentPage.value < totalPages.value) currentPage.value++
+}
+
+function prevPage() {
+  if (currentPage.value > 1) currentPage.value--
+}
 
 async function fetchUsers(searchText = '') {
   console.log(`AdminUserListView: Fetching users (Search: '${searchText}')...`)
@@ -203,7 +225,7 @@ onMounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in users" :key="user.id">
+          <tr v-for="user in paginatedUsers" :key="user.id">
             <td>{{ user.id }}</td>
             <td>{{ user.email || '-' }}</td>
             <td>
@@ -263,6 +285,11 @@ onMounted(() => {
           </tr>
         </tbody>
       </table>
+      <div class="pagination-controls" v-if="totalPages > 1">
+        <button @click="prevPage" :disabled="currentPage === 1" class="btn btn-secondary">Anterior</button>
+        <span class="pagination-info">Página {{ currentPage }} de {{ totalPages }}</span>
+        <button @click="nextPage" :disabled="currentPage === totalPages" class="btn btn-secondary">Siguiente</button>
+      </div>
     </div>
   </div>
 </template>
@@ -404,6 +431,30 @@ onMounted(() => {
   background-color: #c82333;
 }
 .btn-delete:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20px;
+  gap: 15px;
+}
+.pagination-info {
+  font-weight: bold;
+  color: #333;
+}
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+.btn-secondary:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+.btn-secondary:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
   opacity: 0.7;

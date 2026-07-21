@@ -28,6 +28,9 @@ const formData = ref({
   requires_ig_for_giveaway: false,
   available_sizes: [],
   is_event_ticket: false, // 🔥 Nuevo flag explícito de ticket
+  ticket_promo_price: null,
+  is_print_product: false,
+  print_quantity_packages: [],
   is_downloadable: false,
   downloadable_file_url: null,
   original_file_name: null,
@@ -79,6 +82,7 @@ watch(
 watch(() => formData.value.is_downloadable, (val) => {
   if (val) {
     formData.value.is_event_ticket = false;
+    formData.value.is_print_product = false;
     formData.value.has_sizes = false;
     formData.value.is_customizable = false;
     formData.value.stock = null;
@@ -86,7 +90,18 @@ watch(() => formData.value.is_downloadable, (val) => {
 })
 
 watch(() => formData.value.is_event_ticket, (val) => {
-  if (val) formData.value.is_downloadable = false;
+  if (val) {
+    formData.value.is_downloadable = false;
+    formData.value.is_print_product = false;
+  }
+})
+
+watch(() => formData.value.is_print_product, (val) => {
+  if (val) {
+    formData.value.is_event_ticket = false;
+    formData.value.is_downloadable = false;
+    formData.value.has_sizes = false;
+  }
 })
 
 // --- Funciones ---
@@ -117,6 +132,9 @@ async function fetchProductData(productId) {
     data.has_sizes = data.has_sizes ?? false
     data.requires_ig_for_giveaway = data.requires_ig_for_giveaway ?? false
     data.is_event_ticket = data.is_event_ticket ?? false
+    data.ticket_promo_price = data.ticket_promo_price ?? null
+    data.is_print_product = data.is_print_product ?? false
+    data.print_quantity_packages = data.print_quantity_packages || []
     data.is_downloadable = data.is_downloadable ?? false
     data.available_sizes = data.available_sizes || []
     if (!data.image_urls) data.image_urls = []
@@ -149,6 +167,23 @@ function removeSize(index) {
   formData.value.available_sizes.splice(index, 1)
 }
 
+// 🖨️ Manejo de Paquetes de Impresión
+function addPrintPackage() {
+  formData.value.print_quantity_packages.push({ quantity: null, total_price: null })
+}
+function removePrintPackage(index) {
+  formData.value.print_quantity_packages.splice(index, 1)
+}
+function getPrintUnitPrice(pkg) {
+  if (!pkg.quantity || pkg.quantity <= 0 || !pkg.total_price || pkg.total_price <= 0) return null
+  return Math.round(pkg.total_price / pkg.quantity)
+}
+function formatPrintUnitPrice(pkg) {
+  const unitPrice = getPrintUnitPrice(pkg)
+  if (unitPrice === null) return '-'
+  return '$' + unitPrice.toLocaleString('es-CL') + ' c/u'
+}
+
 function handleFileChange(event) {
   cleanupPreviews()
   selectedImageFiles.value = Array.from(event.target.files)
@@ -166,6 +201,25 @@ function handleDigitalFileChange(event) {
 async function saveProduct() {
   saving.value = true
   errorMsg.value = ''
+
+  // Validación de paquetes de impresión
+  if (formData.value.is_print_product) {
+    const validPackages = formData.value.print_quantity_packages.filter(pkg => pkg.quantity > 0 && pkg.total_price > 0)
+    if (validPackages.length === 0) {
+      toast.error('Debes agregar al menos un paquete de cantidad válido para el producto de impresión.')
+      saving.value = false
+      return
+    }
+    const quantities = validPackages.map(p => p.quantity)
+    if (new Set(quantities).size !== quantities.length) {
+      toast.error('No puede haber dos paquetes con la misma cantidad.')
+      saving.value = false
+      return
+    }
+    // Auto-set the price to the first package total (for 'Desde $X' display)
+    formData.value.price = validPackages.sort((a, b) => a.quantity - b.quantity)[0].total_price
+  }
+
   try {
     let finalImageUrls = props.isEditMode ? [...formData.value.image_urls] : []
     if (selectedImageFiles.value.length > 0) {
@@ -212,6 +266,9 @@ async function saveProduct() {
       has_sizes: formData.value.has_sizes,
       available_sizes: formData.value.has_sizes ? formData.value.available_sizes : [],
       is_event_ticket: formData.value.is_event_ticket,
+      ticket_promo_price: formData.value.ticket_promo_price,
+      is_print_product: formData.value.is_print_product,
+      print_quantity_packages: formData.value.is_print_product ? formData.value.print_quantity_packages.filter(pkg => pkg.quantity > 0 && pkg.total_price > 0).sort((a, b) => a.quantity - b.quantity) : [],
       is_downloadable: formData.value.is_downloadable,
       downloadable_file_url: formData.value.is_downloadable ? finalDownloadableUrl : null,
       original_file_name: formData.value.is_downloadable ? finalOriginalFileName : null,
@@ -547,6 +604,46 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- 🖨️ Configuración de Producto de Impresión -->
+      <div class="form-group checkbox-group" style="padding-top: 15px; border-top: 1px solid #ddd;" v-if="!formData.is_downloadable && !formData.is_event_ticket">
+        <input type="checkbox" id="isPrintProduct" v-model="formData.is_print_product" />
+        <label for="isPrintProduct">🖨️ Producto de Impresión (Precio por paquetes de cantidad)</label>
+      </div>
+
+      <div v-if="formData.is_print_product" class="info-box ticket-info" style="border-left-color: #ff6f00; background-color: #fff8e1;">
+        <p><strong>🖨️ Producto de Impresión:</strong> Define paquetes de cantidad con precios totales. El sistema calculará el precio unitario automáticamente.</p>
+        
+        <div class="print-packages-section" style="margin-top: 15px;">
+          <table class="print-packages-table">
+            <thead>
+              <tr>
+                <th>Cantidad</th>
+                <th>Precio Total (CLP)</th>
+                <th>Precio Unitario</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(pkg, index) in formData.print_quantity_packages" :key="index">
+                <td>
+                  <input type="number" v-model.number="pkg.quantity" min="1" step="1" placeholder="Ej: 25" class="print-pkg-input" />
+                </td>
+                <td>
+                  <input type="number" v-model.number="pkg.total_price" min="1" step="1" placeholder="Ej: 2000" class="print-pkg-input" />
+                </td>
+                <td>
+                  <span class="print-unit-badge">{{ formatPrintUnitPrice(pkg) }}</span>
+                </td>
+                <td>
+                  <button type="button" @click="removePrintPackage(index)" class="btn-remove-pkg" title="Eliminar paquete">&times;</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <button type="button" @click="addPrintPackage" class="btn-secondary" style="margin-top: 10px;">+ Agregar Paquete</button>
+        </div>
+      </div>
+
       <!-- 🔥 Configuración de Entradas -->
       <div class="form-group checkbox-group" style="padding-top: 15px; border-top: 1px solid #ddd;" v-if="!formData.is_downloadable">
         <input type="checkbox" id="isEventTicket" v-model="formData.is_event_ticket" />
@@ -554,7 +651,11 @@ onUnmounted(() => {
       </div>
       
       <div v-if="formData.is_event_ticket" class="info-box ticket-info">
-        <p><strong>🎟️ ¡Atención!</strong> Al marcar esta opción, el producto obligará a elegir a tus asistentes Sector, fecha, y RUT, y aplicará tu descuento matemático (Pares a $4.000 e impares sueltos a $2.500) en el carrito sin importar el precio base ingresado arriba.</p>
+        <p><strong>🎟️ ¡Atención!</strong> Al marcar esta opción, el producto obligará a elegir a tus asistentes Sector, fecha, y RUT, y aplicará un descuento por comprar 2 entradas. El precio de 1 entrada será el "Precio" base del producto.</p>
+        <div style="margin-top: 10px;">
+          <label>Precio de Oferta (Por 2 entradas):</label>
+          <input type="number" v-model.number="formData.ticket_promo_price" placeholder="Ej: 4000" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />
+        </div>
       </div>
 
       <div class="form-group checkbox-group">
@@ -955,5 +1056,55 @@ hr {
     margin-left: 0;
     width: 100%;
   }
+}
+
+/* 🖨️ Estilos de Producto de Impresión */
+.print-packages-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+.print-packages-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 0.85em;
+  color: #555;
+  border-bottom: 2px solid #ddd;
+}
+.print-packages-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+}
+.print-pkg-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.95em;
+  box-sizing: border-box;
+}
+.print-unit-badge {
+  display: inline-block;
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.btn-remove-pkg {
+  background: none;
+  border: none;
+  color: #d32f2f;
+  font-size: 1.5em;
+  cursor: pointer;
+  padding: 0 5px;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+.btn-remove-pkg:hover {
+  color: #b71c1c;
 }
 </style>

@@ -13,6 +13,7 @@ import { isValidRut } from '@/utils/validation.js'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidv4 } from 'uuid'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import { calcPrintPrice } from '@/utils/printPricing'
 
 useSeoMeta({
   title: 'Finalizar Compra',
@@ -92,9 +93,27 @@ const processedCartItems = computed(() => {
   return cartProductDetails.value.map((item) => {
     const priceInfo = getPriceInfo(item.product)
     
+    // 🖨️ Override for print products
+    if (item.metadata?.is_print_order) {
+      const printQty = item.metadata.print_quantity || 0
+      const printResult = calcPrintPrice(item.product?.print_quantity_packages, printQty)
+      return {
+        ...item,
+        finalPrice: printResult.total,
+        originalPrice: null,
+        onOffer: false,
+        isPrintOrder: true,
+        printQuantity: printQty,
+        printUnitPrice: printResult.unitPrice,
+        printTotal: printResult.total
+      }
+    }
+
     if (item.metadata?.isTicket) {
       const qty = item.quantity
-      const ticketTotal = Math.floor(qty / 2) * 4000 + (qty % 2) * 2500
+      const basePrice = item.product.price || 2500
+      const promoPrice = item.product.ticket_promo_price || (basePrice * 2)
+      const ticketTotal = Math.floor(qty / 2) * promoPrice + (qty % 2) * basePrice
       return {
         ...item,
         finalPrice: ticketTotal / qty,
@@ -159,6 +178,9 @@ const hasSavedAddress = computed(() => {
 
 const subtotal = computed(() => {
   return processedCartItems.value.reduce((total, item) => {
+    if (item.isPrintOrder) {
+      return total + item.printTotal
+    }
     return total + item.finalPrice * item.quantity
   }, 0)
 })

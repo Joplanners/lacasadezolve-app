@@ -20,7 +20,7 @@ export const useCartStore = defineStore('cart', () => {
   })
 
   const hasPhysicalItems = computed(() => {
-    return items.value.some(item => !item.metadata?.is_downloadable)
+    return items.value.some(item => !item.metadata?.is_downloadable || item.metadata?.is_print_order)
   })
 
   const hasOnlyDigitalItems = computed(() => {

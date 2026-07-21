@@ -720,7 +720,8 @@ async function downloadFile(orderItemId) {
 
       <hr class="section-divider" />
 
-      <!-- SECCIÓN MIS EXPERIENCIAS AR -->
+      <!-- SECCIÓN MIS EXPERIENCIAS AR TEMPORALMENTE DESHABILITADA -->
+      <!--
       <section class="experiences-section ar-experiences-section">
         <h3>Mis Experiencias AR</h3>
         <div v-if="loadingMarkers" class="loading-indicator">Buscando marcadores...</div>
@@ -738,6 +739,7 @@ async function downloadFile(orderItemId) {
           </div>
         </div>
       </section>
+      -->
 
       <hr class="section-divider" />
 
