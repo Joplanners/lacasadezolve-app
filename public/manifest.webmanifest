@@ -1,7 +1,7 @@
 {
   "name": "La Casa de Zolve",
   "short_name": "Zolve",
-  "description": "Experiencias de Realidad Aumentada y papelería personalizada por La Casa de Zolve.",
+  "description": "Personaliza tus productos favoritos en La Casa de Zolve.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

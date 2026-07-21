@@ -9,9 +9,9 @@ import SectionFeaturedProducts from '@/components/SectionFeaturedProducts.vue'
 
 // SEO
 useSeoMeta({
-  title: 'Inicio — Papelería, K-Pop y Realidad Aumentada',
+  title: 'Personalización, Papelería, K-Pop merch fanmade, Regalos y más',
   description:
-    'Tu espacio de personalización y K-Pop en Chile. Papelería, regalos con Realidad Aumentada, merchandising y comunidad. ¡Descubre La Casa de Zolve!',
+    'Personaliza tus productos favoritos en La Casa de Zolve.',
   url: '/',
 })
 

@@ -5,7 +5,7 @@ const SITE_NAME = 'La Casa de Zolve'
 const BASE_URL = 'https://lacasadezolve.com'
 const DEFAULT_IMAGE = `${BASE_URL}/Zolve_Logo.webp`
 const DEFAULT_DESCRIPTION =
-  'Descubre papelería, K-Pop, regalos y productos con Realidad Aumentada. ¡La tienda K-Pop de Zolve en Chile!'
+  'Personaliza tus productos favoritos en La Casa de Zolve.'
 
 /**
  * Composable para configurar los meta tags SEO de cada página.
