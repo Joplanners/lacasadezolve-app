@@ -20,6 +20,7 @@ export function usePrintProduct(productRef) {
   const selectedQuantity = ref(null)
   const selectedPackageIndex = ref(null)
   const isCustomQuantity = ref(false)
+  const selectedPrintDesign = ref('')
 
   // --- Computados ---
 
@@ -151,7 +152,8 @@ export function usePrintProduct(productRef) {
       print_quantity: selectedQuantity.value,
       print_unit_price: priceResult.value.unitPrice,
       print_total: priceResult.value.total,
-      based_on_package: priceResult.value.basedOnPackage
+      based_on_package: priceResult.value.basedOnPackage,
+      print_design: selectedPrintDesign.value
     }
   }
 
@@ -175,6 +177,7 @@ export function usePrintProduct(productRef) {
     selectedQuantity.value = null
     selectedPackageIndex.value = null
     isCustomQuantity.value = false
+    selectedPrintDesign.value = ''
   }
 
   return {
@@ -182,6 +185,7 @@ export function usePrintProduct(productRef) {
     selectedQuantity,
     selectedPackageIndex,
     isCustomQuantity,
+    selectedPrintDesign,
 
     // Computados
     isPrintProduct,

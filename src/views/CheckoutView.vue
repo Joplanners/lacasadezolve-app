@@ -1001,7 +1001,10 @@ onUnmounted(() => {
                 class="item-thumb"
                 alt=""
               />
-              <span class="item-name-summary">{{ item.quantity }} x {{ item.product.name }}</span>
+              <span class="item-name-summary">
+                {{ item.quantity }} x {{ item.product.name }}
+                <span v-if="item.metadata?.print_design" style="color:#e65100; font-size: 0.85em; display: block;">(Diseño: {{ item.metadata.print_design }})</span>
+              </span>
               <span class="item-price-summary">
                 {{ formatPrice(item.finalPrice * item.quantity) }}
               </span>

@@ -165,7 +165,8 @@ const {
   selectPackage: selectPrintPackage,
   setCustomQuantity,
   getCartMetadata: getPrintCartMetadata,
-  reset: resetPrintSelection
+  reset: resetPrintSelection,
+  selectedPrintDesign
 } = usePrintProduct(product)
 
 const customPrintQtyInput = ref('')
@@ -350,6 +351,10 @@ async function handleAddToCart() {
 
   // 🖨️ Si es producto de impresión
   if (isPrintProduct.value) {
+    if (product.value.available_print_designs && product.value.available_print_designs.length > 0 && !selectedPrintDesign.value) {
+      toast.error('Por favor, selecciona un diseño para la impresión.')
+      return
+    }
     if (!printSelectedQuantity.value || printSelectedQuantity.value < 1) {
       toast.error('Por favor, selecciona una cantidad o elige un paquete.')
       return
@@ -477,6 +482,10 @@ async function handleBuyNow() {
 
   // 🖨️ Comprar Ahora - Producto de impresión
   if (isPrintProduct.value) {
+    if (product.value.available_print_designs && product.value.available_print_designs.length > 0 && !selectedPrintDesign.value) {
+      toast.error('Por favor, selecciona un diseño para la impresión.')
+      return
+    }
     if (!printSelectedQuantity.value || printSelectedQuantity.value < 1) {
       toast.error('Por favor, selecciona una cantidad o elige un paquete.')
       return
@@ -729,6 +738,16 @@ const pinterestShareUrl = computed(() => {
           </div>
           <!-- 🖨️ Selector de Paquetes de Impresión -->
           <div v-if="isPrintProduct" class="print-product-section">
+            <div v-if="product.available_print_designs && product.available_print_designs.length > 0" class="print-design-selector" style="margin-bottom: 20px;">
+              <h3 class="print-section-title">🎨 Elige tu diseño</h3>
+              <select v-model="selectedPrintDesign" class="custom-qty-input" style="width: 100%; text-align: left; padding: 12px; margin-top: 5px;">
+                <option value="" disabled>Selecciona un diseño...</option>
+                <option v-for="design in product.available_print_designs" :key="design" :value="design">
+                  {{ design }}
+                </option>
+              </select>
+            </div>
+
             <h3 class="print-section-title">📦 Selecciona tu paquete</h3>
             
             <div class="print-packages-grid">

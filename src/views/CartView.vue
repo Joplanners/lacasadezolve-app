@@ -405,6 +405,7 @@ function formatPrice(value) {
 
             <div v-if="item.metadata && (item.metadata.size || item.metadata.isTicket || item.product.is_downloadable || item.metadata.is_print_order)" class="item-metadata-labels">
               <span v-if="item.metadata.is_print_order" class="meta-label" style="background-color: #fff8e1; color: #e65100; border-color: #ffe0b2;">🖨️ Impresión</span>
+              <span v-if="item.metadata.is_print_order && item.metadata.print_design" class="meta-label" style="background-color: #fce4ec; color: #c2185b; border-color: #f8bbd0;">🎨 {{ item.metadata.print_design }}</span>
               <span v-if="item.product.is_downloadable" class="meta-label" style="background-color: #f3e5f5; color: #9c27b0; border-color: #e1bee7;">📥 Descarga Digital</span>
               <span v-if="item.metadata.size" class="meta-label">Talla: <strong>{{ item.metadata.size }}</strong></span>
               <span v-if="item.metadata.isTicket" class="meta-label">Detalles de {{ item.metadata.tickets?.length }} Entrada(s) incluidos</span>

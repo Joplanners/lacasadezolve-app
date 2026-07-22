@@ -31,6 +31,7 @@ const formData = ref({
   ticket_promo_price: null,
   is_print_product: false,
   print_quantity_packages: [],
+  available_print_designs: [],
   is_downloadable: false,
   downloadable_file_url: null,
   original_file_name: null,
@@ -135,6 +136,7 @@ async function fetchProductData(productId) {
     data.ticket_promo_price = data.ticket_promo_price ?? null
     data.is_print_product = data.is_print_product ?? false
     data.print_quantity_packages = data.print_quantity_packages || []
+    data.available_print_designs = data.available_print_designs || []
     data.is_downloadable = data.is_downloadable ?? false
     data.available_sizes = data.available_sizes || []
     if (!data.image_urls) data.image_urls = []
@@ -174,6 +176,19 @@ function addPrintPackage() {
 function removePrintPackage(index) {
   formData.value.print_quantity_packages.splice(index, 1)
 }
+
+const printDesignInput = ref('')
+function addPrintDesign() {
+  const design = printDesignInput.value.trim()
+  if (design && !formData.value.available_print_designs.includes(design)) {
+    formData.value.available_print_designs.push(design)
+  }
+  printDesignInput.value = ''
+}
+function removePrintDesign(index) {
+  formData.value.available_print_designs.splice(index, 1)
+}
+
 function getPrintUnitPrice(pkg) {
   if (!pkg.quantity || pkg.quantity <= 0 || !pkg.total_price || pkg.total_price <= 0) return null
   return Math.round(pkg.total_price / pkg.quantity)
@@ -269,6 +284,7 @@ async function saveProduct() {
       ticket_promo_price: formData.value.ticket_promo_price,
       is_print_product: formData.value.is_print_product,
       print_quantity_packages: formData.value.is_print_product ? formData.value.print_quantity_packages.filter(pkg => pkg.quantity > 0 && pkg.total_price > 0).sort((a, b) => a.quantity - b.quantity) : [],
+      available_print_designs: formData.value.is_print_product ? formData.value.available_print_designs : [],
       is_downloadable: formData.value.is_downloadable,
       downloadable_file_url: formData.value.is_downloadable ? finalDownloadableUrl : null,
       original_file_name: formData.value.is_downloadable ? finalOriginalFileName : null,
@@ -613,6 +629,21 @@ onUnmounted(() => {
       <div v-if="formData.is_print_product" class="info-box ticket-info" style="border-left-color: #ff6f00; background-color: #fff8e1;">
         <p><strong>🖨️ Producto de Impresión:</strong> Define paquetes de cantidad con precios totales. El sistema calculará el precio unitario automáticamente.</p>
         
+        <div style="margin-top: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 15px;">
+          <label style="font-weight: bold;">Diseños Disponibles (Opcional):</label>
+          <p style="font-size: 0.85em; color: #666; margin-bottom: 8px;">Añade diseños específicos (Ej: "Certificado BTS", "Contrato Jin") para que el cliente elija antes de comprar.</p>
+          <div style="display: flex; gap: 10px;">
+            <input type="text" v-model="printDesignInput" @keydown.enter.prevent="addPrintDesign" placeholder="Ej: Contrato RM" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />
+            <button type="button" @click="addPrintDesign" class="btn-secondary">Añadir</button>
+          </div>
+          <div class="sizes-list" v-if="formData.available_print_designs && formData.available_print_designs.length > 0" style="margin-top: 10px;">
+            <span v-for="(design, index) in formData.available_print_designs" :key="index" class="size-badge" style="background-color: #fff3e0; color: #e65100; border: 1px solid #ffe0b2;">
+              {{ design }}
+              <button type="button" @click="removePrintDesign(index)" title="Eliminar diseño">&times;</button>
+            </span>
+          </div>
+        </div>
+
         <div class="print-packages-section" style="margin-top: 15px;">
           <table class="print-packages-table">
             <thead>
