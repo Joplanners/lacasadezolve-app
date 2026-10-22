@@ -5,6 +5,9 @@
   publish = "dist"
   functions = "netlify/functions" # Correcto, le dice a Netlify dónde están tus funciones
 
+[build.environment]
+  NODE_VERSION = "22.23.4"
+
 [functions]
   node_bundler = "esbuild" # Asegura que se use esbuild, que maneja bien ESM
   # Opcional: si necesitas una versión específica de Node.js para tus funciones
