@@ -2,9 +2,24 @@ import { createClient } from '@supabase/supabase-js'
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
+function getCorsOrigin(origin) {
+  if (!origin) return 'https://lacasadezolve.com'
+  if (
+    origin === 'https://lacasadezolve.com' ||
+    origin === 'https://www.lacasadezolve.com' ||
+    origin.endsWith('.netlify.app') ||
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1')
+  ) {
+    return origin
+  }
+  return 'https://lacasadezolve.com'
+}
+
 export const handler = async (event, context) => {
+  const origin = event.headers?.origin || event.headers?.Origin
   const headers = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': getCorsOrigin(origin),
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   }
@@ -17,7 +32,10 @@ export const handler = async (event, context) => {
     if (!order_item_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing order_item_id' }) }
 
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !supabaseKey) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'Error de configuración del servidor.' }) }
+    }
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     let user = null;
@@ -40,10 +58,16 @@ export const handler = async (event, context) => {
     if (itemError || !orderItem) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Order item not found' }) }
 
     // Verify ownership and order status
+    // Si la orden pertenece a un usuario registrado, se exige que coincida con la sesión actual.
+    // Si la orden fue compra como invitado (sin user_id), se permite la descarga mediante el identificador único del pedido.
     if (orderItem.order.user_id) {
-       if (!user || orderItem.order.user_id !== user.id) {
-           return { statusCode: 403, headers, body: JSON.stringify({ error: 'Forbidden. Debes iniciar sesión con la cuenta que compró el producto.' }) }
-       }
+      if (!user || orderItem.order.user_id !== user.id) {
+        return {
+          statusCode: 403,
+          headers,
+          body: JSON.stringify({ error: 'Forbidden. Debes iniciar sesión con la cuenta que compró el producto.' }),
+        }
+      }
     }
     
     const validStatuses = ['paid', 'processing', 'shipped', 'delivered']
@@ -103,22 +127,8 @@ export const handler = async (event, context) => {
     const bucketName = process.env.R2_BUCKET_NAME || 'lacasadezolve'
 
     if (!accountId || !accessKeyId || !secretAccessKey) {
-      // If no R2 credentials, fallback to public URL (in case they didn't setup R2 signing yet)
-      await supabase
-        .from('user_digital_downloads')
-        .update({ downloads_count: downloadRecord.downloads_count + 1 })
-        .eq('id', downloadRecord.id)
-
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          url: orderItem.product.downloadable_file_url,
-          downloads_count: downloadRecord.downloads_count + 1,
-          max_downloads: downloadRecord.max_downloads,
-          warning: 'R2 credentials missing, using public URL'
-        })
-      }
+      console.error('R2 credentials missing - cannot generate signed URL')
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'Error de configuración del servidor.' }) }
     }
 
     const s3Client = new S3Client({
@@ -146,22 +156,11 @@ export const handler = async (event, context) => {
     }
   } catch (error) {
     console.error('Error generating download URL:', error, error?.message, error?.stack)
-    
-    // Convertir el error a string seguro para enviarlo al frontend y saber qué falló
-    let safeError = {};
-    if (error instanceof Error) {
-      safeError = { message: error.message, stack: error.stack, name: error.name };
-    } else {
-      safeError = error;
-    }
-    
     return { 
       statusCode: 500, 
       headers, 
       body: JSON.stringify({ 
-        error: 'Internal Server Error', 
-        details: safeError,
-        raw: String(error)
+        error: 'Error interno al generar el enlace de descarga.' 
       }) 
     }
   }

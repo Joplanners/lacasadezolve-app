@@ -6,12 +6,24 @@ const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY
 const DEFAULT_CITY_QUERY = 'Santiago,CL' // Para la API
 const DEFAULT_CITY_DISPLAY_NAME = 'Santiago, Chile' // Para mostrar al usuario
 
+function getCorsOrigin(origin) {
+  if (!origin) return 'https://lacasadezolve.com'
+  if (
+    origin === 'https://lacasadezolve.com' ||
+    origin === 'https://www.lacasadezolve.com' ||
+    origin.endsWith('.netlify.app') ||
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1')
+  ) {
+    return origin
+  }
+  return 'https://lacasadezolve.com'
+}
+
 export async function handler(event, context) {
+  const origin = event.headers?.origin || event.headers?.Origin
   const headers = {
-    'Access-Control-Allow-Origin':
-      process.env.CONTEXT === 'production'
-        ? 'https://lacasadezolve.com'
-        : event.headers?.origin || '*',
+    'Access-Control-Allow-Origin': getCorsOrigin(origin),
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Content-Type': 'application/json',
@@ -38,10 +50,17 @@ export async function handler(event, context) {
   let isUsingDefaultCity = true
 
   try {
-    if (lat && lon) {
+    if (lat !== undefined && lon !== undefined && lat !== '' && lon !== '') {
+      const latNum = parseFloat(lat)
+      const lonNum = parseFloat(lon)
+
+      if (isNaN(latNum) || isNaN(lonNum) || latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Coordenadas inválidas.' }) }
+      }
+
       isUsingDefaultCity = false
-      weatherApiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=es`
-      queryLocationInfo = `coordenadas (${lat}, ${lon})`
+      weatherApiUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${latNum}&lon=${lonNum}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=es`
+      queryLocationInfo = `coordenadas (${latNum}, ${lonNum})`
     } else {
       weatherApiUrl = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(DEFAULT_CITY_QUERY)}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=es`
     }
@@ -77,7 +96,7 @@ export async function handler(event, context) {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: error.message || 'Error al obtener el clima.' }),
+      body: JSON.stringify({ error: 'Error al obtener el clima.' }),
     }
   }
 }

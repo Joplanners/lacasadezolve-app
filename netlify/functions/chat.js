@@ -35,6 +35,8 @@ const safetySettings = [
 const predefinedResponsesSimple = {
   hola: '¡Hola! Soy Zolve 🦊 ¿Cómo puedo ayudarte hoy?',
   gracias: '¡De nada! 🦊',
+  'health check ping': 'OK',
+  ping: 'pong',
 }
 function normalizeText(text) {
   if (typeof text !== 'string') return ''
@@ -45,9 +47,26 @@ const MAX_DAILY_REQUESTS_CONFIG_KEY = 'gemini_chat_daily_count'
 const SLEEP_MESSAGE =
   '¡Zorry! 🦊💤 Zolve ha respondido muchas preguntas hoy y necesita recargar energías. Estaré de vuelta mañana para seguir ayudándote. ¡Buenos tutos!'
 
+const SERVER_SYSTEM_PROMPT = `Eres Zolve (🦊), el asistente virtual de La Casa de Zolve (lacasadezolve.com), una tienda online chilena de productos K-pop, anime, manga, cómics, figuras y cultura geek. Responde siempre en español chileno de forma amigable y breve. Solo respondes preguntas relacionadas con la tienda, sus productos y cultura geek. Si te preguntan algo fuera de tema, redirige amablemente al tema de la tienda.`
+
+function getCorsOrigin(origin) {
+  if (!origin) return 'https://lacasadezolve.com'
+  if (
+    origin === 'https://lacasadezolve.com' ||
+    origin === 'https://www.lacasadezolve.com' ||
+    origin.endsWith('.netlify.app') ||
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1')
+  ) {
+    return origin
+  }
+  return 'https://lacasadezolve.com'
+}
+
 export async function handler(event, _context) {
+  const origin = event.headers?.origin || event.headers?.Origin
   const headers = {
-    'Access-Control-Allow-Origin': event.headers?.origin || '*',
+    'Access-Control-Allow-Origin': getCorsOrigin(origin),
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json',
@@ -199,7 +218,8 @@ export async function handler(event, _context) {
     }
 
     const body = JSON.parse(event.body)
-    const { systemPrompt, chatHistory, userPrompt } = body
+    const { chatHistory, userPrompt } = body
+    const limitedHistory = Array.isArray(chatHistory) ? chatHistory.slice(-20) : []
     if (!userPrompt) {
       return {
         statusCode: 400,
@@ -228,9 +248,9 @@ export async function handler(event, _context) {
       `[Netlify Fn chat] Consultando Gemini: "${userPrompt}". Solicitudes hoy (aprox): ${currentCount}/${maxLimit}`,
     )
 
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME, systemInstruction: systemPrompt })
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME, systemInstruction: SERVER_SYSTEM_PROMPT })
     const chatSession = model.startChat({
-      history: chatHistory || [],
+      history: limitedHistory,
       generationConfig,
       safetySettings,
     })
@@ -272,7 +292,8 @@ export async function handler(event, _context) {
         errorMessage = 'Mi cerebro (IA) está saturado. Intenta en unos momentos. 🦊'
       }
     } else if (error.message) {
-      errorMessage = error.message
+      // Don't leak internal error messages
+      errorMessage = 'Hubo un error procesando tu solicitud.'
     }
     return { statusCode: 500, headers, body: JSON.stringify({ error: errorMessage }) }
   }

@@ -17,6 +17,14 @@
 # para que Vue Router se encargue del enrutamiento del lado del cliente.
 # Netlify sirve los archivos estáticos pre-renderizados por vite-ssg primero;
 # esta regla solo aplica cuando NO existe un archivo .html estático.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(self)"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
