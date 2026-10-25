@@ -77,9 +77,9 @@ onMounted(() => {
               <span v-else>{{ product.stock !== null ? product.stock : 'Ilimitado' }}</span>
             </td>
             <td>
-              <span :class="['status-badge', product.is_customizable ? 'yes' : 'no']">
-                {{ product.is_customizable ? 'Sí' : 'No' }}
-              </span>
+              <span v-if="product.is_customizable" class="status-badge yes" title="Permite que el cliente suba fotos a R2">Fotos</span>
+              <span v-else-if="product.requires_customization_notes" class="status-badge yes" style="background-color: #0288d1;" title="Permite notas de texto sin fotos">Notas</span>
+              <span v-else class="status-badge no">No</span>
             </td>
             <td>
               <span :class="['status-badge', product.is_active ? 'yes' : 'no']">

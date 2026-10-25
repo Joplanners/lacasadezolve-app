@@ -735,13 +735,19 @@ const pinterestShareUrl = computed(() => {
           </div>
 
           <div v-if="product.requires_customization_notes" class="customization-notes-section">
-            <label for="customNotes">Detalles Adicionales:</label>
+            <label for="customNotes">
+              {{ product.is_customizable ? 'Detalles o instrucciones de tus fotos:' : '¿Qué grupo, integrante o diseño deseas?:' }}
+            </label>
             <textarea
               id="customNotes"
               v-model="customizationNotes"
               rows="4"
               maxlength="1000"
-              placeholder="Indica aquí el orden de tus imágenes (1: Portada...) u otras instrucciones."
+              :placeholder="
+                product.is_customizable
+                  ? 'Indica aquí el orden de tus imágenes (1: Portada...) u otras instrucciones para tus fotos.'
+                  : 'Indica aquí qué grupo, integrantes o temática quieres para tu pedido (ej: 100 photocards de BTS, 100 de Stray Kids, etc.).'
+              "
             ></textarea>
             <div class="char-counter">{{ customizationNotes.length }} / 1000</div>
           </div>

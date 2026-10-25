@@ -525,24 +525,23 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- Opciones de Personalización y Archivos -->
       <div class="form-group checkbox-group" v-if="!formData.is_downloadable">
-        <input type="checkbox" id="isCustomizable" v-model="formData.is_customizable" />
-        <label for="isCustomizable">Producto Personalizable (permite subir archivos)</label>
+        <input type="checkbox" id="requiresNotes" v-model="formData.requires_customization_notes" />
+        <label for="requiresNotes">Permitir/Requerir notas de texto del cliente (ej: qué grupo, integrante o detalle quiere)</label>
         <small class="tooltip"
           >(?)<span class="tooltip-text"
-            >Si se marca, aparecerá la opción para que el cliente suba sus archivos en la página del
-            producto.</span
+            >Habilita un campo de texto para que el cliente especifique qué grupo, integrante o instrucciones desea en su pedido, SIN necesidad de subir fotos ni ocupar almacenamiento R2.</span
           ></small
         >
       </div>
 
-      <div v-if="formData.is_customizable" class="form-group checkbox-group sub-option">
-        <input type="checkbox" id="requiresNotes" v-model="formData.requires_customization_notes" />
-        <label for="requiresNotes">Requiere Notas Adicionales del Cliente</label>
+      <div class="form-group checkbox-group" v-if="!formData.is_downloadable">
+        <input type="checkbox" id="isCustomizable" v-model="formData.is_customizable" />
+        <label for="isCustomizable">Permitir subir archivos / fotos personalizadas (R2)</label>
         <small class="tooltip"
           >(?)<span class="tooltip-text"
-            >Si se marca, aparecerá un campo de texto en la página del producto para que el cliente
-            añada instrucciones (ej: orden de fotos, nombres).</span
+            >Habilita la subida de fotos por parte del cliente. ¡Déjalo DESMARCADO en productos por lote (ej: 300 photocards) si solo necesitas que te indiquen qué grupo quieren!</span
           ></small
         >
       </div>

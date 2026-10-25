@@ -165,6 +165,13 @@ onMounted(() => {
         </div>
         <div v-else class="no-items">No se especificó una dirección de envío para este pedido.</div>
       </section>
+
+      <section v-if="order.customization_notes" class="detail-section notes-section">
+        <h2>Especificaciones / Personalización</h2>
+        <div class="shipping-address-box">
+          <p style="white-space: pre-wrap; margin: 0; font-size: 0.95em;">{{ order.customization_notes }}</p>
+        </div>
+      </section>
     </div>
   </div>
 </template>

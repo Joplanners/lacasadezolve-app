@@ -40,7 +40,10 @@ export const useCartStore = defineStore('cart', () => {
           user_id: authStore.user.id,
           product_id: item.product_id,
           quantity: item.quantity,
-          metadata: item.metadata || {},
+          metadata: {
+            ...(item.metadata || {}),
+            customization_notes: item.customizationNotes || '',
+          },
         }))
 
       const itemsToRemove = items.value
@@ -73,7 +76,11 @@ export const useCartStore = defineStore('cart', () => {
           id: item.id,
           product_id: item.product_id,
           quantity: item.quantity,
-          metadata: item.metadata || {},
+          customizationNotes: item.customizationNotes || '',
+          metadata: {
+            ...(item.metadata || {}),
+            customization_notes: item.customizationNotes || '',
+          },
         }))
 
       localStorage.setItem('guestCart', JSON.stringify(validItemsForStorage))
@@ -99,12 +106,12 @@ export const useCartStore = defineStore('cart', () => {
 
       if (error) throw error
 
-      // Inicializa items con campos vacíos para archivos/notas
+      // Inicializa items restaurando notas guardadas
       items.value = (data || []).map((item) => ({
         ...item,
         metadata: item.metadata || {},
         customizationFiles: [],
-        customizationNotes: '',
+        customizationNotes: item.metadata?.customization_notes || '',
       }))
     } catch (err) {
       console.error('Error fetching user cart:', err)
@@ -127,7 +134,7 @@ export const useCartStore = defineStore('cart', () => {
                 id: item.id || uuidv4(),
                 metadata: item.metadata || {},
                 customizationFiles: [],
-                customizationNotes: '',
+                customizationNotes: item.customizationNotes || item.metadata?.customization_notes || '',
               }))
           : []
       } catch (e) {
@@ -166,7 +173,7 @@ export const useCartStore = defineStore('cart', () => {
           ...guestItem,
           id: uuidv4(), // Regenerar ID al subir al carrito de logged in para evitar conflictos
           customizationFiles: [],
-          customizationNotes: '',
+          customizationNotes: guestItem.customizationNotes || guestItem.metadata?.customization_notes || '',
         })
       }
     })

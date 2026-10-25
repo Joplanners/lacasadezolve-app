@@ -117,6 +117,11 @@ async function downloadFile(orderItemId) {
           <span class="label">Tarjeta:</span>
           <span class="value">**** {{ order.payment_info.card_number }}</span>
         </div>
+
+        <div v-if="order.customization_notes" class="detail-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span class="label">Tus Especificaciones / Notas:</span>
+          <span class="value" style="font-weight: 400; white-space: pre-wrap; background: #eef2f7; padding: 10px; border-radius: 6px; width: 100%;">{{ order.customization_notes }}</span>
+        </div>
       </div>
 
       <div class="email-notice">
