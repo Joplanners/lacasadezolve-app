@@ -128,6 +128,14 @@ onMounted(() => {
             />
             <div class="product-info">
               <p class="product-name">{{ item.product.name }}</p>
+              <div v-if="item.metadata" class="product-metadata" style="margin: 4px 0; font-size: 0.85em;">
+                <span v-if="item.metadata.es_pack_mayorista || item.metadata.is_print_order" style="display: inline-block; background-color: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 2px 8px; border-radius: 4px; margin-right: 6px;">
+                  📦 Pack de {{ item.metadata.pack_unidades || item.metadata.print_quantity }} uds (Total: {{ item.quantity * (item.metadata.pack_unidades || item.metadata.print_quantity || 1) }} uds)
+                </span>
+                <span v-if="item.metadata.diseno || item.metadata.print_design" style="display: inline-block; background-color: #fce4ec; color: #c2185b; border: 1px solid #f8bbd0; padding: 2px 8px; border-radius: 4px;">
+                  🎨 Modelo: {{ item.metadata.diseno || item.metadata.print_design }}
+                </span>
+              </div>
               <p class="product-quantity-price">
                 {{ item.quantity }} x
                 {{

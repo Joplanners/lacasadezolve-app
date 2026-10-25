@@ -12,7 +12,7 @@ import DOMPurify from 'isomorphic-dompurify'
 // Imports para compartir
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faWhatsapp, faXTwitter, faThreads, faPinterest } from '@fortawesome/free-brands-svg-icons'
-import { usePrintProduct } from '@/composables/usePrintProduct'
+import SelectorPacksMayorista from '@/components/mayorista/SelectorPacksMayorista.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -152,35 +152,44 @@ const isDownloadable = computed(() => {
   return product.value.is_downloadable
 })
 
-// 🖨️ Lógica de Producto de Impresión
-const {
-  isPrintProduct,
-  sortedPackages,
-  selectedQuantity: printSelectedQuantity,
-  selectedPackageIndex,
-  isCustomQuantity,
-  priceResult,
-  priceRangeMessage,
-  priceRangesInfo,
-  selectPackage: selectPrintPackage,
-  setCustomQuantity,
-  getCartMetadata: getPrintCartMetadata,
-  reset: resetPrintSelection,
-  selectedPrintDesign
-} = usePrintProduct(product)
+// 📦 Venta por mayor / Packs de cantidad
+const isMayorista = computed(() => {
+  return product.value?.is_print_product === true
+})
 
-const customPrintQtyInput = ref('')
+async function handleAgregarPackMayorista({ pack, cantidadPacks, diseno, unidadesTotales }) {
+  if (!product.value) return
 
-function handleCustomPrintQtyChange() {
-  const qty = Number(customPrintQtyInput.value)
-  if (qty > 0) {
-    setCustomQuantity(qty)
+  const metadata = {
+    es_pack_mayorista: true,
+    pack_unidades: pack.quantity,
+    precio_pack: pack.total_price,
+    unidades_totales: unidadesTotales,
   }
-}
 
-function handleSelectPrintPackage(index) {
-  selectPrintPackage(index)
-  customPrintQtyInput.value = ''
+  if (diseno) {
+    metadata.diseno = diseno
+  }
+
+  if (giveawayIg.value) {
+    metadata.giveaway_ig = giveawayIg.value.trim()
+  }
+
+  await cartStore.addToCart(
+    product.value.id,
+    cantidadPacks,
+    customizationFiles.value,
+    customizationNotes.value,
+    metadata
+  )
+
+  toast.success(
+    `¡"${product.value.name}" (${cantidadPacks} ${cantidadPacks === 1 ? 'pack' : 'packs'} de ${pack.quantity} uds) añadido al carrito!`
+  )
+
+  customizationFiles.value = []
+  customizationNotes.value = ''
+  giveawayIg.value = ''
 }
 
 // Fechas y sectores hardcodeados
@@ -349,30 +358,6 @@ async function handleAddToCart() {
     return
   }
 
-  // 🖨️ Si es producto de impresión
-  if (isPrintProduct.value) {
-    if (product.value.available_print_designs && product.value.available_print_designs.length > 0 && !selectedPrintDesign.value) {
-      toast.error('Por favor, selecciona un diseño para la impresión.')
-      return
-    }
-    if (!printSelectedQuantity.value || printSelectedQuantity.value < 1) {
-      toast.error('Por favor, selecciona una cantidad o elige un paquete.')
-      return
-    }
-    const printMeta = getPrintCartMetadata()
-    await cartStore.addToCart(
-      product.value.id,
-      1, // quantity is always 1, real qty is in metadata
-      [],
-      '',
-      printMeta
-    )
-    toast.success(`"${product.value.name}" (${printSelectedQuantity.value} uds) añadido al carrito!`)
-    resetPrintSelection()
-    customPrintQtyInput.value = ''
-    return
-  }
-
   // Si es ticket o producto sin tallas
   const metadata = {}
   if (isTicket.value) {
@@ -476,31 +461,6 @@ async function handleBuyNow() {
     customizationFiles.value = []
     customizationNotes.value = ''
     giveawayIg.value = ''
-    router.push({ name: 'cart' })
-    return
-  }
-
-  // 🖨️ Comprar Ahora - Producto de impresión
-  if (isPrintProduct.value) {
-    if (product.value.available_print_designs && product.value.available_print_designs.length > 0 && !selectedPrintDesign.value) {
-      toast.error('Por favor, selecciona un diseño para la impresión.')
-      return
-    }
-    if (!printSelectedQuantity.value || printSelectedQuantity.value < 1) {
-      toast.error('Por favor, selecciona una cantidad o elige un paquete.')
-      return
-    }
-    const printMeta = getPrintCartMetadata()
-    await cartStore.addToCart(
-      product.value.id,
-      1,
-      [],
-      '',
-      printMeta
-    )
-    toast.info(`"${product.value.name}" añadido. Redirigiendo...`)
-    resetPrintSelection()
-    customPrintQtyInput.value = ''
     router.push({ name: 'cart' })
     return
   }
@@ -645,7 +605,14 @@ const pinterestShareUrl = computed(() => {
 
           <div class="product-description-html" v-html="sanitizedDescription"></div>
 
-          <div v-if="!isTicket && !isPrintProduct" class="price-detail">
+          <!-- Precio para Entradas -->
+          <div v-if="isTicket" class="price-detail ticket-promo-price">
+            <span class="display-price">{{ formatPrice(ticketTotalPrice) }}</span>
+            <span class="ticket-promo-badge">Promo 2x $4.000 (Subtotal)</span>
+          </div>
+
+          <!-- Precio para Productos Regulares (No mayorista ni entrada) -->
+          <div v-else-if="!isMayorista" class="price-detail">
             <span class="display-price">{{ displayPrice }}</span>
 
             <span v-if="originalPrice" class="original-price-striked">
@@ -656,12 +623,8 @@ const pinterestShareUrl = computed(() => {
               {{ discountBadgeText }}
             </span>
           </div>
-          
-          <div v-else class="price-detail ticket-promo-price">
-            <span class="display-price">{{ formatPrice(ticketTotalPrice) }}</span>
-            <span class="ticket-promo-badge">Promo 2x $4.000 (Subtotal)</span>
-          </div>
-          <div class="quantity-selector" v-if="(!product.has_sizes || isTicket) && !isPrintProduct">
+
+          <div class="quantity-selector" v-if="(!product.has_sizes || isTicket) && !isMayorista">
             <label for="quantity">Cantidad:</label>
             <input
               type="number"
@@ -736,95 +699,12 @@ const pinterestShareUrl = computed(() => {
               </div>
             </div>
           </div>
-          <!-- 🖨️ Selector de Paquetes de Impresión -->
-          <div v-if="isPrintProduct" class="print-product-section">
-            <div v-if="product.available_print_designs && product.available_print_designs.length > 0" class="print-design-selector" style="margin-bottom: 20px;">
-              <h3 class="print-section-title">🎨 Elige tu diseño</h3>
-              <select v-model="selectedPrintDesign" class="custom-qty-input" style="width: 100%; text-align: left; padding: 12px; margin-top: 5px;">
-                <option value="" disabled>Selecciona un diseño...</option>
-                <option v-for="design in product.available_print_designs" :key="design" :value="design">
-                  {{ design }}
-                </option>
-              </select>
-            </div>
-
-            <h3 class="print-section-title">📦 Selecciona tu paquete</h3>
-            
-            <div class="print-packages-grid">
-              <button
-                v-for="(pkg, index) in sortedPackages"
-                :key="index"
-                type="button"
-                class="print-package-card"
-                :class="{ active: selectedPackageIndex === index && !isCustomQuantity }"
-                @click="handleSelectPrintPackage(index)"
-              >
-                <span class="pkg-qty">{{ pkg.quantity }} uds</span>
-                <span class="pkg-total">${{ pkg.total_price.toLocaleString('es-CL') }}</span>
-                <span class="pkg-unit">${{ pkg.unitPrice.toLocaleString('es-CL') }} c/u</span>
-              </button>
-            </div>
-
-            <div class="print-custom-qty">
-              <div class="custom-qty-divider">
-                <span>o elige cantidad personalizada</span>
-              </div>
-              <div class="custom-qty-input-group">
-                <label for="customPrintQty">Cantidad:</label>
-                <input
-                  type="number"
-                  id="customPrintQty"
-                  v-model="customPrintQtyInput"
-                  @input="handleCustomPrintQtyChange"
-                  min="1"
-                  placeholder="Ej: 60"
-                  class="custom-qty-input"
-                />
-              </div>
-            </div>
-
-            <div v-if="printSelectedQuantity && priceResult.total > 0" class="print-summary">
-              <h4>📋 Resumen</h4>
-              <div class="summary-row">
-                <span>Cantidad:</span>
-                <strong>{{ printSelectedQuantity }} unidades</strong>
-              </div>
-              <div class="summary-row">
-                <span>Precio unitario:</span>
-                <strong>${{ priceResult.unitPrice.toLocaleString('es-CL') }} c/u</strong>
-              </div>
-              <div v-if="priceRangeMessage" class="summary-range-note">
-                {{ priceRangeMessage }}
-              </div>
-              <div class="summary-divider"></div>
-              <div class="summary-row summary-total">
-                <span>Total:</span>
-                <strong>${{ priceResult.total.toLocaleString('es-CL') }} CLP</strong>
-              </div>
-            </div>
-
-            <div class="print-all-ranges">
-              <details>
-                <summary>Ver todos los rangos de precio</summary>
-                <table class="ranges-table">
-                  <thead>
-                    <tr>
-                      <th>Cantidad</th>
-                      <th>Precio Total</th>
-                      <th>Precio Unitario</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="range in priceRangesInfo" :key="range.quantity" :class="{ 'active-range': range.isActive }">
-                      <td>{{ range.quantity }} uds</td>
-                      <td>${{ range.totalPrice.toLocaleString('es-CL') }}</td>
-                      <td>${{ range.unitPrice.toLocaleString('es-CL') }} c/u</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </details>
-            </div>
-          </div>
+          <!-- 📦 Selector de Packs de Cantidad (Estilo AliExpress) -->
+          <SelectorPacksMayorista
+            v-if="isMayorista"
+            :producto="product"
+            @agregar-al-carrito="handleAgregarPackMayorista"
+          />
           <div class="stock-display" v-if="!isDownloadable && product.stock !== null && product.stock !== undefined">
             <p v-if="product.stock > 10" class="stock-info">
               Disponibles: <span class="stock-number">{{ product.stock }}</span>
@@ -866,7 +746,7 @@ const pinterestShareUrl = computed(() => {
             <div class="char-counter">{{ customizationNotes.length }} / 1000</div>
           </div>
 
-          <div class="actions-container">
+          <div class="actions-container" v-if="!isMayorista">
             <div class="buttons-row">
               <button @click="handleAddToCart" class="btn btn-add-to-cart">
                 🛒 Añadir al Carrito
@@ -1559,179 +1439,5 @@ const pinterestShareUrl = computed(() => {
   .share-buttons {
     justify-content: center;
   }
-}
-
-/* 🖨️ Estilos de Producto de Impresión */
-.print-product-section {
-  margin-bottom: 25px;
-  padding: 20px;
-  background-color: #fffaf0;
-  border: 1px solid #ffe0b2;
-  border-radius: 12px;
-}
-.print-section-title {
-  margin: 0 0 15px 0;
-  font-size: 1.2rem;
-  color: #e65100;
-}
-.print-packages-grid {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-.print-package-card {
-  flex: 1;
-  min-width: 120px;
-  padding: 15px 12px;
-  border: 2px solid #ffe0b2;
-  border-radius: 10px;
-  background: white;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s ease;
-}
-.print-package-card:hover {
-  border-color: #ff9800;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
-}
-.print-package-card.active {
-  border-color: #e65100;
-  background-color: #fff3e0;
-  box-shadow: 0 4px 12px rgba(230, 81, 0, 0.15);
-}
-.pkg-qty {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #333;
-}
-.pkg-total {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #e65100;
-}
-.pkg-unit {
-  font-size: 0.8rem;
-  color: #888;
-}
-.print-custom-qty {
-  margin-bottom: 20px;
-}
-.custom-qty-divider {
-  text-align: center;
-  margin: 15px 0;
-  position: relative;
-}
-.custom-qty-divider::before,
-.custom-qty-divider::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  width: 30%;
-  height: 1px;
-  background: #ddd;
-}
-.custom-qty-divider::before { left: 0; }
-.custom-qty-divider::after { right: 0; }
-.custom-qty-divider span {
-  background: #fffaf0;
-  padding: 0 12px;
-  color: #999;
-  font-size: 0.9rem;
-}
-.custom-qty-input-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.custom-qty-input-group label {
-  font-weight: 500;
-  color: var(--color-text);
-}
-.custom-qty-input {
-  width: 120px;
-  padding: 10px 12px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  font-size: 1rem;
-  text-align: center;
-}
-.custom-qty-input:focus {
-  border-color: #ff9800;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.15);
-}
-.print-summary {
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 10px;
-  padding: 18px;
-  margin-bottom: 15px;
-}
-.print-summary h4 {
-  margin: 0 0 12px 0;
-  font-size: 1rem;
-  color: #333;
-}
-.print-summary .summary-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  font-size: 0.95rem;
-}
-.print-summary .summary-total {
-  font-size: 1.15rem;
-  color: #e65100;
-}
-.summary-range-note {
-  font-size: 0.8rem;
-  color: #888;
-  font-style: italic;
-  margin-top: 4px;
-}
-.summary-divider {
-  height: 1px;
-  background: #e0e0e0;
-  margin: 10px 0;
-}
-.print-all-ranges {
-  margin-top: 5px;
-}
-.print-all-ranges details {
-  font-size: 0.9rem;
-}
-.print-all-ranges summary {
-  cursor: pointer;
-  color: #888;
-  font-size: 0.85rem;
-  padding: 5px 0;
-}
-.print-all-ranges summary:hover {
-  color: #e65100;
-}
-.ranges-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 8px;
-  font-size: 0.85rem;
-}
-.ranges-table th {
-  text-align: left;
-  padding: 6px 8px;
-  border-bottom: 2px solid #e0e0e0;
-  color: #666;
-  font-weight: 600;
-}
-.ranges-table td {
-  padding: 6px 8px;
-  border-bottom: 1px solid #f0f0f0;
-}
-.ranges-table tr.active-range {
-  background-color: #fff3e0;
-  font-weight: 600;
 }
 </style>

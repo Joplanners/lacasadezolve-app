@@ -296,6 +296,13 @@ function goBack() {
                 </p>
                 <!-- 🔥 Mostrar metadata si existe -->
                 <div v-if="item.metadata" class="item-metadata-info">
+                  <p v-if="item.metadata.es_pack_mayorista || item.metadata.is_print_order" class="meta-detail" style="color: #e65100;">
+                    📦 Pack de <strong>{{ item.metadata.pack_unidades || item.metadata.print_quantity }} uds</strong>
+                    (Total: <strong>{{ item.quantity * (item.metadata.pack_unidades || item.metadata.print_quantity || 1) }} uds</strong>)
+                  </p>
+                  <p v-if="item.metadata.diseno || item.metadata.print_design" class="meta-detail" style="color: #c2185b;">
+                    🎨 Modelo / Diseño: <strong>{{ item.metadata.diseno || item.metadata.print_design }}</strong>
+                  </p>
                   <p v-if="item.metadata.size" class="meta-detail">Talla: <strong>{{ item.metadata.size }}</strong></p>
                   <p v-if="item.metadata.giveaway_ig" class="meta-detail" style="color: #d81b60;">Sorteo IG: <strong>{{ item.metadata.giveaway_ig }}</strong></p>
                   

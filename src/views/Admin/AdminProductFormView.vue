@@ -6,6 +6,8 @@ import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabaseClient'
 import { useToast } from 'vue-toastification'
+import ConfiguradorPacksMayorista from '@/components/mayorista/ConfiguradorPacksMayorista.vue'
+import { validarPacks } from '@/composables/usarPacksMayorista'
 
 // --- Props, Router, Toast ---
 const props = defineProps({ isEditMode: { type: Boolean, default: false } })
@@ -169,36 +171,6 @@ function removeSize(index) {
   formData.value.available_sizes.splice(index, 1)
 }
 
-// 🖨️ Manejo de Paquetes de Impresión
-function addPrintPackage() {
-  formData.value.print_quantity_packages.push({ quantity: null, total_price: null })
-}
-function removePrintPackage(index) {
-  formData.value.print_quantity_packages.splice(index, 1)
-}
-
-const printDesignInput = ref('')
-function addPrintDesign() {
-  const design = printDesignInput.value.trim()
-  if (design && !formData.value.available_print_designs.includes(design)) {
-    formData.value.available_print_designs.push(design)
-  }
-  printDesignInput.value = ''
-}
-function removePrintDesign(index) {
-  formData.value.available_print_designs.splice(index, 1)
-}
-
-function getPrintUnitPrice(pkg) {
-  if (!pkg.quantity || pkg.quantity <= 0 || !pkg.total_price || pkg.total_price <= 0) return null
-  return Math.round(pkg.total_price / pkg.quantity)
-}
-function formatPrintUnitPrice(pkg) {
-  const unitPrice = getPrintUnitPrice(pkg)
-  if (unitPrice === null) return '-'
-  return '$' + unitPrice.toLocaleString('es-CL') + ' c/u'
-}
-
 function handleFileChange(event) {
   cleanupPreviews()
   selectedImageFiles.value = Array.from(event.target.files)
@@ -217,22 +189,21 @@ async function saveProduct() {
   saving.value = true
   errorMsg.value = ''
 
-  // Validación de paquetes de impresión
+  // Validación de paquetes de venta por mayor
   if (formData.value.is_print_product) {
-    const validPackages = formData.value.print_quantity_packages.filter(pkg => pkg.quantity > 0 && pkg.total_price > 0)
-    if (validPackages.length === 0) {
-      toast.error('Debes agregar al menos un paquete de cantidad válido para el producto de impresión.')
+    const validacion = validarPacks(formData.value.print_quantity_packages)
+    if (!validacion.esValido) {
+      toast.error(validacion.error)
       saving.value = false
       return
     }
-    const quantities = validPackages.map(p => p.quantity)
-    if (new Set(quantities).size !== quantities.length) {
-      toast.error('No puede haber dos paquetes con la misma cantidad.')
-      saving.value = false
-      return
+    // Auto-ajustar el precio base al primer paquete (para mostrar 'Desde $X' en el catálogo)
+    const sorted = [...formData.value.print_quantity_packages]
+      .filter((p) => p && p.quantity > 0 && p.total_price > 0)
+      .sort((a, b) => a.quantity - b.quantity)
+    if (sorted.length > 0) {
+      formData.value.price = sorted[0].total_price
     }
-    // Auto-set the price to the first package total (for 'Desde $X' display)
-    formData.value.price = validPackages.sort((a, b) => a.quantity - b.quantity)[0].total_price
   }
 
   try {
@@ -620,60 +591,13 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 🖨️ Configuración de Producto de Impresión -->
-      <div class="form-group checkbox-group" style="padding-top: 15px; border-top: 1px solid #ddd;" v-if="!formData.is_downloadable && !formData.is_event_ticket">
-        <input type="checkbox" id="isPrintProduct" v-model="formData.is_print_product" />
-        <label for="isPrintProduct">🖨️ Producto de Impresión (Precio por paquetes de cantidad)</label>
-      </div>
-
-      <div v-if="formData.is_print_product" class="info-box ticket-info" style="border-left-color: #ff6f00; background-color: #fff8e1;">
-        <p><strong>🖨️ Producto de Impresión:</strong> Define paquetes de cantidad con precios totales. El sistema calculará el precio unitario automáticamente.</p>
-        
-        <div style="margin-top: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 15px;">
-          <label style="font-weight: bold;">Diseños Disponibles (Opcional):</label>
-          <p style="font-size: 0.85em; color: #666; margin-bottom: 8px;">Añade diseños específicos (Ej: "Certificado BTS", "Contrato Jin") para que el cliente elija antes de comprar.</p>
-          <div style="display: flex; gap: 10px;">
-            <input type="text" v-model="printDesignInput" @keydown.enter.prevent="addPrintDesign" placeholder="Ej: Contrato RM" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />
-            <button type="button" @click="addPrintDesign" class="btn-secondary">Añadir</button>
-          </div>
-          <div class="sizes-list" v-if="formData.available_print_designs && formData.available_print_designs.length > 0" style="margin-top: 10px;">
-            <span v-for="(design, index) in formData.available_print_designs" :key="index" class="size-badge" style="background-color: #fff3e0; color: #e65100; border: 1px solid #ffe0b2;">
-              {{ design }}
-              <button type="button" @click="removePrintDesign(index)" title="Eliminar diseño">&times;</button>
-            </span>
-          </div>
-        </div>
-
-        <div class="print-packages-section" style="margin-top: 15px;">
-          <table class="print-packages-table">
-            <thead>
-              <tr>
-                <th>Cantidad</th>
-                <th>Precio Total (CLP)</th>
-                <th>Precio Unitario</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(pkg, index) in formData.print_quantity_packages" :key="index">
-                <td>
-                  <input type="number" v-model.number="pkg.quantity" min="1" step="1" placeholder="Ej: 25" class="print-pkg-input" />
-                </td>
-                <td>
-                  <input type="number" v-model.number="pkg.total_price" min="1" step="1" placeholder="Ej: 2000" class="print-pkg-input" />
-                </td>
-                <td>
-                  <span class="print-unit-badge">{{ formatPrintUnitPrice(pkg) }}</span>
-                </td>
-                <td>
-                  <button type="button" @click="removePrintPackage(index)" class="btn-remove-pkg" title="Eliminar paquete">&times;</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <button type="button" @click="addPrintPackage" class="btn-secondary" style="margin-top: 10px;">+ Agregar Paquete</button>
-        </div>
-      </div>
+      <!-- 📦 Configuración de Venta por Mayor / Packs de Cantidad -->
+      <ConfiguradorPacksMayorista
+        v-if="!formData.is_downloadable && !formData.is_event_ticket"
+        v-model:activo="formData.is_print_product"
+        v-model:paquetes="formData.print_quantity_packages"
+        v-model:disenos="formData.available_print_designs"
+      />
 
       <!-- 🔥 Configuración de Entradas -->
       <div class="form-group checkbox-group" style="padding-top: 15px; border-top: 1px solid #ddd;" v-if="!formData.is_downloadable">
@@ -1087,55 +1011,5 @@ hr {
     margin-left: 0;
     width: 100%;
   }
-}
-
-/* 🖨️ Estilos de Producto de Impresión */
-.print-packages-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
-.print-packages-table th {
-  text-align: left;
-  padding: 8px 10px;
-  font-size: 0.85em;
-  color: #555;
-  border-bottom: 2px solid #ddd;
-}
-.print-packages-table td {
-  padding: 8px 10px;
-  border-bottom: 1px solid #eee;
-  vertical-align: middle;
-}
-.print-pkg-input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 0.95em;
-  box-sizing: border-box;
-}
-.print-unit-badge {
-  display: inline-block;
-  background-color: #e8f5e9;
-  color: #2e7d32;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.85em;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.btn-remove-pkg {
-  background: none;
-  border: none;
-  color: #d32f2f;
-  font-size: 1.5em;
-  cursor: pointer;
-  padding: 0 5px;
-  line-height: 1;
-  transition: color 0.2s ease;
-}
-.btn-remove-pkg:hover {
-  color: #b71c1c;
 }
 </style>

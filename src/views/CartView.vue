@@ -8,7 +8,6 @@ import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabaseClient'
 import { storeToRefs } from 'pinia'
 import { useSeoMeta } from '@/composables/useSeoMeta'
-import { calcPrintPrice } from '@/utils/printPricing'
 
 useSeoMeta({
   title: 'Tu Carrito de Compras',
@@ -84,20 +83,20 @@ const processedCartItems = computed(() => {
   return cartProductsDetails.value.map((item) => {
     const priceInfo = getPriceInfo(item.product)
     
-    // 🖨️ Override for print products
-    if (item.metadata?.is_print_order) {
-      const printQty = item.metadata.print_quantity || 0
-      const printResult = calcPrintPrice(item.product.print_quantity_packages, printQty)
+    // 📦 Override para packs de venta por mayor
+    if (item.metadata?.es_pack_mayorista) {
+      const precioPack = Number(item.metadata.precio_pack || item.product.price || 0)
+      const packUnidades = Number(item.metadata.pack_unidades || 1)
       return {
         ...item,
-        finalPrice: printResult.total,
+        finalPrice: precioPack,
         originalPrice: null,
         onOffer: false,
-        isPrintOrder: true,
-        printQuantity: printQty,
-        printUnitPrice: printResult.unitPrice,
-        printTotal: printResult.total,
-        printBasedOnPackage: printResult.basedOnPackage
+        isPackMayorista: true,
+        packUnidades: packUnidades,
+        precioPack: precioPack,
+        diseno: item.metadata.diseno || null,
+        unidadesTotales: item.quantity * packUnidades,
       }
     }
     
@@ -173,9 +172,6 @@ onMounted(loadCartProductDetails)
 // --- COMPUTADAS ---
 const subtotal = computed(() => {
   return processedCartItems.value.reduce((total, item) => {
-    if (item.isPrintOrder) {
-      return total + item.printTotal
-    }
     return total + item.finalPrice * item.quantity
   }, 0)
 })
@@ -280,38 +276,6 @@ async function handleUpdateQuantity(itemId, newQuantity) {
   const item = cartProductsDetails.value.find((item) => item.id === itemId)
   if (!item) return
 
-  // 🖨️ For print products, update the print_quantity in metadata
-  if (item.metadata?.is_print_order) {
-    const newPrintQty = Math.max(1, newQuantity)
-    const newResult = calcPrintPrice(item.product.print_quantity_packages, newPrintQty)
-    
-    // Update metadata
-    item.metadata = {
-      ...item.metadata,
-      print_quantity: newPrintQty,
-      print_unit_price: newResult.unitPrice,
-      print_total: newResult.total,
-      based_on_package: newResult.basedOnPackage
-    }
-    
-    // Persist the metadata update
-    try {
-      await cartStore.updateItemQuantity(item.id, 1) // quantity stays 1
-      // Re-persist with updated metadata
-      const cartItem = cartStore.items.find(ci => ci.id === item.id)
-      if (cartItem) {
-        cartItem.metadata = { ...item.metadata }
-        await cartStore.persistCart ? cartStore.persistCart() : null
-      }
-      // Reload to reflect changes
-      await loadCartProductDetails()
-    } catch (error) {
-      console.error('Error updating print item:', error)
-      toast.error('No se pudo actualizar la cantidad.')
-    }
-    return
-  }
-
   const stock = item.product.stock
   let finalQuantity = Math.max(0, newQuantity)
 
@@ -403,19 +367,25 @@ function formatPrice(value) {
           <div class="item-details">
             <h3 class="item-name">{{ item.product.name }}</h3>
 
-            <div v-if="item.metadata && (item.metadata.size || item.metadata.isTicket || item.product.is_downloadable || item.metadata.is_print_order)" class="item-metadata-labels">
-              <span v-if="item.metadata.is_print_order" class="meta-label" style="background-color: #fff8e1; color: #e65100; border-color: #ffe0b2;">🖨️ Impresión</span>
-              <span v-if="item.metadata.is_print_order && item.metadata.print_design" class="meta-label" style="background-color: #fce4ec; color: #c2185b; border-color: #f8bbd0;">🎨 {{ item.metadata.print_design }}</span>
+            <div v-if="item.metadata && (item.metadata.size || item.metadata.isTicket || item.product.is_downloadable || item.metadata.es_pack_mayorista || item.metadata.is_print_order)" class="item-metadata-labels">
+              <span v-if="item.metadata.es_pack_mayorista || item.metadata.is_print_order" class="meta-label" style="background-color: #fff3e0; color: #e65100; border-color: #ffe0b2;">
+                📦 Pack de {{ item.metadata.pack_unidades || item.metadata.print_quantity }} uds (Total: {{ item.quantity * (item.metadata.pack_unidades || item.metadata.print_quantity || 1) }} uds)
+              </span>
+              <span v-if="item.metadata.diseno || item.metadata.print_design" class="meta-label" style="background-color: #fce4ec; color: #c2185b; border-color: #f8bbd0;">
+                🎨 {{ item.metadata.diseno || item.metadata.print_design }}
+              </span>
               <span v-if="item.product.is_downloadable" class="meta-label" style="background-color: #f3e5f5; color: #9c27b0; border-color: #e1bee7;">📥 Descarga Digital</span>
               <span v-if="item.metadata.size" class="meta-label">Talla: <strong>{{ item.metadata.size }}</strong></span>
               <span v-if="item.metadata.isTicket" class="meta-label">Detalles de {{ item.metadata.tickets?.length }} Entrada(s) incluidos</span>
             </div>
 
             <p class="item-price">
-              <span v-if="item.isPrintOrder" class="final-item-price" style="color: #e65100;">🖨️ {{ item.printQuantity }} uds × {{ formatPrice(item.printUnitPrice) }} c/u</span>
+              <span v-if="item.isPackMayorista" class="final-item-price" style="color: #e65100;">
+                {{ formatPrice(item.precioPack) }} / pack
+              </span>
               <span v-else-if="item.isTicket" class="final-item-price promo-text">¡Promo Entradas! ✨</span>
               <span v-else class="final-item-price">{{ formatPrice(item.finalPrice) }} c/u</span>
-              <span v-if="item.onOffer && !item.isTicket" class="original-item-price">
+              <span v-if="item.onOffer && !item.isTicket && !item.isPackMayorista" class="original-item-price">
                 {{ formatPrice(item.originalPrice) }}
               </span>
             </p>
@@ -433,52 +403,29 @@ function formatPrice(value) {
           </div>
 
           <div class="item-quantity-selector">
-            <template v-if="item.isPrintOrder">
-              <button
-                @click="handleUpdateQuantity(item.id, item.printQuantity - 1)"
-                :disabled="item.printQuantity <= 1"
-                class="quantity-btn"
-                aria-label="Disminuir cantidad"
-              >
-                -
-              </button>
-              <span class="quantity-display">{{ item.printQuantity }}</span>
-              <button
-                @click="handleUpdateQuantity(item.id, item.printQuantity + 1)"
-                class="quantity-btn"
-                aria-label="Aumentar cantidad"
-              >
-                +
-              </button>
-            </template>
-            <template v-else>
-              <button
-                @click="handleUpdateQuantity(item.id, item.quantity - 1)"
-                :disabled="item.quantity <= 1"
-                class="quantity-btn"
-                aria-label="Disminuir cantidad"
-              >
-                -
-              </button>
-              <span class="quantity-display">{{ item.quantity }}</span>
-              <button
-                @click="handleUpdateQuantity(item.id, item.quantity + 1)"
-                :disabled="!item.product.is_downloadable && item.product.stock !== null && item.quantity >= item.product.stock"
-                class="quantity-btn"
-                aria-label="Aumentar cantidad"
-              >
-                +
-              </button>
-            </template>
+            <button
+              @click="handleUpdateQuantity(item.id, item.quantity - 1)"
+              :disabled="item.quantity <= 1"
+              class="quantity-btn"
+              aria-label="Disminuir cantidad"
+            >
+              -
+            </button>
+            <span class="quantity-display">
+              {{ item.quantity }} {{ item.isPackMayorista ? (item.quantity === 1 ? 'pack' : 'packs') : '' }}
+            </span>
+            <button
+              @click="handleUpdateQuantity(item.id, item.quantity + 1)"
+              :disabled="!item.product.is_downloadable && item.product.stock !== null && item.quantity >= item.product.stock"
+              class="quantity-btn"
+              aria-label="Aumentar cantidad"
+            >
+              +
+            </button>
           </div>
 
           <div class="item-total">
-            <template v-if="item.isPrintOrder">
-              {{ formatPrice(item.printTotal) }}
-            </template>
-            <template v-else>
-              {{ formatPrice(item.finalPrice * item.quantity) }}
-            </template>
+            {{ formatPrice(item.finalPrice * item.quantity) }}
           </div>
 
           <button

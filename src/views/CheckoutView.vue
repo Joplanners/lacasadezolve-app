@@ -13,7 +13,6 @@ import { isValidRut } from '@/utils/validation.js'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidv4 } from 'uuid'
 import { useSeoMeta } from '@/composables/useSeoMeta'
-import { calcPrintPrice } from '@/utils/printPricing'
 
 useSeoMeta({
   title: 'Finalizar Compra',
@@ -93,19 +92,20 @@ const processedCartItems = computed(() => {
   return cartProductDetails.value.map((item) => {
     const priceInfo = getPriceInfo(item.product)
     
-    // 🖨️ Override for print products
-    if (item.metadata?.is_print_order) {
-      const printQty = item.metadata.print_quantity || 0
-      const printResult = calcPrintPrice(item.product?.print_quantity_packages, printQty)
+    // 📦 Override para packs mayoristas
+    if (item.metadata?.es_pack_mayorista) {
+      const precioPack = Number(item.metadata.precio_pack || item.product.price || 0)
+      const packUnidades = Number(item.metadata.pack_unidades || 1)
       return {
         ...item,
-        finalPrice: printResult.total,
+        finalPrice: precioPack,
         originalPrice: null,
         onOffer: false,
-        isPrintOrder: true,
-        printQuantity: printQty,
-        printUnitPrice: printResult.unitPrice,
-        printTotal: printResult.total
+        isPackMayorista: true,
+        packUnidades: packUnidades,
+        precioPack: precioPack,
+        diseno: item.metadata.diseno || null,
+        unidadesTotales: item.quantity * packUnidades,
       }
     }
 
@@ -178,9 +178,6 @@ const hasSavedAddress = computed(() => {
 
 const subtotal = computed(() => {
   return processedCartItems.value.reduce((total, item) => {
-    if (item.isPrintOrder) {
-      return total + item.printTotal
-    }
     return total + item.finalPrice * item.quantity
   }, 0)
 })
@@ -1003,7 +1000,12 @@ onUnmounted(() => {
               />
               <span class="item-name-summary">
                 {{ item.quantity }} x {{ item.product.name }}
-                <span v-if="item.metadata?.print_design" style="color:#e65100; font-size: 0.85em; display: block;">(Diseño: {{ item.metadata.print_design }})</span>
+                <span v-if="item.metadata?.es_pack_mayorista" style="color: #e65100; font-size: 0.85em; display: block;">
+                  (Pack {{ item.metadata.pack_unidades }} uds - Total {{ item.quantity * item.metadata.pack_unidades }} uds)
+                </span>
+                <span v-if="item.metadata?.diseno || item.metadata?.print_design" style="color:#d81b60; font-size: 0.85em; display: block;">
+                  (Modelo: {{ item.metadata.diseno || item.metadata.print_design }})
+                </span>
               </span>
               <span class="item-price-summary">
                 {{ formatPrice(item.finalPrice * item.quantity) }}
