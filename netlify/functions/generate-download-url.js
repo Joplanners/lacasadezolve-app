@@ -136,7 +136,17 @@ export const handler = async (event, context) => {
       endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
       credentials: { accessKeyId, secretAccessKey },
     })
-    const command = new GetObjectCommand({ Bucket: bucketName, Key: objectKey })
+
+    // Limpiar el nombre para forzar que el navegador descargue el archivo directamente a disco
+    const rawFileName = orderItem.product.original_file_name || objectKey.split('/').pop() || `${orderItem.product.name}.pdf`
+    const cleanFileName = rawFileName.replace(/["\r\n]/g, '').trim()
+    const encodedFileName = encodeURIComponent(cleanFileName)
+
+    const command = new GetObjectCommand({
+      Bucket: bucketName,
+      Key: objectKey,
+      ResponseContentDisposition: `attachment; filename="${cleanFileName}"; filename*=UTF-8''${encodedFileName}`,
+    })
     const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 })
 
     // Increment count
@@ -150,6 +160,7 @@ export const handler = async (event, context) => {
       headers,
       body: JSON.stringify({
         url: signedUrl,
+        fileName: cleanFileName,
         downloads_count: downloadRecord.downloads_count + 1,
         max_downloads: downloadRecord.max_downloads
       })

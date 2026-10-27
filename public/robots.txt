@@ -1,3 +1,40 @@
+# Motores de Búsqueda de IA
+User-agent: GPTBot
+Allow: /
+Disallow: /admin/
+Disallow: /mi-perfil/
+Disallow: /finalizar-compra
+Disallow: /payment/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /admin/
+Disallow: /mi-perfil/
+Disallow: /finalizar-compra
+Disallow: /payment/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin/
+Disallow: /mi-perfil/
+Disallow: /finalizar-compra
+Disallow: /payment/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin/
+Disallow: /mi-perfil/
+Disallow: /finalizar-compra
+Disallow: /payment/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /admin/
+Disallow: /mi-perfil/
+Disallow: /finalizar-compra
+Disallow: /payment/
+
+# Motores de Búsqueda Generales
 User-agent: *
 Allow: /
 Disallow: /admin/

@@ -59,13 +59,18 @@ async function downloadFile(orderItemId) {
       throw new Error(JSON.stringify(data.details || data.error))
     }
     
-    // Abrir URL en nueva pestaña
-    window.open(data.url, '_blank')
+    // Forzar la descarga directa del archivo al dispositivo del usuario
+    const link = document.createElement('a')
+    link.href = data.url
+    link.setAttribute('download', data.fileName || 'archivo.pdf')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
     toast.success(`Descarga iniciada. Te quedan ${data.max_downloads - data.downloads_count} descargas.`)
   } catch (err) {
     console.error('Error al descargar:', err)
-    alert('Error detallado del servidor: ' + err.message)
-    toast.error('No se pudo descargar el archivo')
+    toast.error('No se pudo descargar el archivo. Por favor intenta de nuevo.')
   } finally {
     isDownloading.value = false
   }
@@ -141,7 +146,7 @@ async function downloadFile(orderItemId) {
             </button>
           </div>
         </div>
-        <p class="download-warning"><small>Nota: Las descargas están limitadas a 5 por archivo y el link expira en 1 hora por seguridad.</small></p>
+        <p class="download-warning"><small>💾 El archivo se descargará directamente en tu carpeta de Descargas. Las descargas están limitadas a 5 por archivo y el link expira en 1 hora por seguridad.</small></p>
         
         <div v-if="!authStore.isLoggedIn" class="guest-register-invite">
           <p>💡 <strong>¿Quieres guardar tus descargas para siempre?</strong></p>

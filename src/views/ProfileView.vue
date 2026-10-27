@@ -405,12 +405,18 @@ async function downloadFile(orderItemId) {
       throw new Error(JSON.stringify(data.details || data.error))
     }
     
-    window.open(data.url, '_blank')
+    // Forzar la descarga directa del archivo al dispositivo del usuario
+    const link = document.createElement('a')
+    link.href = data.url
+    link.setAttribute('download', data.fileName || 'archivo.pdf')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
     toast.success(`Descarga iniciada. Te quedan ${data.max_downloads - data.downloads_count} descargas.`)
   } catch (err) {
     console.error('Error al descargar:', err)
-    alert('Error detallado del servidor: ' + err.message)
-    toast.error('No se pudo descargar el archivo')
+    toast.error('No se pudo descargar el archivo. Por favor intenta de nuevo.')
   } finally {
     isDownloading.value = false
   }
