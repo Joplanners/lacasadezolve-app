@@ -1,5 +1,13 @@
 <script setup>
 import { ref } from 'vue'
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Enlaces y Redes Sociales',
+  description:
+    'Encuentra todos los enlaces oficiales de La Casa de Zolve: Tienda online, BTS Chile, WhatsApp, reseñas y redes sociales.',
+  url: '/links',
+})
 
 // Aquí pones tus enlaces reales
 const links = ref([
@@ -10,11 +18,17 @@ const links = ref([
     class: 'primary'
   },
   { 
-    title: 'BTS Chile 2025', 
+    title: 'BTS Chile 2026', 
     url: 'https://lacasadezolve.com/bts-chile', 
     icon: '',
     image: '/images/bts/ZolveBTS.webp',
     class: 'accent'
+  },
+  { 
+    title: '⭐ Regálanos tu reseña en Google', 
+    url: 'https://g.page/r/CXJzwt80cDJ3EBM/review', 
+    icon: '⭐',
+    class: 'secondary'
   },
   { 
     title: '📸 Instagram', 
@@ -28,7 +42,7 @@ const links = ref([
     icon: '💃',
     class: 'secondary'
   },
-{ 
+  { 
     title: '💬 Háblanos al WhatsApp', 
     // REEMPLAZA EL 569XXXXXXXX CON TU NÚMERO REAL (sin el +)
     // El texto del final es el mensaje automático (está codificado para URL)
