@@ -79,6 +79,8 @@ onMounted(() => {
             <img
               :src="banner.image_url"
               :alt="banner.alt_text || 'Banner promocional'"
+              width="1920"
+              height="960"
               loading="lazy"
             />
           </component>
@@ -132,6 +134,7 @@ onMounted(() => {
 .banner-slide img {
   width: 100%;
   height: auto;
+  aspect-ratio: 2 / 1;
   max-height: 600px;
   object-fit: cover;
   object-position: center;
@@ -168,6 +171,17 @@ onMounted(() => {
   width: 10px;
   height: 10px;
   transition: all 0.2s ease;
+  position: relative;
+}
+/* Área táctil accesible mínima de 44x44px sin deformar el punto visual */
+.banner-swiper :deep(.swiper-pagination-bullet)::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 44px;
+  min-height: 44px;
 }
 .banner-swiper :deep(.swiper-pagination-bullet-active) {
   background-color: var(--brand-pink);
@@ -190,6 +204,7 @@ onMounted(() => {
   .banner-swiper :deep(.swiper-pagination-bullet) {
     width: 8px;
     height: 8px;
+    margin: 0 6px !important;
   }
   .banner-swiper :deep(.swiper-pagination-bullet-active) {
     width: 22px;

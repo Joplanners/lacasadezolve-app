@@ -71,7 +71,7 @@ const goToProduct = (productId) => {
           <div v-else class="placeholder-image">🦊</div>
         </div>
         <div class="product-info">
-          <h4>{{ product.name }}</h4>
+          <h3>{{ product.name }}</h3>
           <p class="product-price">${{ product.price.toLocaleString('es-CL') }}</p>
         </div>
       </div>
@@ -176,7 +176,7 @@ const goToProduct = (productId) => {
   padding: 15px;
 }
 
-.product-info h4 {
+.product-info h3 {
   font-size: 1rem;
   margin: 0 0 8px 0;
   color: var(--color-heading);

@@ -25,6 +25,13 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(self)"
 
+# Responder 404 a solicitudes de /.well-known/ que no existan como archivo estático,
+# evitando que el fallback de SPA entregue HTML a bots de IA o auditores (como PageSpeed/Lighthouse)
+[[redirects]]
+  from = "/.well-known/*"
+  to = "/index.html"
+  status = 404
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

@@ -76,7 +76,7 @@ onUnmounted(() => {
       <div class="hero-content">
         <div class="hero-top">
           <div class="hero-logo">
-            <img src="/Zolve_Logo.webp" alt="La Casa de Zolve" class="hero-logo-img" />
+            <img src="/Zolve_Logo.webp" alt="La Casa de Zolve" class="hero-logo-img" width="220" height="220" fetchpriority="high" />
           </div>
           <div class="hero-text-block">
             <h2 class="hero-title" data-typewriter>Bienvenidos a La Casa de Zolve</h2>
@@ -113,7 +113,7 @@ onUnmounted(() => {
           <div class="news-card">
             <div class="card-inner-flex">
               <RouterLink to="/bts-chile">
-                <img src="/images/bts/ZolveBTS.webp" alt="Zolve BTS Logo" class="clickable-logo" loading="lazy" />
+                <img src="/images/bts/ZolveBTS.webp" alt="Zolve BTS Logo" class="clickable-logo" loading="lazy" width="150" height="150" />
               </RouterLink>
               <h3>¡Visita nuestra página de Evento!</h3>
               <p>Nuestra colección exclusiva de BTS TOUR 2026</p>
@@ -128,6 +128,7 @@ onUnmounted(() => {
               <div class="ig-embed-container">
                 <iframe
                   src="https://www.instagram.com/p/DWPSTG6CQFy/embed"
+                  title="Video y Jingle Oficial de La Casa de Zolve"
                   width="100%"
                   height="320"
                   frameborder="0"
@@ -142,7 +143,7 @@ onUnmounted(() => {
           <!-- Card 3: Servicio Impresiones -->
           <div class="news-card">
             <div class="card-inner-flex">
-              <img src="/ZolveImpresión.webp" alt="Zolve Impresión" class="clickable-logo" loading="lazy" />
+              <img src="/ZolveImpresión.webp" alt="Zolve Impresión" class="clickable-logo" loading="lazy" width="150" height="130" />
               <h3>Servicio de Impresiones</h3>
               <p>¿Tienes textos de estudio y/o necesitas imprimir? Tenemos lo que necesitas al mejor precio y llega directo a tu casa. ¡Cotiza con nosotros!.</p>
               <a href="https://wa.me/56936649482" target="_blank" rel="noopener noreferrer" class="btn btn-secondary mt-auto">
@@ -451,7 +452,7 @@ onUnmounted(() => {
   gap: 15px;
 }
 
-.news-card h3 { font-size: 1.4rem; color: var(--brand-pink); margin: 0; line-height: 1.3; }
+.news-card h3 { font-size: 1.4rem; color: #c2255c; margin: 0; line-height: 1.3; }
 .news-card p { color: var(--color-text); font-size: 1rem; }
 .mt-auto { margin-top: auto; }
 
@@ -521,9 +522,9 @@ onUnmounted(() => {
   text-align: center;
 }
 .btn:hover:not(:disabled) { transform: translateY(-2px); opacity: 0.9; }
-.btn-primary { background-color: var(--brand-pink); }
-.btn-secondary { background-color: var(--brand-turquoise); }
-.btn-contact-submit { background-color: var(--brand-orange); }
+.btn-primary { background-color: #c2255c; }
+.btn-secondary { background-color: #216d74; }
+.btn-contact-submit { background-color: #d34e18; }
 
 /* =========================================
    RESPONSIVE
