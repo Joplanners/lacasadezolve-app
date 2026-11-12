@@ -3,6 +3,14 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import StackSection from '@/components/StackSection.vue'
 import { btsChileCards } from '@/data/btsChileCards'
 import { useScrollStacking } from '@/composables/useScrollStacking'
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Freebies K-Pop por Mayor, Cumpleaños, Eventos y Colección Fan',
+  description:
+    'Packs de freebies K-Pop al por mayor (photocards, polaroids, calendarios imantados), entradas conmemorativas, planners y regalos para cumpleaños, juntas fan, conciertos y emprendimientos en Chile.',
+  url: '/especiales-y-freebies',
+})
 
 const { initStacking, initFadeInBlocks, initHeroAnimation, destroyStacking } = useScrollStacking()
 
@@ -54,11 +62,11 @@ onUnmounted(() => destroyStacking())
             <img src="/images/bts/ZolveBTS.webp" alt="Zolve BTS" class="hero-logo-img" />
           </div>
           <div class="hero-text-block">
-            <h2 class="hero-title">BTS ARIRANG TOUR 2026</h2>
+            <h2 class="hero-title">TUS MOMENTOS K-POP MERECEN UN DETALLE ÚNICO</h2>
             <h1 class="hero-text">
-              <span class="hero-line hero-line--glow" data-typewriter>Después de 9 años...</span>
-              <span class="hero-line hero-line--glow" data-typewriter>Este octubre, el momento que esperabas llegó.</span>
-              <span class="hero-line hero-line--cta hero-shimmer" data-typewriter>¡Vívelo en La Casa de Zolve!</span>
+              <span class="hero-line hero-line--glow" data-typewriter>Para un concierto, un cumpleaños, una junta fan o tu propio emprendimiento...</span>
+              <span class="hero-line hero-line--glow" data-typewriter>Sorprende con freebies por mayor, recuerdos personalizados y diseños exclusivos.</span>
+              <span class="hero-line hero-line--cta hero-shimmer" data-typewriter>¡Créalo a tu medida en La Casa de Zolve!</span>
             </h1>
           </div>
         </div>
@@ -80,44 +88,63 @@ onUnmounted(() => destroyStacking())
       :z-index="zIndexMap[card.id] || 1"
     />
 
-    <!-- ===== CONCURSO ===== -->
+    <!-- ===== FREEBIES, EVENTOS Y RECUERDOS TODO EL AÑO ===== -->
     <section ref="contestRef" class="contest-section">
       <div class="contest-inner">
-        <h2 class="contest-block">🎉 Concurso: El Gran Premio Especial</h2>
+        <h2 class="contest-block">💜 Freebies por Mayor, Cumpleaños, Eventos y Colección Fan</h2>
 
         <div class="contest-block contest-banner">
           <img
             src="/images/bts/concert-bg.webp"
-            alt="Banner concurso BTS"
+            alt="Freebies K-Pop por Mayor, Cumpleaños y Eventos La Casa de Zolve"
             class="contest-banner-img"
           />
         </div>
 
         <div class="contest-block contest-info">
-          <h3>🏆 El Gran Premio</h3>
-          <p style="margin-bottom: 1.5rem; color: #e2c0e8;">Un solo ganador se llevará el Pack Definitivo:</p>
-          <ul style="margin-bottom: 2rem;">
-            <li><strong>1 Planner Diario BTS:</strong> Portadas Personalizables.</li>
-            <li><strong>1 Polera Temática:</strong> Diseño conmemorativo.</li>
-            <li><strong>1 Regalo Sorpresa:</strong> ¡Exclusivo de de parte de Zolve!</li>
+          <h3>✨ Un detalle inolvidable para cada ocasión del año</h3>
+          <p style="margin-bottom: 1.5rem; color: #e2c0e8; line-height: 1.7;">
+            En <strong>La Casa de Zolve</strong> diseñamos y confeccionamos packs de
+            <em>freebies</em> al por mayor y artículos personalizados de K-Pop pensados para
+            acompañarte todo el año en Chile:
+          </p>
+          <ul style="margin-bottom: 2rem; line-height: 2; padding-left: 1.5rem; color: #f0f0f0;">
+            <li>
+              <strong>🎂 Cumpleaños y Eventos Temáticos:</strong> Sorprende a tus invitados con
+              photocards, polaroids, calendarios imantados o entradas conmemorativas personalizadas
+              de su bias.
+            </li>
+            <li>
+              <strong>🤝 Juntas Fan, Cupsleeves y Conciertos:</strong> Packs de <em>freebies</em>
+              listos para repartir, regalar o intercambiar con tus amigas y comunidades fan.
+            </li>
+            <li>
+              <strong>🛍️ Packs Mayoristas para Emprendimientos:</strong> Incorpora un
+              <em>freebie</em> de calidad en cada pedido de tu tienda o arma tu propio stock con
+              precios especiales por mayor.
+            </li>
+            <li>
+              <strong>🎁 Regalos y Colección Personal:</strong> Entradas conmemorativas físicas,
+              planners personalizables y poleras exclusivas hechas a tu medida.
+            </li>
           </ul>
 
-          <h3>🌟 ¿Cómo participar?</h3>
-          <ol>
-            <li><strong>Paso 1:</strong> Síguenos en Instagram en <a href="https://instagram.com/zolve_fox" target="_blank" style="color: #c8a2d4;">@zolve_fox</a>.</li>
-            <li><strong>Paso 2:</strong> Dale "Me gusta" a nuestra publicación del concurso.</li>
-            <li><strong>Paso 3:</strong> Comparte la publicación en tus historias etiquetándonos (¡tu perfil debe estar público para que podamos verlo!).</li>
-            <li><strong>🎁 Multiplica tu suerte (Opcional):</strong> Cada vez que realices una compra en nuestra web, ingresa tu usuario de Instagram al pagar. ¡Cada compra suma opciones adicionales automáticas a tu nombre!</li>
-          </ol>
-        </div>
-
-        <div class="contest-block contest-conditions" style="margin-bottom: 4rem;">
-          <h3>📜 Condiciones Oficiales</h3>
-          <ul>
-            <li>El sorteo se realizará en vivo el <strong>30 de Septiembre de 2026</strong>.</li>
-            <li>El costo de envío del Gran Premio corre por cuenta de la persona ganadora (por pagar).</li>
-            <li>Sorteo válido únicamente para residentes dentro del territorio nacional (Chile).</li>
-          </ul>
+          <div
+            style="display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-top: 1.5rem;"
+          >
+            <router-link
+              to="/tienda?categoria=freebies_mayorista"
+              style="background: linear-gradient(135deg, #f06292 0%, #c2185b 100%); color: #fff; text-decoration: none; padding: 14px 28px; border-radius: 30px; font-weight: 700; font-size: 1.05rem; box-shadow: 0 6px 20px rgba(240, 98, 146, 0.4);"
+            >
+              🎁 Ver Categoría Freebies / Por Mayor
+            </router-link>
+            <router-link
+              to="/tienda"
+              style="background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(200, 162, 212, 0.5); color: #fff; text-decoration: none; padding: 14px 28px; border-radius: 30px; font-weight: 600; font-size: 1.05rem;"
+            >
+              🛍️ Explorar Toda la Tienda
+            </router-link>
+          </div>
         </div>
       </div>
     </section>
@@ -341,20 +368,43 @@ onUnmounted(() => destroyStacking())
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 767px) {
+  .hero-section {
+    height: auto;
+    min-height: 100svh;
+    padding: 28px 0 44px;
+  }
+  .hero-content {
+    padding: 0 20px;
+  }
   .hero-top {
     flex-direction: column;
     text-align: center;
+    gap: 1.1rem;
+  }
+  .hero-text-block {
+    gap: 0.65rem;
   }
   .hero-title {
-    font-size: 2.2rem;
+    font-size: 1.85rem;
+    line-height: 1.15;
+    letter-spacing: 0.08em;
     text-align: center;
   }
   .hero-text {
-    font-size: 1.3rem;
+    font-size: 1.08rem;
+    line-height: 1.38;
+    gap: 0.55rem;
     text-align: center;
   }
+  .hero-line--cta {
+    font-size: 1.65rem;
+    margin-top: 0.3rem;
+  }
   .hero-logo-img {
-    width: 150px;
+    width: 125px;
+  }
+  .hero-scroll-hint {
+    margin-top: 1.2rem;
   }
   .contest-section {
     padding: 50px 0;

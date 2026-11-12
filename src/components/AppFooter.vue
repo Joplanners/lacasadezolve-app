@@ -1,6 +1,8 @@
 <script setup>
 import { RouterLink } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import CookieConsentBanner from '@/ga4/CookieConsentBanner.vue'
+import { openCookiePreferences } from '@/ga4'
 </script>
 
 <template>
@@ -26,6 +28,11 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
             <router-link :to="{ name: 'privacy-policy' }">Política de Privacidad</router-link>
           </li>
           <li><router-link :to="{ name: 'cookies-policy' }">Política de Cookies</router-link></li>
+          <li>
+            <button type="button" class="cookie-prefs-btn" @click="openCookiePreferences">
+              Preferencias de Cookies
+            </button>
+          </li>
         </ul>
       </div>
 
@@ -92,6 +99,8 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
     <div class="footer-copyright">
       <p>&copy; {{ new Date().getFullYear() }} La Casa de Zolve. Todos los derechos reservados.</p>
     </div>
+
+    <CookieConsentBanner />
   </footer>
 </template>
 
@@ -164,6 +173,21 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
   text-decoration: none;
 }
 .footer-links-section a:hover {
+  color: var(--brand-pink);
+  text-decoration: underline;
+}
+
+.cookie-prefs-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.cookie-prefs-btn:hover {
   color: var(--brand-pink);
   text-decoration: underline;
 }

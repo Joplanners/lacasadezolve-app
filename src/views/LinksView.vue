@@ -5,7 +5,7 @@ import { useSeoMeta } from '@/composables/useSeoMeta'
 useSeoMeta({
   title: 'Enlaces y Redes Sociales',
   description:
-    'Encuentra todos los enlaces oficiales de La Casa de Zolve: Tienda online, BTS Chile, WhatsApp, reseñas y redes sociales.',
+    'Encuentra todos los enlaces oficiales de La Casa de Zolve: Tienda online, Especiales y Freebies K-Pop, WhatsApp, reseñas y redes sociales.',
   url: '/links',
 })
 
@@ -18,8 +18,8 @@ const links = ref([
     class: 'primary'
   },
   { 
-    title: 'BTS Chile 2026', 
-    url: 'https://lacasadezolve.com/bts-chile', 
+    title: '💜 Especiales & Freebies K-Pop', 
+    url: 'https://lacasadezolve.com/especiales-y-freebies', 
     icon: '',
     image: '/images/bts/ZolveBTS.webp',
     class: 'accent'
@@ -61,7 +61,7 @@ const openLink = (url) => {
   <div class="linktree-container">
     <div class="profile-section">
       <div class="avatar">
-        <img src="/Zolve_logo_con Nombre.png" alt="La Casa de Zolve" />
+        <img src="/Zolve_logo_con_Nombre_opt.jpg" alt="La Casa de Zolve" width="100" height="100" />
       </div>
       <h1>@lacasadezolve</h1>
       <p>Papelería personalizada • Tecnología • K-pop 🦊✨</p>

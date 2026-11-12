@@ -109,15 +109,15 @@ onUnmounted(() => {
         <h2 class="section-title">Novedades y Servicios</h2>
 
         <div class="cards-grid-3">
-          <!-- Card 1: BTS Evento -->
+          <!-- Card 1: Especiales & Freebies -->
           <div class="news-card">
             <div class="card-inner-flex">
-              <RouterLink to="/bts-chile">
-                <img src="/images/bts/ZolveBTS.webp" alt="Zolve BTS Logo" class="clickable-logo" loading="lazy" width="150" height="150" />
+              <RouterLink to="/especiales-y-freebies">
+                <img src="/images/bts/ZolveBTS.webp" alt="Zolve Especiales y Freebies" class="clickable-logo" loading="lazy" width="150" height="150" />
               </RouterLink>
-              <h3>¡Visita nuestra página de Evento!</h3>
-              <p>Nuestra colección exclusiva de BTS TOUR 2026</p>
-              <RouterLink to="/bts-chile" class="btn btn-primary mt-auto">Ir al evento</RouterLink>
+              <h3>¡Especiales & Freebies K-Pop!</h3>
+              <p>Freebies por mayor, recuerdos de eventos, entradas conmemorativas y colección fan</p>
+              <RouterLink to="/especiales-y-freebies" class="btn btn-primary mt-auto">Ver Especiales</RouterLink>
             </div>
           </div>
 

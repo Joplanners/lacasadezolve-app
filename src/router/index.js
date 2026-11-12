@@ -56,8 +56,8 @@ export const routes = [
     //   meta: { requiresAuth: false },
     // },
     {
-      path: '/bts-chile',
-      name: 'bts-chile',
+      path: '/especiales-y-freebies',
+      name: 'especiales-freebies',
       component: () => import('../views/BTSChileView.vue'),
       meta: { requiresAuth: false },
     },

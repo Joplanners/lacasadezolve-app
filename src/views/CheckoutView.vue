@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabaseClient'
 import regionesComunasData from '@/data/regiones_comunas.json'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { faUniversity, faTruck, faHandshake } from '@fortawesome/free-solid-svg-icons'
+import { faTruck } from '@fortawesome/free-solid-svg-icons'
 import { useToast } from 'vue-toastification'
 import { isValidRut } from '@/utils/validation.js'
 import { storeToRefs } from 'pinia'
@@ -153,8 +153,9 @@ const isContestActive = ref(false)
 const regions = ref(regionesComunasData)
 const communes = ref([])
 const selectedRegionObject = ref(null)
-const selectedPaymentMethod = ref('')
+const selectedPaymentMethod = ref('transbank')
 const selectedShippingMethod = ref('')
+const acceptTerms = ref(false)
 const isSubmitting = ref(false)
 const userProfileData = ref(null)
 const loadingProfile = ref(false)
@@ -197,15 +198,18 @@ const discountAmount = computed(() => {
   return (subtotal.value * totalPercent) / 100
 })
 
-// 🔥 MODIFICADO: Calculamos costo de envío
-const isFreeShippingRM = computed(() => {
-  return Math.max(0, subtotal.value - discountAmount.value) >= 35000
+// 🔥 Costo y modalidad dinámica de envío según Región
+const RM_SHIPPING_FEE = 3500
+
+const isMetropolitanRegion = computed(() => {
+  const reg = (customerData.value.region || '').toLowerCase()
+  return reg.includes('metropolitana') || reg.includes('santiago')
 })
 
 const shippingCost = computed(() => {
   if (cartStore.hasOnlyDigitalItems) return 0
   if (selectedShippingMethod.value !== 'rm_rapido') return 0
-  return isFreeShippingRM.value ? 0 : 3590
+  return RM_SHIPPING_FEE
 })
 
 const finalTotal = computed(() => {
@@ -227,10 +231,16 @@ watch(
       ) {
         customerData.value.commune = ''
       }
+      // Switch dinámico automático de método de envío según Región
+      const isRM =
+        region.region.toLowerCase().includes('metropolitana') ||
+        region.region.toLowerCase().includes('santiago')
+      selectedShippingMethod.value = isRM ? 'rm_rapido' : 'starken'
     } else {
       selectedRegionObject.value = null
       communes.value = []
       customerData.value.commune = ''
+      selectedShippingMethod.value = ''
     }
   },
   { immediate: true },
@@ -375,6 +385,10 @@ async function handleCheckoutSubmit() {
     toast.error('RUT inválido.')
     return
   }
+  if (!acceptTerms.value) {
+    toast.error('Debes aceptar los Términos y Condiciones y la Política de Privacidad para continuar.')
+    return
+  }
 
   const requiredFields = {
     fullName: 'Nombre',
@@ -515,8 +529,8 @@ async function handleCheckoutSubmit() {
       shipping_method: cartStore.hasOnlyDigitalItems 
         ? 'digital'
         : (selectedShippingMethod.value === 'rm_rapido' 
-          ? (isFreeShippingRM.value ? 'Envío RM (Gratis)' : 'Envío RM ($3.590)') 
-          : selectedShippingMethod.value),
+          ? 'Envío RM - Paket ($3.500)' 
+          : 'Envío Regiones - Starken (Por Pagar)'),
       payment_method: selectedPaymentMethod.value,
       applied_coupon_code: appliedCoupons.value.map((c) => c.code).join(', ') || null,
       discount_amount: discountAmount.value > 0 ? discountAmount.value : null,
@@ -547,19 +561,8 @@ async function handleCheckoutSubmit() {
       // Lógica adicional si es necesario
     }
 
-    // 7. Procesar Pago o Redirigir
-    if (selectedPaymentMethod.value === 'transferencia') {
-      try {
-        await supabase.functions.invoke('send-order-confirmation', {
-          body: { orderData: { orderId: newOrderId } },
-        })
-      } catch (e) {
-        console.error('Error al invocar la función de Supabase:', e)
-      }
-      await cartStore.clearCart()
-      toast.success('¡Pedido creado!')
-      router.push({ name: 'transfer-pending', params: { orderId: newOrderId } })
-    } else if (selectedPaymentMethod.value === 'transbank') {
+    // 7. Procesar Pago con Transbank Webpay Plus
+    if (selectedPaymentMethod.value === 'transbank') {
       try {
         isProcessingPayment.value = true
         toast.info('Abriendo pasarela de pago...')
@@ -893,46 +896,58 @@ onUnmounted(() => {
 
         <fieldset class="form-section" v-if="!cartStore.hasOnlyDigitalItems">
           <legend>3. Método de Envío</legend>
-          <p>Elige cómo recibir tu pedido:</p>
+          <p v-if="!customerData.region" style="color: var(--color-text-soft); font-size: 0.92rem; margin-bottom: 12px;">
+            📍 Selecciona primero tu <strong>Región</strong> en el paso anterior para asignar automáticamente tu modalidad de despacho (<strong>Paket</strong> en Región Metropolitana o <strong>Starken</strong> en Regiones).
+          </p>
+          <p v-else style="font-size: 0.92rem; margin-bottom: 12px;">
+            Modalidad asignada automáticamente según tu región (<strong>{{ customerData.region }}</strong>):
+          </p>
           <div class="shipping-options">
             <label
               class="shipping-option"
-              :class="{ selected: selectedShippingMethod === 'starken' }"
-            >
-              <input
-                type="radio"
-                name="shippingMethod"
-                value="starken"
-                v-model="selectedShippingMethod"
-              />
-              <font-awesome-icon :icon="faTruck" class="shipping-icon" />
-              <span>Envío por Starken (Por Pagar)</span>
-              <small>Pagas el envío al recibir.</small>
-            </label>
-            <label
-              class="shipping-option"
-              :class="{ selected: selectedShippingMethod === 'rm_rapido' }"
+              :class="{
+                selected: selectedShippingMethod === 'rm_rapido',
+                'shipping-disabled': customerData.region && !isMetropolitanRegion,
+              }"
             >
               <input
                 type="radio"
                 name="shippingMethod"
                 value="rm_rapido"
                 v-model="selectedShippingMethod"
+                :disabled="!customerData.region || !isMetropolitanRegion"
               />
               <font-awesome-icon :icon="faTruck" class="shipping-icon" />
-              <span>
-                Envío en RM 
-                <span v-if="isFreeShippingRM" style="color: var(--brand-turquoise); font-weight: bold;">(¡GRATIS!)</span>
-              </span>
-              <small v-if="isFreeShippingRM">¡Tu compra aplica para envío gratis!</small>
-              <small v-else>$3.590 - (¡Envío gratis por compras sobre $35.000!)</small>
+              <span>Envío Región Metropolitana (Paket)</span>
+              <small>Tarifa plana: <strong>$3.500</strong> (se suma al total).</small>
+            </label>
+            <label
+              class="shipping-option"
+              :class="{
+                selected: selectedShippingMethod === 'starken',
+                'shipping-disabled': !customerData.region || isMetropolitanRegion,
+              }"
+            >
+              <input
+                type="radio"
+                name="shippingMethod"
+                value="starken"
+                v-model="selectedShippingMethod"
+                :disabled="!customerData.region || isMetropolitanRegion"
+              />
+              <font-awesome-icon :icon="faTruck" class="shipping-icon" />
+              <span>Envío a Regiones por Starken (Por Pagar)</span>
+              <small>Pagas el valor del envío al recibir tu pedido.</small>
             </label>
           </div>
+          <p style="font-size: 0.8rem; color: var(--color-text-soft); margin-top: 10px;">
+            📦 <strong>Plazo de despacho:</strong> Como nuestros productos se confeccionan bajo demanda, el envío se realiza entre <strong>2 a 3 días hábiles</strong> después de la compra (en períodos de alta demanda, como Navidad o campañas especiales, podría extenderse hasta 5 días hábiles, lo cual será informado oportunamente).
+          </p>
         </fieldset>
 
         <fieldset class="form-section">
           <legend>4. Método de Pago</legend>
-          <p>Selecciona cómo pagar:</p>
+          <p>Pago en línea seguro a nivel nacional:</p>
           <div class="payment-options">
             <label
               class="payment-option"
@@ -944,26 +959,31 @@ onUnmounted(() => {
                 value="transbank"
                 v-model="selectedPaymentMethod"
               />
-              <img src="/TransbankWebpay.png" alt="Webpay" class="payment-logo" />
+              <img src="/TransbankWebpay.webp" alt="Webpay" class="payment-logo" />
               <span>Webpay Plus</span>
-              <small>Débito o crédito.</small>
-            </label>
-            <label
-              v-if="!cartStore.hasOnlyDigitalItems"
-              class="payment-option"
-              :class="{ selected: selectedPaymentMethod === 'transferencia' }"
-            >
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="transferencia"
-                v-model="selectedPaymentMethod"
-              />
-              <font-awesome-icon :icon="faUniversity" class="payment-icon" />
-              <span>Transferencia Bancaria</span>
-              <small>Te daremos los datos al confirmar.</small>
+              <small>Tarjetas de débito, crédito y prepago.</small>
             </label>
           </div>
+          <p style="font-size: 0.82rem; color: var(--color-text-soft); margin-top: 10px;">
+            🔒 Tus datos personales se utilizan exclusivamente para individualizar tu compra, procesar el pago y gestionar el envío, conforme a nuestra <router-link :to="{ name: 'privacy-policy' }" target="_blank">Política de Privacidad</router-link>. Próximamente se incorporarán nuevos medios de pago electrónicos.
+          </p>
+          <label
+            style="display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; font-size: 0.9rem; cursor: pointer; line-height: 1.45;"
+          >
+            <input
+              type="checkbox"
+              v-model="acceptTerms"
+              required
+              style="margin-top: 3px; width: 18px; height: 18px; accent-color: var(--brand-pink, #f06292); cursor: pointer;"
+            />
+            <span>
+              He leído y acepto los
+              <router-link :to="{ name: 'terms-conditions' }" target="_blank" style="color: var(--brand-pink, #f06292); font-weight: 600;">Términos y Condiciones</router-link>
+              y la
+              <router-link :to="{ name: 'privacy-policy' }" target="_blank" style="color: var(--brand-pink, #f06292); font-weight: 600;">Política de Privacidad</router-link>
+              de La Casa de Zolve SpA.
+            </span>
+          </label>
         </fieldset>
 
         <button
@@ -1035,9 +1055,13 @@ onUnmounted(() => {
             </template>
 
             <!-- Costo de envío -->
-            <p v-if="shippingCost > 0" class="shipping-row">
-              <span>Costo de Envío (RM)</span>
+            <p v-if="!cartStore.hasOnlyDigitalItems && selectedShippingMethod === 'rm_rapido'" class="shipping-row">
+              <span>Envío RM (Paket)</span>
               <span>+ {{ formatPrice(shippingCost) }}</span>
+            </p>
+            <p v-else-if="!cartStore.hasOnlyDigitalItems && selectedShippingMethod === 'starken'" class="shipping-row">
+              <span>Envío Regiones (Starken)</span>
+              <span>Por Pagar</span>
             </p>
 
             <div class="final-total">
@@ -1626,5 +1650,12 @@ onUnmounted(() => {
 .highlight-label {
   color: #7b2d8e;
   font-weight: 700;
+}
+
+.shipping-option.shipping-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: grayscale(0.6);
 }
 </style>

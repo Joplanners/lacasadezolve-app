@@ -33,7 +33,7 @@ const showNavbar = computed(() => {
     // 'how-to',   // AR - comentado temporalmente
     // 'ar-demo',  // AR - comentado temporalmente
     'store',
-    'bts-chile',
+    'especiales-freebies',
     'terms-conditions',
     'privacy-policy',
     'cookies-policy',

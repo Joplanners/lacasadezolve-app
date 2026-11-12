@@ -36,8 +36,10 @@ export const useProductsStore = defineStore('products', () => {
         ) // Pedimos el conteo total
         .eq('is_active', true)
 
-      // Aplicar filtro de categoría si existe
-      if (categoryId) {
+      // Aplicar filtro de categoría (o categoría inteligente de Freebies / Por Mayor)
+      if (categoryId === 'freebies_mayorista') {
+        query = query.eq('is_print_product', true)
+      } else if (categoryId) {
         query = query.eq('category_id', categoryId)
       }
 

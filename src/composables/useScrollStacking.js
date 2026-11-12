@@ -39,12 +39,15 @@ export function useScrollStacking() {
       if (!section) return
 
       // Pin each section so the next scrolls over it
+      // Si la sección en móvil es más alta que la pantalla, se ancla cuando llega al final ('bottom bottom')
+      // para que nunca se corte la segunda tarjeta antes de que suba la siguiente diapositiva.
       ScrollTrigger.create({
         trigger: section,
-        start: 'top top',
+        start: () => (section.offsetHeight > window.innerHeight ? 'bottom bottom' : 'top top'),
         end: 'bottom top',
         pin: true,
         pinSpacing: false,
+        invalidateOnRefresh: true,
       })
 
       // Animate title on enter

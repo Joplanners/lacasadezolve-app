@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabaseClient.js'
 import PasswordInput from '@/components/PasswordInput.vue'
 import { useAuthStore } from '@/stores/authStore'
-import { useRouter } from 'vue-router'
+import { useRouter, RouterLink } from 'vue-router'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 
 useSeoMeta({
@@ -21,6 +21,7 @@ const password = ref('')
 const passwordConfirm = ref('') // <-- NUEVO: Para la confirmación de contraseña
 const firstName = ref('')
 const lastName = ref('')
+const acceptRegisterTerms = ref(false)
 const isRegistering = ref(false)
 const loading = ref(false)
 const message = ref('')
@@ -70,7 +71,8 @@ const isRegisterButtonDisabled = computed(() => {
     !isPasswordValid.value ||
     !firstName.value ||
     !lastName.value ||
-    !passwordsMatch.value
+    !passwordsMatch.value ||
+    !acceptRegisterTerms.value
   )
 })
 
@@ -351,6 +353,22 @@ const switchToLoginRegister = () => {
               </p>
             </template>
           </PasswordInput>
+          <label
+            style="display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 16px; font-size: 0.85rem; text-align: left; cursor: pointer; line-height: 1.4;"
+          >
+            <input
+              type="checkbox"
+              v-model="acceptRegisterTerms"
+              required
+              style="margin-top: 3px; width: 16px; height: 16px; accent-color: var(--brand-pink, #f06292); cursor: pointer;"
+            />
+            <span>
+              Acepto los
+              <router-link :to="{ name: 'terms-conditions' }" target="_blank" class="auth-link">Términos y Condiciones</router-link>
+              y la
+              <router-link :to="{ name: 'privacy-policy' }" target="_blank" class="auth-link">Política de Privacidad</router-link>.
+            </span>
+          </label>
         </template>
         <!-- Fin del nuevo campo -->
 

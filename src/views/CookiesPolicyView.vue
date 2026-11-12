@@ -1,11 +1,12 @@
 <script setup>
 import { RouterLink } from 'vue-router'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import { openCookiePreferences } from '@/ga4'
 
 useSeoMeta({
   title: 'Política de Cookies',
   description:
-    'Información sobre las cookies que utiliza La Casa de Zolve, sus fines y cómo puedes gestionarlas.',
+    'Información sobre las cookies que utiliza La Casa de Zolve, incluyendo Google Analytics 4 (GA4), sus fines y cómo puedes gestionarlas.',
   url: '/politica-de-cookies',
 })
 </script>
@@ -13,7 +14,7 @@ useSeoMeta({
 <template>
   <div class="legal-page-container">
     <h1>Política de Cookies</h1>
-    <p class="last-updated">Última actualización: 7 de noviembre de 2025</p>
+    <p class="last-updated">Última actualización: 11 de noviembre de 2026</p>
     <h2>¿Qué es esta política?</h2>
     <p>
       Esta Política de Cookies explica cómo <strong>La Casa de Zolve SpA</strong> ("nosotros", "nos"
@@ -52,34 +53,55 @@ useSeoMeta({
     </p>
     <ul>
       <li>
-        <strong>Cookies Esenciales:</strong> Algunas cookies son técnicamente necesarias para que
-        nuestro Sitio Web funcione correctamente, para mantener la seguridad y para permitirte
-        iniciar sesión y utilizar las funciones básicas (como el acceso a tu perfil y a las
-        experiencias de Realidad Aumentada). Nos referimos a ellas como cookies "esenciales" o
-        "estrictamente necesarias". Principalmente, nuestro proveedor de autenticación Supabase
-        utiliza almacenamiento local, que funciona de manera similar a las cookies, para gestionar
-        tu sesión de forma segura.
+        <strong>Cookies Esenciales (Siempre activas):</strong> Algunas cookies y tecnologías de
+        almacenamiento local son técnicamente necesarias para que nuestro Sitio Web funcione
+        correctamente, para mantener la seguridad y para permitirte iniciar sesión, gestionar tu
+        carrito de compras, acceder a tu perfil y recordar tus preferencias de privacidad. Nos
+        referimos a ellas como cookies "esenciales" o "estrictamente necesarias". Principalmente,
+        nuestro proveedor de autenticación <strong>Supabase</strong> utiliza almacenamiento local
+        (<code>localStorage</code>) para gestionar tu sesión de forma segura.
       </li>
       <li>
-        <strong>Cookies de Rendimiento y Funcionalidad (Limitadas):</strong> Podríamos utilizar
-        cookies (o tecnologías similares empleadas por nuestros proveedores de infraestructura como
-        Netlify o Cloudflare) para mejorar el rendimiento y la funcionalidad básica de nuestro Sitio
-        Web, pero actualmente no son esenciales para su uso principal.
+        <strong>Cookies de Rendimiento e Infraestructura (Limitadas):</strong> Nuestros proveedores
+        de infraestructura tecnológica (como <strong>Netlify</strong> y <strong>Cloudflare</strong>)
+        pueden emplear cookies técnicas de seguridad y balanceo para proteger el Sitio Web contra
+        accesos automatizados maliciosos y garantizar la entrega rápida de archivos e imágenes.
       </li>
       <li>
-        <strong>Cookies Analíticas (Limitadas/Futuras):</strong> Actualmente, solo utilizamos datos
-        agregados y anónimos proporcionados por nuestros servicios de hosting (Netlify/Cloudflare)
-        para entender de forma general cómo se usa nuestro sitio. No utilizamos herramientas de
-        terceros como Google Analytics que instalen cookies de seguimiento detallado en este
-        momento. Si decidiéramos implementarlas en el futuro, solicitaremos tu consentimiento
-        explícito previo a través de nuestro banner de cookies.
+        <strong>Cookies Analíticas y de Estadística (Google Analytics 4 y Search Console):</strong>
+        Utilizamos <strong>Google Analytics 4 (GA4)</strong> y métricas de
+        <strong>Google Search Console</strong>, provistos por Google LLC, para comprender de forma
+        estadística y agregada cómo los visitantes encuentran e interactúan con nuestro Sitio Web
+        (por ejemplo, búsquedas en Google, páginas más visitadas, tiempo de permanencia, país o
+        ciudad aproximada de origen y confirmación de compras reales pagadas). GA4 utiliza cookies
+        de origen como <code>_ga</code> y <code>_ga_*</code> (con una duración estándar de hasta 2
+        años) y opera con anonimización de direcciones IP. Estas cookies analíticas
+        <strong
+          >solo se activan si otorgas tu consentimiento explícito en nuestro banner de
+          cookies</strong
+        >
+        (parámetro <code>analytics_storage</code> de <em>Google Consent Mode v2</em>). Si
+        seleccionas "Solo esenciales" o desactivas esta categoría en el panel "Configurar", las
+        cookies de GA4 permanecen desactivadas.
       </li>
       <li>
-        <strong>Otras Cookies (Publicidad, Redes Sociales, etc.):</strong> No utilizamos
-        directamente cookies con fines publicitarios dirigidos en nuestro Sitio Web. Tampoco
-        incrustamos widgets de redes sociales que instalen cookies de seguimiento directamente. Los
-        enlaces a nuestras redes sociales te llevan a sus plataformas, las cuales tienen sus propias
-        políticas de cookies.
+        <strong
+          >Cookies de Campañas y Redes Sociales (Meta / Instagram / Facebook / Ads):</strong
+        >
+        Realizamos campañas de difusión y publicidad en plataformas como
+        <strong>Instagram y Facebook (Meta Platforms, Inc.)</strong> y buscadores. Cuando visitas
+        nuestro Sitio Web desde un anuncio o enlace en redes sociales, estas tecnologías o
+        parámetros de atribución (controlados mediante <code>ad_storage</code>,
+        <code>ad_user_data</code> y <code>ad_personalization</code> en
+        <em>Google Consent Mode v2</em>, o píxeles de conversión si se implementan) nos permiten
+        medir la efectividad de nuestras campañas publicitarias y saber qué publicaciones generan
+        interés real.
+        <strong
+          >Estas cookies están desactivadas por defecto y solo se activan si las autorizas
+          explícitamente</strong
+        >
+        al hacer clic en "Aceptar todas" o al habilitar el interruptor "Cookies de Campañas y Redes
+        Sociales" en el submenú <strong>"⚙️ Configurar"</strong> de nuestro banner de cookies.
       </li>
     </ul>
 
@@ -137,35 +159,52 @@ useSeoMeta({
         </ul>
       </li>
       <li>
-        <strong>Banner de Consentimiento (Próximamente):</strong> Implementaremos un banner de
-        consentimiento de cookies en nuestro Sitio Web. Este banner te permitirá aceptar o rechazar
-        categorías específicas de cookies no esenciales antes de que se activen. Las cookies
-        esenciales no se pueden rechazar, ya que son necesarias para proporcionar los servicios que
-        solicitas (como mantener tu sesión iniciada).
+        <strong>Banner de Consentimiento Granular y Gestión de Preferencias:</strong> En
+        cumplimiento con la normativa chilena sobre Protección de Datos Personales (Ley N° 19.628 y
+        su reforma mediante la Ley N° 21.719), nuestro Sitio Web cuenta con un banner de
+        consentimiento con un submenú desplegable (<strong>"⚙️ Configurar"</strong>) que te permite
+        elegir de forma granular e independiente si deseas activar las
+        <em>Cookies Analíticas y de Estadística</em> y/o las
+        <em>Cookies de Campañas y Redes Sociales</em>, aceptar todas o mantener únicamente las
+        esenciales. Además, puedes modificar o revocar tu consentimiento en cualquier momento
+        haciendo clic en el enlace "Preferencias de Cookies" del pie de página o directamente aquí:
+        <div style="margin-top: 10px">
+          <button type="button" class="btn-reopen-cookies" @click="openCookiePreferences">
+            ⚙️ Configurar mis preferencias de cookies
+          </button>
+        </div>
       </li>
     </ul>
     <p>
-      Bloquear o eliminar cookies puede tener un impacto negativo en la usabilidad de nuestro Sitio
-      Web, y algunas funciones podrían no estar disponibles si rechazas ciertas cookies
-      (especialmente las esenciales relacionadas con el inicio de sesión).
+      Bloquear o eliminar cookies opcionales no afectará tu capacidad de navegar o comprar en
+      nuestro Sitio Web. Sin embargo, bloquear las cookies esenciales del navegador puede impedir el
+      funcionamiento del inicio de sesión y del carrito de compras.
     </p>
 
     <h2>¿Qué ocurre con otras tecnologías de rastreo, como el almacenamiento local?</h2>
     <p>
-      Las cookies no son la única forma de reconocer o rastrear a los visitantes. Nuestro proveedor
-      de autenticación, Supabase, utiliza el
-      <strong>Almacenamiento Local (localStorage)</strong> del navegador para gestionar de forma
-      segura tu sesión de inicio de sesión. Esta tecnología es esencial para que puedas permanecer
-      conectado mientras navegas por las áreas protegidas del sitio. El tratamiento de esta
-      información se rige por nuestra Política de Privacidad. No utilizamos otras tecnologías como
-      balizas web o Flash Cookies actualmente.
+      Las cookies no son la única forma de reconocer o recordar preferencias de navegación. Nuestro
+      proveedor de autenticación, <strong>Supabase</strong>, utiliza el
+      <strong>Almacenamiento Local (<code>localStorage</code>)</strong> del navegador para gestionar
+      de forma segura tu sesión de usuario, y nuestro Sitio Web también utiliza
+      <code>localStorage</code> para recordar el estado de tu carrito de compras, tus preferencias
+      de cookies (<code>zolve_cookie_consent_v1</code>) y evitar duplicar el conteo estadístico de
+      un mismo pedido pagado. El tratamiento de esta información se rige por nuestra
+      <router-link :to="{ name: 'privacy-policy' }">Política de Privacidad</router-link>.
     </p>
 
-    <h2>¿Sirven publicidad dirigida?</h2>
+    <h2>¿Qué ocurre con la medición de campañas publicitarias y redes sociales?</h2>
     <p>
-      No. Terceros no sirven cookies a través de nuestro Sitio Web con el propósito de mostrarte
-      publicidad dirigida aquí. Como mencionamos, los enlaces a sitios de terceros (redes sociales,
-      <strong>Transbank</strong>) se rigen por sus propias políticas.
+      <strong>La Casa de Zolve SpA</strong> nunca vende, arrienda ni comercializa tus datos
+      personales a terceros, ni muestra anuncios de terceros dentro de este Sitio Web. No obstante,
+      cuando realizamos campañas propias de difusión en plataformas como
+      <strong>Instagram o Facebook (Meta)</strong>, la categoría opcional de
+      <em>Cookies de Campañas y Redes Sociales</em> nos ayuda a medir de forma estadística cuántas
+      visitas o compras provienen de dichas publicaciones. Estas funciones permanecen bloqueadas por
+      defecto a menos que otorgues tu consentimiento expreso en el banner de cookies. Asimismo, los
+      enlaces externos hacia nuestras redes sociales o hacia la pasarela de pago
+      <strong>Transbank Webpay Plus</strong> se rigen por las políticas de privacidad y cookies de
+      sus respectivas plataformas.
     </p>
 
     <h2>¿Con qué frecuencia actualizarán esta Política de Cookies?</h2>
@@ -265,6 +304,22 @@ useSeoMeta({
 }
 .back-link a {
   font-weight: var(--font-weight-medium);
+}
+
+.btn-reopen-cookies {
+  background-color: var(--brand-pink, #f06292);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.btn-reopen-cookies:hover {
+  opacity: 0.9;
 }
 
 /* === AÑADE ESTO AL FINAL DEL <style scoped> DE CADA VISTA LEGAL === */

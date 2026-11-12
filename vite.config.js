@@ -31,7 +31,22 @@ export default defineConfig(({ mode }) => {
     ssgOptions: {
       script: 'async',
       formatting: 'minify',
-      mock: true
+      mock: true,
+      includedRoutes(paths) {
+        // Pre-renderizar únicamente las páginas estáticas públicas e indexables para SEO,
+        // excluyendo rutas dinámicas (:id, *) y rutas privadas (/admin, /mi-perfil, /finalizar-compra, /payment)
+        return paths.filter(
+          (i) =>
+            !i.includes(':') &&
+            !i.includes('*') &&
+            !i.includes('/admin') &&
+            !i.includes('/mi-perfil') &&
+            !i.includes('/finalizar-compra') &&
+            !i.includes('/payment') &&
+            !i.includes('/actualizar-contrasena') &&
+            !i.includes('/bienvenida')
+        )
+      },
     },
     // AÑADIR ESTA SECCIÓN 'build'
     build: {

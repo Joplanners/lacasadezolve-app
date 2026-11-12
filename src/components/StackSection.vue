@@ -276,14 +276,38 @@ defineProps({
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 767px) {
+  .stack-section {
+    min-height: 100svh;
+  }
+  .stack-content {
+    padding: 24px 16px;
+  }
   .stack-title {
-    font-size: 1.7rem;
+    font-size: 1.55rem;
+    margin-bottom: 1rem;
+  }
+  .stack-grid {
+    gap: 0.9rem;
+  }
+  .stack-grid--dual {
+    flex-direction: column;
+    align-items: center;
   }
   .stack-grid--dual .product-card {
-    min-width: 100%;
+    width: 100%;
+    max-width: 280px;
+    min-width: 0;
+    padding: 12px 16px;
   }
-  .product-card__image {
-    max-width: 200px;
+  .stack-grid--dual .product-card__image {
+    max-width: 145px;
+    margin-bottom: 0.5rem;
+  }
+  .stack-grid--dual .product-card__name {
+    font-size: 0.95rem;
+  }
+  .stack-grid--single .product-card__image {
+    max-width: 210px;
   }
 }
 </style>

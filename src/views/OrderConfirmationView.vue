@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from 'vue-toastification'
+import { trackPurchase } from '@/ga4'
 
 const route = useRoute()
 const orderId = route.params.orderId
@@ -27,6 +28,7 @@ onMounted(async () => {
     if (orderError) throw orderError
 
     order.value = data
+    trackPurchase(data)
   } catch (err) {
     console.error('Error cargando orden:', err)
     error.value = 'No se pudo cargar la información del pedido'
@@ -42,37 +44,18 @@ const digitalItems = computed(() => {
 async function downloadFile(orderItemId) {
   isDownloading.value = true
   try {
-    const { data: { session } } = await supabase.auth.getSession()
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    if (!supabaseUrl) throw new Error('Configuración de Supabase no encontrada.')
     
-    const headers = { 'Content-Type': 'application/json' }
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`
-    }
-    
-    const response = await fetch('/.netlify/functions/generate-download-url', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ order_item_id: orderItemId })
-    })
-    const data = await response.json()
-    if (!response.ok) {
-      throw new Error(JSON.stringify(data.details || data.error))
-    }
-    
-    // Forzar la descarga directa del archivo al dispositivo del usuario
-    const link = document.createElement('a')
-    link.href = data.url
-    link.setAttribute('download', data.fileName || 'archivo.pdf')
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    toast.success(`Descarga iniciada. Te quedan ${data.max_downloads - data.downloads_count} descargas.`)
+    toast.info('Iniciando descarga de tu archivo...')
+    window.location.href = `${supabaseUrl}/functions/v1/download-digital-file?item_id=${orderItemId}`
   } catch (err) {
     console.error('Error al descargar:', err)
     toast.error('No se pudo descargar el archivo. Por favor intenta de nuevo.')
   } finally {
-    isDownloading.value = false
+    setTimeout(() => {
+      isDownloading.value = false
+    }, 2500)
   }
 }
 </script>
@@ -135,7 +118,7 @@ async function downloadFile(orderItemId) {
         </p>
       </div>
 
-      <div v-if="digitalItems.length > 0 && (order.status === 'paid' || order.status === 'processing')" class="digital-downloads">
+      <div v-if="digitalItems.length > 0 && ['paid', 'processing', 'shipped', 'delivered'].includes(order.status)" class="digital-downloads">
         <h2>📥 Tus Archivos Digitales</h2>
         <p>Tu compra incluye archivos digitales que ya puedes descargar.</p>
         <div class="downloads-list">

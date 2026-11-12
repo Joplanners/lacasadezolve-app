@@ -25,7 +25,7 @@ import {
   faTiktok,
   faWhatsapp, // 🔥 AÑADIDO
 } from '@fortawesome/free-brands-svg-icons'
-import { useAuthStore } from '@/stores/authStore' // <-- ¡Importante añadir esto!
+import { useAuthStore } from '@/stores/authStore'
 
 library.add(
   faEye,

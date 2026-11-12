@@ -1,9 +1,11 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { ref, onMounted, computed, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useProductsStore } from '@/stores/storeProducts'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 
+const route = useRoute()
+const router = useRouter()
 const productsStore = useProductsStore()
 
 useSeoMeta({
@@ -91,6 +93,9 @@ function goToPage(page) {
 function selectCategory(categoryId) {
   currentPage.value = 1
   selectedCategoryId.value = categoryId
+  router.replace({
+    query: categoryId ? { ...route.query, categoria: String(categoryId) } : {},
+  })
   fetchProducts()
 }
 
@@ -106,9 +111,21 @@ function onSortChange() {
 }
 
 onMounted(() => {
+  if (route.query.categoria) {
+    selectedCategoryId.value = String(route.query.categoria)
+  }
   productsStore.fetchCategories()
   fetchProducts()
 })
+
+watch(
+  () => route.query.categoria,
+  (newCat) => {
+    selectedCategoryId.value = newCat ? String(newCat) : null
+    currentPage.value = 1
+    fetchProducts()
+  },
+)
 </script>
 
 <template>
@@ -124,6 +141,14 @@ onMounted(() => {
           <li>
             <button @click="selectCategory(null)" :class="{ active: selectedCategoryId === null }">
               ✨ Todas
+            </button>
+          </li>
+          <li>
+            <button
+              @click="selectCategory('freebies_mayorista')"
+              :class="{ active: selectedCategoryId === 'freebies_mayorista' }"
+            >
+              🎁 Freebies / Por Mayor
             </button>
           </li>
           <li v-for="category in productsStore.categories" :key="category.id">
@@ -146,6 +171,7 @@ onMounted(() => {
               @change="onCategoryChangeMobile"
             >
               <option value="null">✨ Todas</option>
+              <option value="freebies_mayorista">🎁 Freebies / Por Mayor</option>
               <option
                 v-for="category in productsStore.categories"
                 :key="category.id"

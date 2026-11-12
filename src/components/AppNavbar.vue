@@ -91,7 +91,7 @@ function onLogout() {
     <!-- Center: Nav links (desktop) -->
     <nav class="navbar-center" :class="{ 'mobile-menu-active': isMobileMenuOpen }">
       <router-link :to="{ name: 'home' }" @click="closeMobileMenu">Inicio</router-link>
-      <router-link :to="{ name: 'bts-chile' }" @click="closeMobileMenu">BTS Chile</router-link>
+      <router-link :to="{ name: 'especiales-freebies' }" @click="closeMobileMenu">💜 Especiales & Freebies</router-link>
       <!-- AR routes comentadas temporalmente
       <router-link :to="{ name: 'how-to' }" @click="closeMobileMenu">Cómo Usar</router-link>
       <router-link :to="{ name: 'ar-demo' }" @click="closeMobileMenu">Demo AR</router-link>

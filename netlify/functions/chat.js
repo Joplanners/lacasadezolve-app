@@ -47,7 +47,7 @@ const MAX_DAILY_REQUESTS_CONFIG_KEY = 'gemini_chat_daily_count'
 const SLEEP_MESSAGE =
   '¡Zorry! 🦊💤 Zolve ha respondido muchas preguntas hoy y necesita recargar energías. Estaré de vuelta mañana para seguir ayudándote. ¡Buenos tutos!'
 
-const SERVER_SYSTEM_PROMPT = `Eres Zolve (🦊), el asistente virtual de La Casa de Zolve (lacasadezolve.com), una tienda online chilena de productos K-pop, anime, manga, cómics, figuras y cultura geek. Responde siempre en español chileno de forma amigable y breve. Solo respondes preguntas relacionadas con la tienda, sus productos y cultura geek. Si te preguntan algo fuera de tema, redirige amablemente al tema de la tienda.`
+const SERVER_SYSTEM_PROMPT = `Eres Zolve (🦊), el asistente virtual de La Casa de Zolve (lacasadezolve.com), una tienda online chilena especializada exclusivamente en papelería creativa, planners, agendas, cuadernos, poleras, stickers, photocards y artículos fanmade de K-pop. NO vendemos anime, manga, cómics ni figuras coleccionables. Responde siempre en español chileno amable, cercano y breve.`
 
 function getCorsOrigin(origin) {
   if (!origin) return 'https://lacasadezolve.com'
@@ -218,8 +218,12 @@ export async function handler(event, _context) {
     }
 
     const body = JSON.parse(event.body)
-    const { chatHistory, userPrompt } = body
+    const { chatHistory, userPrompt, systemPrompt } = body
     const limitedHistory = Array.isArray(chatHistory) ? chatHistory.slice(-20) : []
+    const effectiveSystemPrompt =
+      typeof systemPrompt === 'string' && systemPrompt.trim().length > 0 && systemPrompt.length <= 30000
+        ? systemPrompt
+        : SERVER_SYSTEM_PROMPT
     if (!userPrompt) {
       return {
         statusCode: 400,
@@ -248,7 +252,7 @@ export async function handler(event, _context) {
       `[Netlify Fn chat] Consultando Gemini: "${userPrompt}". Solicitudes hoy (aprox): ${currentCount}/${maxLimit}`,
     )
 
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME, systemInstruction: SERVER_SYSTEM_PROMPT })
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME, systemInstruction: effectiveSystemPrompt })
     const chatSession = model.startChat({
       history: limitedHistory,
       generationConfig,

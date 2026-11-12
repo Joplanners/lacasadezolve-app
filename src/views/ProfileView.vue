@@ -51,6 +51,10 @@ const loadingOrders = ref(false)
 const errorOrders = ref('')
 const isDownloading = ref(false)
 
+// --- Estado para Eliminación de Cuenta (Ley 21.719) ---
+const confirmDeleteSwitch = ref(false)
+const isDeletingAccount = ref(false)
+
 // --- Estado para Regiones y Comunas ---
 const regions = ref(regionesComunasData)
 const communes = ref([])
@@ -165,21 +169,13 @@ watch(
   (currentUser) => {
     if (currentUser && currentUser.id) {
       fetchFullProfile(currentUser.id)
-      fetchUserVisibleMarkers(currentUser.id)
-      fetchAvailableOverlays(currentUser.id)
       fetchUserOrders(currentUser.id)
     } else {
       profileData.value = null
-      userMarkers.value = []
-      availableOverlays.value = []
       userOrders.value = []
       errorProfile.value = 'Debes iniciar sesión para ver tu perfil.'
-      errorMarkers.value = 'Debes iniciar sesión para ver tus experiencias AR.'
-      errorOverlays.value = 'Debes iniciar sesión para ver las fotos mágicas.'
       errorOrders.value = 'Debes iniciar sesión para ver tus pedidos.'
       loadingProfile.value = false
-      loadingMarkers.value = false
-      loadingOverlays.value = false
       loadingOrders.value = false
     }
   },
@@ -389,36 +385,68 @@ const userDigitalItems = computed(() => {
 async function downloadFile(orderItemId) {
   isDownloading.value = true
   try {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) throw new Error('Sesión inválida o expirada.')
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    if (!supabaseUrl) throw new Error('Configuración de Supabase no encontrada.')
     
-    const response = await fetch('/.netlify/functions/generate-download-url', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({ order_item_id: orderItemId })
-    })
-    const data = await response.json()
-    if (!response.ok) {
-      throw new Error(JSON.stringify(data.details || data.error))
-    }
-    
-    // Forzar la descarga directa del archivo al dispositivo del usuario
-    const link = document.createElement('a')
-    link.href = data.url
-    link.setAttribute('download', data.fileName || 'archivo.pdf')
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    toast.success(`Descarga iniciada. Te quedan ${data.max_downloads - data.downloads_count} descargas.`)
+    toast.info('Iniciando descarga de tu archivo...')
+    window.location.href = `${supabaseUrl}/functions/v1/download-digital-file?item_id=${orderItemId}`
   } catch (err) {
     console.error('Error al descargar:', err)
     toast.error('No se pudo descargar el archivo. Por favor intenta de nuevo.')
   } finally {
-    isDownloading.value = false
+    setTimeout(() => {
+      isDownloading.value = false
+    }, 2500)
+  }
+}
+
+async function handleDeleteAccountPermanently() {
+  if (!confirmDeleteSwitch.value || !profileData.value?.id) return
+
+  const confirmed = window.confirm(
+    '¿Estás 100% seguro(a) de que deseas eliminar tu cuenta y todos tus datos personales de forma definitiva? Esta acción no se puede deshacer.'
+  )
+  if (!confirmed) return
+
+  isDeletingAccount.value = true
+  try {
+    const userId = profileData.value.id
+
+    // 1. Limpiar y eliminar el registro de datos personales en la tabla profiles de Supabase
+    await supabase
+      .from('profiles')
+      .update({
+        first_name: null,
+        last_name: null,
+        rut: null,
+        phone: null,
+        city: null,
+        birth_date: null,
+        gender: null,
+        shipping_address: null,
+        avatar_url: null,
+      })
+      .eq('id', userId)
+
+    await supabase.from('profiles').delete().eq('id', userId)
+
+    // 2. Intentar eliminar el usuario de auth si existe la función RPC en Supabase
+    try {
+      await supabase.rpc('delete_user_account')
+    } catch {
+      // Si la RPC aún no está creada, el perfil ya quedó purgado y cerramos sesión
+    }
+
+    await authStore.signOut()
+    toast.success('Tus datos personales y tu cuenta han sido eliminados exitosamente.')
+    router.push({ name: 'home' })
+  } catch (err) {
+    console.error('Error al eliminar cuenta:', err)
+    toast.error(
+      'Hubo un inconveniente al procesar la baja automática. Por favor escríbenos a contacto@lacasadezolve.com con el asunto BORRAR DATOS PERSONALES.'
+    )
+  } finally {
+    isDeletingAccount.value = false
   }
 }
 </script>
@@ -459,15 +487,6 @@ async function downloadFile(orderItemId) {
             <p><strong>Apellido:</strong> {{ profileData.last_name || '(No especificado)' }}</p>
             <p><strong>RUT:</strong> {{ profileData.rut || '(No especificado)' }}</p>
             <p><strong>Teléfono:</strong> {{ profileData.phone || '(No especificado)' }}</p>
-            <p>
-              <strong>F. Nacimiento:</strong>
-              {{
-                profileData.birth_date
-                  ? new Date(profileData.birth_date + 'T00:00:00').toLocaleDateString('es-CL')
-                  : '(No especificada)'
-              }}
-            </p>
-            <p><strong>Género:</strong> {{ profileData.gender || '(No especificado)' }}</p>
 
             <!-- Dirección de Envío Guardada -->
             <div class="address-display">
@@ -544,23 +563,6 @@ async function downloadFile(orderItemId) {
               <div class="form-group">
                 <label for="phone">Teléfono:</label>
                 <input type="tel" id="phone" v-model="editableProfileData.phone" />
-              </div>
-              <div class="form-group">
-                <label for="birthDate">Fecha Nacimiento:</label>
-                <input type="date" id="birthDate" v-model="editableProfileData.birth_date" />
-              </div>
-              <div class="form-group">
-                <label for="gender">Género:</label>
-                <select id="gender" v-model="editableProfileData.gender">
-                  <option value="">Prefiero no decirlo</option>
-                  <option value="Femenino">Femenino</option>
-                  <option value="Masculino">Masculino</option>
-                  <option value="Otro">Otro</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="city">Ciudad (General):</label>
-                <input type="text" id="city" v-model="editableProfileData.city" />
               </div>
 
               <hr class="form-divider" />
@@ -749,59 +751,54 @@ async function downloadFile(orderItemId) {
 
       <hr class="section-divider" />
 
+      <!-- ZONA DE PRIVACIDAD Y ELIMINACIÓN DE CUENTA (LEY 21.719) -->
+      <section class="privacy-delete-section">
+        <h3>🛡️ Privacidad y Eliminación de Datos Personales</h3>
+        <p class="privacy-info-text">
+          Tus datos personales (nombre, RUT, teléfono, correo y dirección) se almacenan de forma
+          segura en nuestra base de datos (Supabase) <strong>únicamente</strong> para individualizar
+          tus compras, gestionar tus envíos y facilitar tus futuros pedidos. En cumplimiento de la
+          <strong>Ley N° 19.628 y la Ley N° 21.719</strong>, jamás vendemos ni cedemos tus datos a
+          terceros, y puedes eliminarlos definitivamente cuando quieras.
+        </p>
 
-      <!-- SECCIÓN MIS FOTOS MÁGICAS - TEMPORALMENTE DESHABILITADA -->
-      <!--
-      <section class="experiences-section overlay-experiences-section">
-        <h3>Mis Fotos Mágicas</h3>
-        <div v-if="loadingOverlays" class="loading-indicator">Cargando fotos mágicas...</div>
-        <div v-if="errorOverlays" class="error-message">{{ errorOverlays }}</div>
-        <div
-          v-if="!loadingOverlays && !errorOverlays && availableOverlays.length === 0"
-          class="no-items"
-        >
-          No hay fotos mágicas disponibles para ti.
-        </div>
-        <div
-          v-if="!loadingOverlays && !errorOverlays && availableOverlays.length > 0"
-          class="items-grid overlay-grid"
-        >
-          <div
-            v-for="overlay in availableOverlays"
-            :key="overlay.id"
-            class="item-card overlay-card"
-          >
-            <img
-              v-if="overlay.r2_key"
-              :src="getOverlayImageUrl(overlay.r2_key)"
-              :alt="overlay.image_name"
-              class="card-thumbnail"
-              @error="
-                (e) => {
-                  e.target.style.display = 'none'
-                  const placeholder = e.target.nextElementSibling
-                  if (placeholder) placeholder.style.display = 'flex'
-                }
-              "
+        <div class="delete-account-box">
+          <label class="delete-switch-label">
+            <input
+              type="checkbox"
+              v-model="confirmDeleteSwitch"
+              class="delete-switch-input"
             />
-            <div
-              v-if="overlay.r2_key"
-              class="card-icon-placeholder thumbnail-error-placeholder"
-              style="display: none"
-              title="No se pudo cargar la vista previa"
+            <span class="delete-switch-slider"></span>
+            <span class="delete-switch-text">
+              Quiero <strong>borrar mi cuenta y mis datos personales definitivamente</strong>
+              (entiendo que perderé el acceso a mi perfil y descargas guardadas).
+            </span>
+          </label>
+
+          <button
+            type="button"
+            class="btn btn-danger-delete"
+            :disabled="!confirmDeleteSwitch || isDeletingAccount"
+            @click="handleDeleteAccountPermanently"
+          >
+            {{
+              isDeletingAccount
+                ? 'Eliminando datos...'
+                : '🗑️ Eliminar mi cuenta definitivamente'
+            }}
+          </button>
+
+          <p class="delete-email-fallback">
+            También puedes solicitar la eliminación en cualquier momento enviando un correo a
+            <a href="mailto:contacto@lacasadezolve.com?subject=BORRAR%20DATOS%20PERSONALES"
+              >contacto@lacasadezolve.com</a
             >
-              🖼️?
-            </div>
-            <div v-else class="card-icon-placeholder">🖼️</div>
-            <h4 class="card-title">{{ overlay.image_name }}</h4>
-            <p v-if="overlay.description" class="card-description">{{ overlay.description }}</p>
-            <button @click="startOverlayPhotoCapture(overlay)" class="btn btn-secondary">
-              📸 Iniciar Foto
-            </button>
-          </div>
+            con el asunto <strong>BORRAR DATOS PERSONALES</strong> indicando tu nombre y correo
+            registrado.
+          </p>
         </div>
       </section>
-      -->
     </div>
   </div>
 </template>
@@ -1292,5 +1289,123 @@ span[class^='status-'] {
   .experiences-section h3 {
     font-size: 1.1rem;
   }
+}
+
+/* --- Zona de Privacidad y Eliminación de Cuenta --- */
+.privacy-delete-section {
+  margin-top: 25px;
+  padding: 20px;
+  background-color: #fff8f8;
+  border: 1px solid #fed7d7;
+  border-radius: 10px;
+}
+
+.privacy-delete-section h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #9b2c2c;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.privacy-info-text {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #4a5568;
+  margin-bottom: 16px;
+}
+
+.delete-account-box {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px dashed #feb2b2;
+}
+
+.delete-switch-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.delete-switch-input {
+  display: none;
+}
+
+.delete-switch-slider {
+  position: relative;
+  width: 46px;
+  height: 24px;
+  background-color: #cbd5e0;
+  border-radius: 24px;
+  flex-shrink: 0;
+  transition: background-color 0.25s ease;
+}
+
+.delete-switch-slider::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.25s ease;
+}
+
+.delete-switch-input:checked + .delete-switch-slider {
+  background-color: #e53e3e;
+}
+
+.delete-switch-input:checked + .delete-switch-slider::after {
+  transform: translateX(22px);
+}
+
+.delete-switch-text {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #2d3748;
+}
+
+.btn-danger-delete {
+  background-color: #e53e3e;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 11px 18px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-danger-delete:hover:not(:disabled) {
+  background-color: #c53030;
+}
+
+.btn-danger-delete:disabled {
+  background-color: #feb2b2;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.delete-email-fallback {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #718096;
+  text-align: center;
+}
+
+.delete-email-fallback a {
+  color: #c53030;
+  font-weight: 600;
+  text-decoration: underline;
 }
 </style>

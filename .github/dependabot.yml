@@ -10,8 +10,8 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "America/Santiago"
-    # Limit to 5 PRs per week to avoid overwhelming
-    open-pull-requests-limit: 5
+    # Pausado en 0 para evitar que PRs automáticos disparen builds y consuman créditos en Netlify
+    open-pull-requests-limit: 0
     # Group minor and patch updates together to reduce noise
     groups:
       minor-and-patch:

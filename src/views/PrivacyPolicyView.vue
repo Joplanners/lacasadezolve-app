@@ -1,358 +1,208 @@
 <script setup>
-import { RouterLink } from 'vue-router' // Importar si necesitas enlaces internos
+import { RouterLink } from 'vue-router'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 
 useSeoMeta({
   title: 'Política de Privacidad',
   description:
-    'Conoce cómo La Casa de Zolve SpA protege tu información personal, tus datos y tu privacidad en nuestro sitio web.',
+    'Conoce cómo La Casa de Zolve SpA protege tu información personal, tus datos y tu privacidad bajo la Ley 19.628 y Ley 21.719.',
   url: '/politica-de-privacidad',
 })
 </script>
 
 <template>
   <div class="legal-page-container">
-    <h1>Política de Privacidad</h1>
-    <p class="last-updated">Última actualización: 7 de noviembre de 2025</p>
+    <h1>Política de Privacidad y Protección de Datos Personales</h1>
+    <p class="last-updated">Última actualización: 11 de noviembre de 2026</p>
 
-    <h2>I. Introducción</h2>
+    <h2>I. Introducción y Responsable del Tratamiento</h2>
     <p>
-      La privacidad de los visitantes y usuarios de nuestro sitio web www.lacasadezolve.com es muy
-      importante para nosotros y estamos comprometidos a protegerla. Esta política explica cómo
-      tratamos su información personal.
-    </p>
-    <p>
-      Al aceptar nuestra política de cookies (cuando corresponda) y utilizar nuestro sitio web,
-      usted consiente el uso de cookies de conformidad con los términos de esta política y nuestra
-      Política de Cookies separada.
+      La privacidad y protección de los datos personales de los visitantes y compradores de nuestro
+      sitio web www.lacasadezolve.com es una prioridad para nosotros. Esta política explica de
+      manera transparente cómo <strong>La Casa de Zolve SpA</strong> (RUT N° 77.446.775-0, con
+      domicilio legal en Eulogía Sánchez 065, Providencia, Santiago, Chile, representada legalmente
+      por Doña Jacqueline Alejandra Vásquez Diabuno, correo de contacto
+      <strong>contacto@lacasadezolve.com</strong>) recopila, almacena, protege y elimina su
+      información personal, en estricto cumplimiento de la <strong>Ley N° 19.628</strong> sobre
+      Protección de la Vida Privada y sus modificaciones introducidas por la
+      <strong>Ley N° 21.719</strong> sobre Protección de Datos Personales de la República de Chile.
     </p>
 
-    <h2>II. Recopilación de Información Personal</h2>
+    <h2>II. ¿Qué Datos Personales Recopilamos y con qué Finalidad?</h2>
     <p>
-      Los siguientes tipos de información personal pueden ser recopilados, almacenados y usados:
+      Aplicamos el principio de minimización de datos: únicamente solicitamos los datos
+      estrictamente indispensables para prestar nuestros servicios:
     </p>
     <ol>
       <li>
-        Información sobre su dispositivo y navegación, como su dirección IP (anonimizada cuando sea
-        posible), ubicación geográfica general, tipo y versión de navegador, sistema operativo,
-        fuente de referencia, duración de la visita, páginas visitadas y rutas de navegación dentro
-        del sitio web (recopilada a través de herramientas de analítica básicas de nuestro proveedor
-        de hosting Netlify y/o Cloudflare, si está activo).
+        <strong>Datos de Compra y Despacho (Nombre, RUT, Correo Electrónico, Teléfono y Dirección):</strong>
+        Solicitamos estos datos en el proceso de pago (Checkout)
+        <strong
+          >única y exclusivamente para individualizar a la persona que realiza la compra, procesar
+          el pago electrónico, emitir la documentación tributaria correspondiente y gestionar el
+          despacho del pedido a su domicilio o sucursal</strong
+        >
+        (o habilitar sus descargas en el caso de productos digitales). De forma completamente
+        opcional, cuando exista un sorteo promocional activo en el sitio, el comprador podrá indicar
+        su usuario de Instagram (<code>@usuario</code>) con el único fin de participar e
+        identificarle en dicho sorteo.
       </li>
       <li>
-        Información que usted introduce al crear una cuenta en nuestro sitio web para acceder a la
-        funcionalidad de Realidad Aumentada (WebAR), como su dirección de correo electrónico y la
-        contraseña que elija (la cual es almacenada de forma segura y encriptada por nuestro
-        proveedor de autenticación, Supabase).
+        <strong>Datos de Registro y Perfil de Usuario ("Mi Perfil"):</strong>
+        Si usted decide crear una cuenta en nuestro sitio web (mediante correo y contraseña o inicio
+        de sesión con Google OAuth), sus datos de identificación y su dirección de envío se
+        almacenan en nuestra base de datos segura provista por <strong>Supabase</strong> con el
+        <strong>único fin de facilitar sus futuras compras</strong> (evitando que deba escribirlos
+        cada vez), permitirle revisar el estado de sus pedidos y mantener disponibles sus archivos
+        digitales descargables.
       </li>
       <li>
-        Información que usted introduce voluntariamente al completar o editar su perfil de usuario
-        en nuestro sitio web, como su nombre, apellido, ciudad, número de teléfono, fecha de
-        nacimiento y género.
+        <strong>Archivos para Productos Personalizados:</strong>
+        Las imágenes, fotografías o indicaciones que usted sube voluntariamente al adquirir un
+        producto personalizado se almacenan de forma segura en infraestructura de
+        <strong>Cloudflare R2 / Supabase Storage</strong> y se utilizan
+        <strong>exclusivamente para confeccionar su pedido</strong>. Jamás las publicamos ni
+        compartimos con terceros sin su autorización expresa.
       </li>
       <li>
-        Información que nos proporciona al solicitar un servicio de personalización, incluyendo las
-        imágenes y/o videos que nos envía para incorporar a la experiencia de Realidad Aumentada
-        (WebAR).
+        <strong>Información de Pagos (Webpay Plus):</strong>
+        Todos los pagos nacionales en línea son procesados directamente por
+        <strong>Transbank (Webpay Plus)</strong> bajo estándares bancarios cifrados.
+        <strong>La Casa de Zolve SpA jamás accede ni almacena los números completos de sus tarjetas
+        de crédito, débito o códigos CVV.</strong>
       </li>
       <li>
-        Información relacionada con los pagos que realice.
-        <ul>
-          <li style="margin-top: 5px">
-            <strong>Para pagos con tarjeta (Transbank):</strong> No almacenamos los datos de su
-            tarjeta, estos son procesados directamente por Transbank (Webpay Plus).
-          </li>
-          <li style="margin-top: 5px">
-            <strong>Para pagos con Transferencia Bancaria:</strong> Recopilamos y almacenamos el
-            <strong>comprobante de depósito</strong> que usted sube al seleccionar este método. Este
-            documento (imagen o PDF) es un <strong>requisito indispensable</strong> para iniciar la
-            verificación del pago y contiene información como el monto, fecha y datos del originador
-            de fondos.
-          </li>
-        </ul>
+        <strong>Datos de Navegación, Analítica (GA4) y Atribución de Campañas:</strong>
+        Previo consentimiento otorgado en nuestro banner de cookies, utilizamos
+        <strong>Google Analytics 4 (GA4)</strong> (con anonimización de IP) y métricas de atribución
+        de tráfico (como visitas provenientes de nuestras campañas o perfiles en Instagram, Facebook
+        y buscadores en Google Search Console) con fines puramente estadísticos para conocer qué
+        productos interesan a nuestros visitantes y mejorar la experiencia del sitio.
       </li>
       <li>
-        Información contenida en las comunicaciones que nos envía a través del formulario de
-        contacto de nuestro sitio web o directamente a nuestro correo electrónico
-        (contacto@lacasadezolve.com), incluyendo su nombre, correo electrónico, el contenido de la
-        comunicación y metadatos asociados.
+        <strong>Comunicaciones de Contacto y Asistente Virtual (ZolveBot):</strong>
+        Los mensajes enviados a <strong>contacto@lacasadezolve.com</strong> se utilizan solo para
+        responder su consulta. Por su parte, las consultas realizadas en nuestro chat interactivo
+        <strong>ZolveBot</strong> se procesan en tiempo real a través de los
+        <strong>servidores de Google LLC (API de Google Gemini)</strong> únicamente para generar la
+        respuesta orientativa durante su sesión de navegación.
+        <strong
+          >La Casa de Zolve SpA NO guarda, registra ni almacena en ninguna base de datos los
+          mensajes, nombres ni los datos de la interacción con el bot</strong
+        >
+        (la conversación desaparece por completo al cerrar o recargar la página). Aun así,
+        recomendamos no ingresar datos personales sensibles ni contraseñas en el chat.
       </li>
-      <li>Cualquier otra información personal que usted decida enviarnos voluntariamente.</li>
     </ol>
 
-    <h3>II.1. Tratamiento de Datos en Funciones de Realidad Aumentada (AR) de La Casa de Zolve</h3>
+    <h2>III. Prohibición Absoluta de Venta o Comercialización de Datos</h2>
     <p>
-      Cuando utilizas las funciones de Realidad Aumentada (AR) de
-      <strong>La Casa de Zolve SpA</strong>, la cámara de tu dispositivo se activa para permitir la
-      visualización de contenido digital superpuesto en el mundo real. Queremos ser completamente
-      transparentes sobre cómo manejamos los datos durante este proceso:
-    </p>
-    <div style="padding-left: 20px">
-      <p style="margin-bottom: 10px">
-        <strong>II.1.1. No Capturamos ni Almacenamos tu Entorno Físico:</strong> Es fundamental para
-        nosotros que comprendas que <strong>La Casa de Zolve SpA</strong>
-        <strong
-          >no captura, graba, ni almacena imágenes o secuencias de video de tu entorno físico, ni de
-          las superficies que tu cámara visualiza</strong
-        >
-        mientras utilizas nuestros servicios de AR. La interacción con la cámara se limita
-        estrictamente a la detección y el seguimiento en tiempo real necesarios para la correcta
-        superposición del contenido aumentado, sin retener datos visuales de tu entorno.
-      </p>
-      <p style="margin-bottom: 10px">
-        <strong>II.1.2. Contenido AR Proporcionado por el Usuario:</strong> Los únicos archivos
-        multimedia que <strong>La Casa de Zolve SpA</strong> gestiona y almacena en relación con la
-        funcionalidad AR son aquellos que tú, como usuario, nos proporcionas explícitamente. Este
-        tipo de información se detalla en el
-        <strong
-          >cuarto punto (ítem 4) de la lista principal dentro de la sección "II. Recopilación de
-          Información Personal"</strong
-        >
-        de esta política, específicamente: "<em
-          >Información que nos proporciona al solicitar un servicio de personalización, incluyendo
-          las imágenes y/o videos que nos envía para incorporar a la experiencia de Realidad
-          Aumentada (WebAR)</em
-        >". Estos archivos son la base que utilizamos para generar y mostrar el contenido aumentado
-        que has personalizado.
-      </p>
-      <p style="margin-bottom: 10px">
-        <strong>II.1.3. Almacenamiento Seguro de tu Contenido AR:</strong> Los archivos que nos
-        confías para crear tus experiencias AR se almacenan de manera segura. Para este fin,
-        utilizamos servicios de almacenamiento en la nube robustos y diseñados para la protección de
-        datos (como la infraestructura de almacenamiento de Cloudflare R2). Implementamos medidas de
-        seguridad para proteger estos archivos contra accesos no autorizados y asegurar su
-        integridad y confidencialidad.
-      </p>
-      <p style="margin-bottom: 10px">
-        <strong>II.1.4. Protección Adicional Mediante Ofuscación de Código:</strong> Como una capa
-        adicional de seguridad, ciertas partes de nuestro código de aplicación son sometidas a
-        procesos de ofuscación. Esta técnica tiene como objetivo dificultar el análisis no
-        autorizado de nuestra lógica de aplicación y, por ende, proteger el acceso a los sistemas
-        que manejan tu contenido AR.
-      </p>
-    </div>
-    <p>
-      La privacidad de los contenidos que creas y compartes a través de
-      <strong>La Casa de Zolve SpA</strong> es de suma importancia para nosotros. Estamos
-      comprometidos con la protección de tu información y la transparencia en cómo la tratamos,
-      asegurando que puedas disfrutar de nuestras experiencias AR con total confianza.
+      <strong
+        >La Casa de Zolve SpA declara expresamente que JAMÁS vende, arrienda, cede ni comercializa
+        los datos personales de sus usuarios, clientes o visitantes a terceros bajo ninguna
+        modalidad.</strong
+      >
     </p>
 
+    <h2>IV. Encargados de Tratamiento y Proveedores Tecnológicos</h2>
     <p>
-      Antes de divulgarnos la información personal de otra persona, primero debe obtener el
-      consentimiento de esa persona, tanto para la divulgación como para el procesamiento de esa
-      información personal de acuerdo con esta política.
-    </p>
-
-    <h2>III. Uso de su Información Personal</h2>
-    <p>
-      La información personal que nos envíe a través de nuestro sitio web o por otros medios de
-      contacto será usada con los fines especificados en esta política o en las páginas relevantes
-      del sitio web. Podemos usar su información personal para los siguientes fines:
-    </p>
-    <ol>
-      <li>Administrar nuestro sitio web y negocio.</li>
-      <li>
-        Permitirle usar los servicios disponibles en nuestro sitio web, como la creación de cuenta y
-        el acceso a las experiencias de Realidad Aumentada (WebAR) asociadas a sus marcadores.
-      </li>
-      <li>
-        Procesar y gestionar sus solicitudes de servicios de personalización, incluyendo la creación
-        de productos y la integración del contenido AR que nos proporcione.
-      </li>
-      <li>
-        Gestionar el pago de los servicios solicitados. Esto incluye la confirmación de pagos vía
-        <strong>Transbank</strong> y la
-        <strong>validación de pagos por Transferencia Bancaria</strong>, utilizando el comprobante
-        subido para realizar el cruce de información (cruce del pedido con el comprobante y la
-        acreditación de fondos).
-      </li>
-      <li>
-        Coordinar la entrega de los productos adquiridos (entregas presenciales o envíos por
-        correo).
-      </li>
-      <li>
-        Enviarle comunicaciones directamente relacionadas con su cuenta o servicios solicitados (ej.
-        confirmaciones, notificaciones importantes, respuestas a sus consultas).
-      </li>
-      <li>
-        Responder a las preguntas y consultas que nos envíe a través de nuestros canales de
-        contacto.
-      </li>
-      <li>Mantener protegido el sitio web y nuestra plataforma, y prevenir el fraude.</li>
-      <li>
-        Verificar el cumplimiento de los Términos y Condiciones que rigen el uso de nuestro sitio
-        web.
-      </li>
-      <li>
-        Analizar datos de uso agregados y anónimos para mejorar nuestro sitio web y servicios (sin
-        identificar usuarios individuales).
-      </li>
-    </ol>
-    <p>
-      No utilizaremos su información personal para fines distintos a los aquí descritos sin su
-      consentimiento previo. Las imágenes y videos que nos proporcione para las personalizaciones AR
-      se usarán exclusivamente para crear su experiencia AR solicitada y no serán publicados ni
-      compartidos con terceros sin su permiso explícito.
-    </p>
-    <p>
-      Sin su consentimiento explícito, no proporcionaremos su información personal a ningún tercero
-      para su marketing directo o el de otros terceros.
-    </p>
-
-    <h2>IV. Divulgación de Información Personal</h2>
-    <p>
-      Podremos divulgar su información personal a nuestros proveedores de servicios tecnológicos
-      estrictamente necesarios para operar nuestro sitio y ofrecer nuestros servicios, como sea
-      razonablemente necesario para los fines descritos en esta política. Estos proveedores
-      incluyen:
+      Para que nuestra tienda en línea funcione de forma segura, utilizamos proveedores tecnológicos
+      de primer nivel que actúan como encargados de tratamiento bajo estrictos estándares de
+      seguridad y confidencialidad:
     </p>
     <ul>
-      <li>Supabase (Autenticación y base de datos).</li>
-      <li>Netlify (proveedor de hosting).</li>
-      <li>Cloudflare (Seguridad, rendimiento y almacenamiento de contenido).</li>
-      <li>Resend (Envío de correos transaccionales y de contacto).</li>
-      <li><strong>Transbank</strong> (Procesamiento de pagos en línea).</li>
-      <li>Empresas de Correo/Mensajería (Envíos físicos).</li>
+      <li><strong>Supabase:</strong> Base de datos segura y sistema de autenticación de usuarios.</li>
+      <li><strong>Netlify:</strong> Alojamiento (hosting) y despliegue del sitio web.</li>
+      <li><strong>Cloudflare / Cloudflare R2:</strong> Seguridad perimetral y almacenamiento seguro de archivos digitales.</li>
+      <li><strong>Transbank (Webpay Plus):</strong> Procesamiento seguro de pagos con tarjetas en Chile.</li>
+      <li><strong>Resend:</strong> Envío de correos transaccionales de confirmación de compra.</li>
+      <li><strong>Paket y Starken (Empresas de Courier):</strong> Transporte y entrega de pedidos físicos (<strong>Paket</strong> para despachos dentro de la Región Metropolitana y <strong>Starken</strong> para envíos a regiones; reciben únicamente el nombre, teléfono y dirección de destino indispensables para entregar el paquete).</li>
+      <li><strong>Google LLC:</strong> Google Analytics 4 / Search Console (estadísticas web sujetas a su configuración de cookies), Google OAuth (inicio de sesión opcional) y procesamiento en tiempo real en los servidores de Google (API de Google Gemini) para las respuestas del chat <strong>ZolveBot</strong>, sin almacenamiento de las conversaciones en nuestra base de datos.</li>
     </ul>
-    <p>
-      Solo compartiremos la información mínima necesaria para que estos proveedores puedan cumplir
-      su función y exigimos que mantengan la confidencialidad y seguridad de sus datos.
-    </p>
-    <p>Además, podemos divulgar su información personal:</p>
-    <ol>
-      <li>En la medida en que sea requerido por la ley chilena.</li>
-      <li>En relación con cualquier procedimiento legal actual o prospectivo.</li>
-      <li>Para establecer, ejercer o defender nuestros derechos legales.</li>
-      <li>
-        A cualquier comprador (o comprador prospectivo) si vendiéramos nuestro negocio o activos.
-      </li>
-    </ol>
-    <p>
-      Con excepción de lo establecido en esta política o requerido por ley, no proporcionaremos su
-      información personal a otros terceros sin su consentimiento.
-    </p>
 
     <h2>V. Transferencias Internacionales de Datos</h2>
     <p>
-      La información que recopilamos puede ser almacenada y procesada en servidores ubicados fuera
-      de Chile, específicamente en los países donde operan nuestros proveedores de servicios
-      tecnológicos como Supabase, Netlify, Cloudflare, Resend, Google (si usa Google Login) y
-      <strong>Transbank</strong> (principalmente Estados Unidos y Europa). Estos proveedores están
-      comprometidos con altos estándares de seguridad y protección de datos.
-    </p>
-    <p>
-      Al usar nuestros servicios, usted acepta explícitamente estas transferencias internacionales
-      de información personal necesarias para la operation del servicio, entendiendo que tomamos
-      medidas razonables para asegurar que sus datos sean tratados de forma segura y de acuerdo con
-      esta Política de Privacidad.
+      Dado que proveedores globales de infraestructura en la nube como Supabase, Netlify, Cloudflare,
+      Resend y Google operan servidores ubicados principalmente en Estados Unidos y la Unión Europea,
+      el uso del sitio conlleva el alojamiento técnico de datos en dichos servidores internacionales,
+      los cuales cuentan con certificaciones internacionales de seguridad (ISO 27001 / SOC 2) y
+      estándares de protección adecuados conforme a la Ley N° 21.719.
     </p>
 
-    <h2>VI. Conservación de Información Personal</h2>
+    <h2>VI. Plazo de Conservación de los Datos Personales (Límite de 1 Año por Inactividad)</h2>
     <p>
-      Esta sección especifica nuestras políticas y procedimientos de conservación de información
-      personal, diseñadas para ayudar a garantizar que cumplimos con nuestras obligaciones legales.
-    </p>
-    <p>
-      La información personal que procesamos para cualquier fin no debe ser almacenada más tiempo de
-      lo necesario para ese fin o fines.
-    </p>
-    <p>
-      Generalmente, conservaremos los datos de su cuenta y perfil mientras mantenga su cuenta activa
-      con nosotros. Los datos relacionados con pedidos específicos (como las imágenes o videos para
-      AR) se conservarán durante el tiempo necesario para producir y entregar el producto, y
-      posiblemente por un período adicional razonable para atender posibles reclamos de garantía o
-      consultas posteriores, tras lo cual serán eliminados de forma segura. Los mensajes de contacto
-      se conservarán el tiempo necesario para darles respuesta y seguimiento.
-    </p>
-    <p>
-      Sin perjuicio de lo anterior, conservaremos documentos (incluidos electrónicos) que contengan
-      datos personales:
+      En cumplimiento del principio de limitación del plazo de conservación de la
+      <strong>Ley N° 21.719</strong>:
     </p>
     <ol>
       <li>
-        En la medida en que sea requerido por la ley chilena (ej. para fines tributarios o
-        contables).
+        <strong>Cuentas de Usuario:</strong> Los datos personales guardados en su perfil se
+        conservarán mientras usted mantenga su cuenta activa. Si una cuenta permanece sin actividad
+        por un período continuo superior a <strong>doce (12) meses (1 año)</strong> sin que medie
+        renovación del consentimiento del titular, <strong>La Casa de Zolve SpA</strong> procederá a
+        la eliminación o anonimización de los datos del perfil.
       </li>
       <li>
-        Si creemos que los documentos pueden ser relevantes para cualquier procedimiento legal
-        actual o prospectivo.
+        <strong>Archivos de Personalización:</strong> Las imágenes enviadas para confeccionar un
+        producto personalizado se conservan únicamente durante la fabricación, entrega y el plazo de
+        garantía legal del pedido, eliminándose posteriormente de forma segura.
       </li>
-      <li>Para establecer, ejercer o defender nuestros derechos legales.</li>
+      <li>
+        <strong>Obligaciones Legales y Tributarias:</strong> Los datos estrictamente asociados a
+        comprobantes de venta y facturación se conservarán por el plazo exigido por la legislación
+        tributaria chilena ante el Servicio de Impuestos Internos (SII).
+      </li>
     </ol>
 
-    <h2>VII. Seguridad de su Información Personal</h2>
+    <h2>VII. ¿Cómo Solicitar el Borrado de sus Datos Personales o Eliminar su Cuenta Definitivamente?</h2>
     <p>
-      Tomaremos precauciones técnicas y organizacionales razonables para evitar la pérdida, mal uso
-      o alteración de su información personal.
+      Usted es dueño(a) de sus datos personales y puede eliminarlos de nuestra base de datos en
+      <strong>Supabase</strong> en cualquier momento y sin costo a través de cualquiera de estos dos
+      mecanismos directos:
     </p>
+    <ol>
+      <li>
+        <strong>Desde su panel "Mi Perfil" (Eliminación inmediata con Switch):</strong>
+        Inicie sesión en www.lacasadezolve.com, ingrese a <strong>"Mi Perfil"</strong> y baje hasta
+        el final de la página a la sección
+        <em>"Privacidad y Eliminación de Datos Personales"</em>. Active el interruptor
+        (<strong>switch</strong>) de confirmación y presione el botón
+        <strong>"Eliminar mi cuenta definitivamente"</strong>. Sus datos de perfil se borrarán de
+        inmediato de nuestra base de datos y su sesión quedará cerrada.
+      </li>
+      <li>
+        <strong>Por Correo Electrónico:</strong>
+        Envíe un correo electrónico a <strong>contacto@lacasadezolve.com</strong> indicando en el
+        asunto <strong><code>BORRAR DATOS PERSONALES</code></strong> e incluyendo en el cuerpo del
+        mensaje su <strong>nombre completo y correo electrónico registrado</strong> para poder
+        individualizar su cuenta y eliminar definitivamente sus registros de nuestra base de datos.
+      </li>
+    </ol>
+
+    <h2>VIII. Ejercicio de Derechos ARSOP+ (Ley N° 19.628 y Ley N° 21.719)</h2>
     <p>
-      Almacenaremos la información personal que nos proporcione en bases de datos seguras
-      gestionadas por Supabase, que implementa medidas de seguridad robustas (encriptación,
-      cortafuegos).
+      Como titular de datos personales, usted puede ejercer gratuitamente en cualquier momento sus
+      derechos legales:
     </p>
+    <ul>
+      <li><strong>Acceso:</strong> Conocer qué datos suyos tratamos y su finalidad.</li>
+      <li><strong>Rectificación:</strong> Corregir o actualizar datos inexactos o incompletos (directamente en "Mi Perfil" o por correo).</li>
+      <li><strong>Supresión (Cancelación):</strong> Eliminar sus datos personales y su cuenta cuando lo desee.</li>
+      <li><strong>Oposición y Bloqueo:</strong> Oponerse a tratamientos específicos o solicitar la suspensión temporal de sus datos.</li>
+      <li><strong>Portabilidad:</strong> Solicitar copia electrónica estructurada de sus datos personales.</li>
+      <li><strong>Revocación del Consentimiento:</strong> Retirar su consentimiento en cualquier momento (por ejemplo, para cookies desde el botón "Preferencias de Cookies" en el pie de página).</li>
+    </ul>
     <p>
-      Las transacciones de pago con tarjeta <strong>en línea</strong> son gestionadas directamente
-      por <strong>Transbank (Webpay Plus)</strong> a través de sus plataformas seguras y cifradas.
-    </p>
-    <p>
-      Usted acepta que la transmisión de información en Internet nunca es completamente segura y,
-      aunque nos esforzamos por proteger sus datos, no podemos garantizar la seguridad absoluta de
-      los datos enviados a través de nuestro sitio web.
-    </p>
-    <p>
-      Usted es responsable de mantener de forma confidencial la contraseña que use para acceder a
-      nuestro sitio web. Nosotros nunca le pediremos su contraseña (excepto cuando usted mismo
-      inicie sesión en el sitio).
+      Todas las solicitudes son atendidas gratuitamente en
+      <strong>contacto@lacasadezolve.com</strong> dentro de los plazos establecidos por la ley
+      chilena.
     </p>
 
-    <h2>VIII. Modificaciones a esta Política</h2>
+    <h2>IX. Cookies y Tecnologías Similares</h2>
     <p>
-      Es posible que actualicemos esta política de vez en cuando publicando una nueva versión en
-      nuestro sitio web. Usted debe comprobar ocasionalmente esta página para asegurarse de que
-      entiende cualquier cambio a esta política. Podríamos notificarle de cambios significativos a
-      esta política a través de correo electrónico si tenemos su dirección registrada.
-    </p>
-
-    <h2>IX. Sus Derechos</h2>
-    <p>
-      Usted tiene derecho a ejercer sus derechos de Acceso, Rectificación, Cancelación y Oposición
-      (ARCO) respecto a su información personal que poseemos, de acuerdo con la Ley 19.628.
-    </p>
-    <p>
-      Puede solicitarnos que le proporcionemos la información personal que tenemos sobre usted, que
-      corrijamos datos inexactos, que eliminemos sus datos (sujeto a nuestras obligaciones legales
-      de conservación) o que nos opongamos a ciertos usos.
-    </p>
-    <p>
-      Para ejercer estos derechos, por favor contáctenos a través de nuestro correo electrónico:
-      contacto@lacasadezolve.com, presentando evidencia apropiada sobre su identidad para proteger
-      su privacidad. Responderemos a su solicitud en los plazos legales correspondientes.
-    </p>
-    <p>
-      Podemos retener información personal que usted nos solicite en la medida de lo permitido por
-      la ley.
-    </p>
-
-    <h2>X. Sitios Web de Terceros</h2>
-    <p>
-      Nuestro sitio web puede incluir hiperenlaces a sitios web de terceros (como Instagram,
-      Facebook, YouTube o <strong>Transbank</strong>). No tenemos control ni somos responsables por
-      las políticas de privacidad y prácticas de estos terceros. Le recomendamos leer sus políticas
-      de privacidad.
-    </p>
-
-    <h2>XI. Actualización de su Información</h2>
-    <p>
-      Por favor, mantenga actualizada la información de su perfil. Si necesita corregir algún dato
-      que no pueda modificar directamente, contáctenos a contacto@lacasadezolve.com.
-    </p>
-
-    <h2>XII. Cookies</h2>
-    <p>
-      Nuestro sitio web usa cookies y tecnologías similares para su funcionamiento y para mejorar su
-      experiencia. Para obtener información detallada sobre las cookies que utilizamos, sus fines y
-      cómo puede gestionarlas, por favor consulte nuestra
+      Para conocer en detalle cómo funcionan las cookies esenciales, analíticas (GA4) y de campañas
+      en redes sociales, y cómo activarlas o desactivarlas desde nuestro submenú de configuración,
+      consulte nuestra
       <router-link :to="{ name: 'cookies-policy' }">Política de Cookies</router-link>.
     </p>
 
@@ -376,11 +226,17 @@ useSeoMeta({
 }
 .legal-page-container h1 {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 10px;
   color: var(--color-heading);
   border-bottom: 1px solid var(--color-border);
   padding-bottom: 15px;
   font-size: 1.8rem;
+}
+.last-updated {
+  text-align: center;
+  font-size: 0.85em;
+  color: #666;
+  margin-bottom: 30px;
 }
 .legal-page-container h2 {
   margin-top: 2em;
@@ -389,7 +245,7 @@ useSeoMeta({
   color: var(--color-heading);
   border-bottom: 1px solid #eee;
   padding-bottom: 0.3em;
-  font-weight: var(--font-weight-bold); /* Hacer H2 más fuerte */
+  font-weight: var(--font-weight-bold);
 }
 
 .legal-page-container p,
@@ -402,13 +258,13 @@ useSeoMeta({
 .legal-page-container ul {
   margin-left: 25px;
   margin-bottom: 1em;
-  padding-left: 15px; /* Añadir padding para listas */
+  padding-left: 15px;
 }
 .legal-page-container ol {
-  list-style-type: decimal; /* Asegurar numeración */
+  list-style-type: decimal;
 }
 .legal-page-container ul {
-  list-style-type: disc; /* Asegurar viñetas */
+  list-style-type: disc;
 }
 .legal-page-container strong {
   font-weight: var(--font-weight-bold);
@@ -430,12 +286,8 @@ useSeoMeta({
   text-decoration: underline;
 }
 
-/* === AÑADE ESTO AL FINAL DEL <style scoped> DE CADA VISTA LEGAL === */
-
 @media (max-width: 820px) {
-  /* Ligeramente antes de que 800px sea el 100% */
   .legal-page-container {
-    /* width: 90%; */ /* Si quieres que ocupe más de la pantalla en tablets */
     padding: 20px 25px;
   }
 }
@@ -444,54 +296,41 @@ useSeoMeta({
   .legal-page-container {
     width: 95%;
     margin: 20px auto;
-    padding: 20px 15px; /* Menos padding lateral en móviles */
-    min-height: unset; /* Quitar min-height si no es necesario */
-    border: none; /* Opcional: quitar borde en móvil */
-    background-color: var(--color-background); /* Opcional: quitar el fondo suave */
+    padding: 20px 15px;
+    min-height: unset;
+    border: none;
+    background-color: var(--color-background);
   }
 
   .legal-page-container h1 {
-    font-size: 1.5rem; /* Reducir tamaño de H1 */
-    margin-bottom: 20px;
+    font-size: 1.5rem;
+    margin-bottom: 10px;
     padding-bottom: 10px;
   }
 
   .legal-page-container h2 {
-    font-size: 1.2rem; /* Reducir tamaño de H2 */
+    font-size: 1.2rem;
     margin-top: 1.5em;
     margin-bottom: 0.8em;
   }
 
-  .legal-page-container h3 {
-    font-size: 1.1rem;
-    margin-top: 1.2em;
-    margin-bottom: 0.6em;
-  }
-  .legal-page-container h4 {
-    font-size: 1rem;
-    margin-top: 1em;
-    margin-bottom: 0.5em;
-  }
-
   .legal-page-container p,
   .legal-page-container li {
-    font-size: 0.95rem; /* Ligeramente más pequeño si es necesario */
+    font-size: 0.95rem;
     line-height: 1.7;
-    text-align: left; /* Alinear a la izquierda en móvil suele ser más legible que justificado */
+    text-align: left;
   }
 
   .legal-page-container ol,
   .legal-page-container ul {
-    margin-left: 20px; /* Menos indentación */
-    padding-left: 10px; /* Ajustar padding si es necesario */
+    margin-left: 20px;
+    padding-left: 10px;
   }
   .last-updated {
-    /* Para CookiesPolicyView si lo tienes */
     font-size: 0.8rem;
     margin-bottom: 20px;
   }
   .back-link {
-    /* Para el enlace de volver */
     margin-top: 30px;
     padding-top: 15px;
   }

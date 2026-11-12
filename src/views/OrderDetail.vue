@@ -2,15 +2,40 @@
 import { ref, onMounted, computed } from 'vue' // <-- Añadimos computed
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabaseClient'
+import { useToast } from 'vue-toastification'
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
 
 const order = ref(null)
 const loading = ref(true)
 const error = ref('')
+const isDownloading = ref(false)
 
 const orderId = route.params.orderId
+
+const canDownloadDigital = computed(() => {
+  return ['paid', 'processing', 'shipped', 'delivered'].includes(order.value?.status)
+})
+
+async function downloadFile(orderItemId) {
+  if (!orderItemId) return
+  isDownloading.value = true
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    if (!supabaseUrl) throw new Error('Configuración de Supabase no encontrada.')
+    toast.info('Iniciando descarga de tu archivo...')
+    window.location.href = `${supabaseUrl}/functions/v1/download-digital-file?item_id=${orderItemId}`
+  } catch (err) {
+    console.error('Error al descargar:', err)
+    toast.error('No se pudo descargar el archivo. Por favor intenta de nuevo.')
+  } finally {
+    setTimeout(() => {
+      isDownloading.value = false
+    }, 2500)
+  }
+}
 
 // --- NUEVO: Propiedad computada para el subtotal ---
 const subtotal = computed(() => {
@@ -33,9 +58,11 @@ async function fetchOrderDetails() {
         id, created_at, total_amount, status, shipping_address,
         applied_coupon_code, discount_amount,
         order_items (
+          id,
           quantity,
           price_at_purchase,
-          product:products (name, image_urls)
+          metadata,
+          product:products (id, name, image_urls, is_downloadable)
         )
       `,
       )
@@ -144,6 +171,15 @@ onMounted(() => {
                   )
                 }}
               </p>
+              <div v-if="item.product?.is_downloadable && canDownloadDigital" style="margin-top: 8px;">
+                <button
+                  @click="downloadFile(item.id)"
+                  :disabled="isDownloading"
+                  style="background: #8e24aa; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer;"
+                >
+                  {{ isDownloading ? 'Cargando...' : '📥 Descargar Archivo Digital' }}
+                </button>
+              </div>
             </div>
             <p class="product-subtotal">
               {{
