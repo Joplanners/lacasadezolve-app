@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 export const useProductsStore = defineStore('products', () => {
   // State
   const products = ref([])
+  const allProductsCatalog = ref([]) // Catálogo completo persistente para ZolveBot
   const totalProducts = ref(0) // Para la paginación
   const categories = ref([])
   const loading = ref(false)
@@ -30,6 +31,8 @@ export const useProductsStore = defineStore('products', () => {
           `
           id, name, price, offer_price, discount_percentage,
           discount_start_date, discount_end_date, image_urls,
+          is_active, is_print_product, is_downloadable, stock,
+          print_quantity_packages,
           category:product_categories ( name )
         `,
           { count: 'exact' },
@@ -83,7 +86,7 @@ export const useProductsStore = defineStore('products', () => {
 
   // --- OTRAS FUNCIONES DE LECTURA ---
 
-  // Obtener todos los productos (para el panel de admin)
+  // Obtener todos los productos (para el panel de admin y ZolveBot)
   const fetchAllProducts = async () => {
     try {
       loading.value = true
@@ -95,6 +98,7 @@ export const useProductsStore = defineStore('products', () => {
 
       if (fetchError) throw fetchError
       products.value = data || []
+      allProductsCatalog.value = data || []
       return products.value
     } catch (err) {
       console.error('Error obteniendo todos los productos:', err)
@@ -279,6 +283,7 @@ export const useProductsStore = defineStore('products', () => {
   return {
     // State
     products,
+    allProductsCatalog,
     totalProducts,
     categories,
     loading,

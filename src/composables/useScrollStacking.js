@@ -126,7 +126,14 @@ export function useScrollStacking() {
     const lines = heroEl.querySelectorAll('.hero-line[data-typewriter]')
     const shimmerEl = heroEl.querySelector('.hero-shimmer')
 
-    const tl = gsap.timeline({ delay: 0.3 })
+    const tl = gsap.timeline({
+      delay: 0.2,
+      scrollTrigger: {
+        trigger: heroEl,
+        start: 'top 80%',
+        once: true,
+      },
+    })
 
     // 1. Logo bounces in
     if (logo) {

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es-CL">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Minijuegos · La Casa de Zolve</title>
+    <meta
+      name="description"
+      content="Arcade de minijuegos K-pop de La Casa de Zolve: juega Misión BITIES: Rumbo al Estadio y Los Perdidos: Suiatsu."
+    />
+    <meta property="og:title" content="Minijuegos · La Casa de Zolve" />
+    <meta
+      property="og:description"
+      content="Elige tu misión: acompaña la aventura ARMY hasta el estadio en Misión BITIES o rescata a los 8 integrantes en Los Perdidos: Suiatsu."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#180a33" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Antonio:wght@600;700&family=Fredoka:wght@500;600;700&family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      window.addEventListener(
+        'error',
+        function (event) {
+          if (event && typeof event.filename === 'string' && event.filename.indexOf('chrome-extension://') === 0) {
+            event.preventDefault();
+          }
+        },
+        true
+      );
+    </script>
+  </head>
+  <body class="bg-[#0e0520] text-white antialiased selection:bg-[#e85d24] selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

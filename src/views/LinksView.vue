@@ -5,7 +5,7 @@ import { useSeoMeta } from '@/composables/useSeoMeta'
 useSeoMeta({
   title: 'Enlaces y Redes Sociales',
   description:
-    'Encuentra todos los enlaces oficiales de La Casa de Zolve: Tienda online, Especiales y Freebies K-Pop, WhatsApp, reseñas y redes sociales.',
+    'Encuentra todos los enlaces oficiales de La Casa de Zolve: Tienda online, Juegos, Especiales y Freebies K-Pop, WhatsApp, reseñas y redes sociales.',
   url: '/links',
 })
 
@@ -16,6 +16,12 @@ const links = ref([
     url: 'https://lacasadezolve.com', 
     icon: '🛍️',
     class: 'primary'
+  },
+  { 
+    title: '🎮 ¡Aquí están los juegos!', 
+    url: 'https://juegos.lacasadezolve.com/', 
+    icon: '🕹️',
+    class: 'games'
   },
   { 
     title: '💜 Especiales & Freebies K-Pop', 
@@ -61,7 +67,7 @@ const openLink = (url) => {
   <div class="linktree-container">
     <div class="profile-section">
       <div class="avatar">
-        <img src="/Zolve_logo_con_Nombre_opt.jpg" alt="La Casa de Zolve" width="100" height="100" />
+        <img src="/Zolve_logo_navidad.jpg" alt="La Casa de Zolve" width="100" height="100" />
       </div>
       <h1>@lacasadezolve</h1>
       <p>Papelería personalizada • Tecnología • K-pop 🦊✨</p>
@@ -186,6 +192,18 @@ p {
 .primary:hover {
   background-color: var(--brand-turquoise);
   color: var(--vt-c-white);
+}
+
+/* Games: Para la sección de Juegos (Fondo Rosado Zolve Sólido) */
+.games {
+  background-color: var(--brand-pink);
+  color: var(--vt-c-white);
+  border: 2px solid var(--brand-pink);
+}
+
+.games:hover {
+  background-color: #e85572;
+  border-color: #e85572;
 }
 
 /* Accent: Para el Planner (Fondo Turquesa Sólido) */

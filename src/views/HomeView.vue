@@ -70,7 +70,12 @@ onUnmounted(() => {
 <template>
   <div class="home-page">
 
-    <!-- ===== SECCIÓN 1: HERO ===== -->
+    <!-- ===== SECCIÓN 1: BANNER CAROUSEL ===== -->
+    <section class="banner-section">
+      <BannerCarousel />
+    </section>
+
+    <!-- ===== SECCIÓN 2: HERO ===== -->
     <section ref="heroRef" class="hero-section">
       <div class="hero-bg"></div>
       <div class="hero-content">
@@ -93,11 +98,6 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <!-- ===== SECCIÓN 2: BANNER CAROUSEL ===== -->
-    <section class="banner-section">
-      <BannerCarousel />
-    </section>
-
     <!-- ===== SECCIÓN 3: PRODUCTOS DESTACADOS ===== -->
     <section class="content-section">
       <SectionFeaturedProducts />
@@ -105,10 +105,10 @@ onUnmounted(() => {
 
     <!-- ===== SECCIÓN 4: NOVEDADES Y SERVICIOS ===== -->
     <section class="content-section bg-soft">
-      <div class="content-inner">
+      <div class="content-inner content-inner--wide">
         <h2 class="section-title">Novedades y Servicios</h2>
 
-        <div class="cards-grid-3">
+        <div class="cards-grid-4">
           <!-- Card 1: Especiales & Freebies -->
           <div class="news-card">
             <div class="card-inner-flex">
@@ -121,7 +121,21 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Card 2: Instagram Jingle -->
+          <!-- Card 2: Arcade K-Pop (Temporal hasta el 31) -->
+          <div class="news-card">
+            <div class="card-inner-flex">
+              <a href="https://juegos.lacasadezolve.com/" target="_blank" rel="noopener noreferrer" class="arcade-img-link">
+                <img src="/images/arcade-kpop-navidad.jpg" alt="Arcade K-Pop - Juegos La Casa de Zolve" class="clickable-arcade-img" loading="lazy" width="280" height="186" />
+              </a>
+              <h3>¡Arcade K-Pop! 🎮</h3>
+              <p>Disfruta nuestros minijuegos creados con cariño, compite por el mejor puntaje y comparte tu tarjeta en redes.</p>
+              <a href="https://juegos.lacasadezolve.com/" target="_blank" rel="noopener noreferrer" class="btn btn-primary mt-auto">
+                ¡Aquí están los juegos!
+              </a>
+            </div>
+          </div>
+
+          <!-- Card 3: Instagram Jingle -->
           <div class="news-card">
             <div class="card-inner-flex">
               <h3>¡Mira nuestro Jingle!</h3>
@@ -140,7 +154,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Card 3: Servicio Impresiones -->
+          <!-- Card 4: Servicio Impresiones -->
           <div class="news-card">
             <div class="card-inner-flex">
               <img src="/ZolveImpresión.webp" alt="Zolve Impresión" class="clickable-logo" loading="lazy" width="150" height="130" />
@@ -403,6 +417,10 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
+.content-inner--wide {
+  max-width: 1280px;
+}
+
 /* Fondos */
 .bg-soft { background-color: var(--color-background-soft); }
 .bg-mute { background-color: var(--color-background-mute); }
@@ -415,23 +433,20 @@ onUnmounted(() => {
 }
 
 /* =========================================
-   3 CARDS (Novedades)
+   4 CARDS (Novedades y Servicios)
 ========================================= */
-.cards-grid-3 {
-  display: flex;
-  gap: 25px;
-  justify-content: center;
+.cards-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
   align-items: stretch;
-  flex-wrap: wrap;
 }
 
 .news-card {
-  flex: 1;
-  min-width: 280px;
-  max-width: 330px;
+  width: 100%;
   background: var(--color-background);
   border-radius: 15px;
-  padding: 25px;
+  padding: 25px 20px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
@@ -463,6 +478,24 @@ onUnmounted(() => {
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.2));
 }
 .clickable-logo:hover { transform: scale(1.05); }
+
+.arcade-img-link {
+  display: block;
+  width: 100%;
+}
+
+.clickable-arcade-img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  object-fit: cover;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.clickable-arcade-img:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 16px rgba(236, 72, 153, 0.35);
+}
 
 .ig-embed-container {
   width: 100%;
@@ -529,6 +562,12 @@ onUnmounted(() => {
 /* =========================================
    RESPONSIVE
 ========================================= */
+@media (max-width: 1100px) {
+  .cards-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 767px) {
   .hero-top {
     flex-direction: column;
@@ -542,7 +581,7 @@ onUnmounted(() => {
 
   .content-section { padding: 40px 15px; }
 
-  .cards-grid-3 { flex-direction: column; align-items: center; }
+  .cards-grid-4 { grid-template-columns: 1fr; justify-items: center; }
   .news-card { width: 100%; max-width: 400px; }
 
   .contact-box { padding: 30px 20px; }

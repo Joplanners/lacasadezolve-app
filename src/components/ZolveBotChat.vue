@@ -82,16 +82,19 @@ const awaitingName = ref(true) // Para controlar el placeholder del input
 // --- SYSTEM PROMPT DINÁMICO ---
 // --- SYSTEM PROMPT DINÁMICO ---
 const dynamicProductList = computed(() => {
-  const products = productsStore.products
-  if (!products || products.length === 0) return 'Por el momento no tengo la lista de precios a mano, pero pregúntame y te ayudo.'
+  const sourceProducts =
+    productsStore.allProductsCatalog?.length > 0
+      ? productsStore.allProductsCatalog
+      : productsStore.products
+  if (!sourceProducts || sourceProducts.length === 0) return 'Por el momento no tengo la lista de precios a mano, pero pregúntame y te ayudo.'
   
   const baseUrl = window.location.origin
   
-  return products
-    .filter(p => p.is_active)
+  return sourceProducts
+    .filter(p => p.is_active !== false)
     .map(p => {
       // 1. Verificar Stock
-      const isUnlimited = p.is_downloadable || p.stock === null || p.stock === undefined
+      const isUnlimited = p.is_downloadable || p.is_print_product || p.stock === null || p.stock === undefined
       const hasStock = isUnlimited || p.stock > 0
       const stockMsg = hasStock ? '' : ' (AGOTADO / SIN STOCK)'
       
@@ -110,7 +113,25 @@ const dynamicProductList = computed(() => {
         offerMsg = ' 🔥 ¡OFERTA!'
       }
 
-      return `- ${p.name}: ${priceDisplay}${stockMsg}${offerMsg} - [Ver detalle](${baseUrl}/producto/${p.id})`
+      // 3. Etiquetas dinámicas según el tipo de producto en Supabase (100% automático si agregas o editas productos en Admin)
+      const categoryLabel = p.category?.name ? ` [Categoría: ${p.category.name}]` : ''
+      let typeAndPacksInfo = ''
+
+      if (p.is_print_product) {
+        const packsStr =
+          Array.isArray(p.print_quantity_packages) && p.print_quantity_packages.length > 0
+            ? p.print_quantity_packages
+                .map(pkg => `${pkg.quantity} uds por $${Number(pkg.total_price).toLocaleString('es-CL')}`)
+                .join(' | ')
+            : `Desde ${priceDisplay}`
+        typeAndPacksInfo = ` [FREEBIES / VENTA POR MAYOR — Packs disponibles: ${packsStr}]`
+      } else if (p.is_downloadable) {
+        typeAndPacksInfo = ' [PRODUCTO DIGITAL DESCARGABLE]'
+      } else if (p.is_event_ticket && p.ticket_promo_price) {
+        typeAndPacksInfo = ` [ENTRADA CONMEMORATIVA — Llevando 2 o más queda en $${Number(p.ticket_promo_price).toLocaleString('es-CL')} c/u]`
+      }
+
+      return `- ${p.name}${categoryLabel}: ${priceDisplay}${typeAndPacksInfo}${stockMsg}${offerMsg} - [Ver producto](${baseUrl}/producto/${p.id})`
     })
     .join('\n')
 })
@@ -133,10 +154,11 @@ const dynamicCouponList = computed(() => {
 const SYSTEM_PROMPT_ZOLVE = computed(() => `Eres Zolve 🦊, el asistente inteligente, amigable y astuto de la tienda online chilena 'La Casa de Zolve' (lacasadezolve.com).
 
 **¿QUIÉNES SOMOS Y QUÉ VENDEMOS?**
-- Somos una tienda online chilena especializada **EXCLUSIVAMENTE** en: **Papelería creativa, planners, agendas, cuadernos, poleras, stickers, photocards y artículos fanmade de K-pop (BTS, Stray Kids, etc.)**.
-- 🚫 **QUÉ NO VENDEMOS (REGLA ESTRICTA - NUNCA INVENTES):** 
+- Somos una tienda online chilena especializada **EXCLUSIVAMENTE** en: **Papelería creativa, planners, agendas, cuadernos, poleras, stickers, photocards, packs de FREEBIES K-Pop por mayor (para conciertos, cumpleaños, juntas o eventos), productos digitales y artículos fanmade de K-pop**.
+- 💡 **SOBRE LOS "FREEBIES" Y VENTA POR MAYOR (100% DINÁMICO):** Cuando un cliente pregunte por "freebies" o compras por mayor, revisa en la **LISTA DE PRODUCTOS Y PRECIOS ACTUALIZADOS (CLP)** de más abajo todos los productos que tengan la etiqueta "[FREEBIES / VENTA POR MAYOR]". Entrégale los nombres, los precios exactos de cada pack según la lista actualizada y sus enlaces directos, además de invitarlo a ver la sección [Especiales y Freebies](${window.location.origin}/especiales-y-freebies) o la categoría [Freebies / Por Mayor](${window.location.origin}/tienda?categoria=freebies_mayorista).
+- 🚫 **QUÉ NO VENDEMOS Y PROHIBICIÓN DE INVENTAR ENLACES (REGLA ESTRICTA):** 
   - **NO vendemos** anime, manga, cómics, figuras coleccionables ni productos de cultura geek/otaku general.
-  - **NUNCA inventes productos que no existan.** Solo puedes hablar de lo que está explícitamente en la lista de productos y categorías de abajo. Si alguien te pregunta por manga, anime, figuras o cosas ajenas, responde amablemente: "¡No vendemos eso! En La Casa de Zolve nos dedicamos 100% a la papelería creativa, personalización y cositas fanmade de K-pop 🦊✨".
+  - **NUNCA inventes productos, precios ni URLs que no estén en la lista de abajo.** Solo puedes usar los nombres, precios y enlaces exactos "/producto/ID" que aparecen en la **LISTA DE PRODUCTOS Y PRECIOS ACTUALIZADOS (CLP)** de más abajo. Si alguien te pregunta por manga, anime, figuras o cosas ajenas, responde amablemente: "¡No vendemos eso! En La Casa de Zolve nos dedicamos 100% a la papelería creativa, personalización y cositas fanmade de K-pop 🦊✨".
 
 Tu misión: Ayudar con consultas sobre nuestros productos reales, precios, envíos, contacto y guiar en el proceso de compra.
 
@@ -181,7 +203,7 @@ ${dynamicProductList.value}
 
 **REGLAS DE ATENCIÓN Y VENTAS (IMPORTANTE - CERO FLOJERA):**
 1. 💰 **SIEMPRE ENTREGA PRECIOS Y ENLACES:** Cuando un usuario pregunte por cualquier producto, su valor o qué cosas tenemos, **NUNCA respondas con vaguedades ni lo mandes a buscar a la web por su cuenta**. Tienes la lista completa con precios oficiales en CLP justo arriba. ¡Entrega el valor exacto en $ CLP de inmediato y añade el link directo [Ver producto](url)!
-2. 🚀 **SÉ PROACTIVO AL RECOMENDAR:** Si el usuario pregunta "¿En qué me puedes ayudar?" o "¿Qué productos tienen?", no respondas con un simple "pregunta nomás". Menciónale con entusiasmo 2 o 3 opciones destacadas con sus precios de la lista (por ejemplo: el Planner de Stray Kids a $10.990, las poleras BTS edición Huaso, o nuestras agendas y actas de matrimonio fanmade).
+2. 🚀 **SÉ PROACTIVO AL RECOMENDAR:** Si el usuario pregunta "¿En qué me puedes ayudar?" o "¿Qué productos tienen?", no respondas con un simple "pregunta nomás". Elige dinámicamente 2 o 3 productos disponibles de la **LISTA DE PRODUCTOS Y PRECIOS ACTUALIZADOS (CLP)** de arriba y menciónalos con entusiasmo junto con sus precios vigentes y enlaces reales.
 3. 📦 **STOCK:** Solo si un producto dice expresamente "(AGOTADO / SIN STOCK)" avisas que no está disponible por el momento. Si no dice agotado, ¡está disponible para comprar!
 4. 🦊 **PERSONALIDAD:** Tono cercano, astuto, chileno neutro, acogedor y alegre 🦊✨.
 `)

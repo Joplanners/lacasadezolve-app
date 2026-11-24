@@ -1,0 +1,6 @@
+{
+  "name": "Misión BITIES: Rumbo al Estadio",
+  "description": "Minijuego web 2D interactivo estilo RPG casual creado como regalo navideño de La Casa de Zolve para fans en Chile.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

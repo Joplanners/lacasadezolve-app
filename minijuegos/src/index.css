@@ -1,0 +1,276 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Fredoka', system-ui, -apple-system, sans-serif;
+    --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    --zolve-purple-deep: #1b0b38;
+    --zolve-purple: #5b21b6;
+    --zolve-purple-bright: #8b5cf6;
+    --zolve-orange: #e85d24;
+    --zolve-turquoise: #328990;
+    --zolve-cream: #fffaf3;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: var(--font-body);
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+
+  button {
+    touch-action: manipulation;
+  }
+}
+
+.theme-suiatsu {
+  --font-display: 'Antonio', sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Los Perdidos: Suiatsu Cel-Shaded Styles --- */
+.cel-box {
+  border: 2.5px solid #050811;
+  box-shadow: 4px 4px 0px #050811;
+}
+
+.cel-box-sm {
+  border: 2px solid #050811;
+  box-shadow: 2.5px 2.5px 0px #050811;
+}
+
+.cel-box-cyan {
+  border: 2.5px solid #050811;
+  box-shadow: 4px 4px 0px #00d4ff;
+}
+
+.cel-text-shadow {
+  text-shadow: 2px 2px 0px #050811, -1px -1px 0px #050811, 1px -1px 0px #050811, -1px 1px 0px #050811;
+}
+
+@keyframes cutin-slide {
+  0% {
+    transform: translateX(-110%) skewX(-12deg);
+    opacity: 0;
+  }
+  14% {
+    transform: translateX(0%) skewX(-12deg);
+    opacity: 1;
+  }
+  84% {
+    transform: translateX(0%) skewX(-12deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(110%) skewX(-12deg);
+    opacity: 0;
+  }
+}
+
+.animate-cutin {
+  animation: cutin-slide 1.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sakuga-slash {
+  0% {
+    transform: translateX(-28%) skewX(-10deg) scale(1.08);
+    opacity: 0;
+  }
+  20% {
+    transform: translateX(0%) skewX(-10deg) scale(1);
+    opacity: 1;
+  }
+  85% {
+    transform: translateX(2%) skewX(-10deg) scale(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(18%) skewX(-10deg) scale(1.06);
+    opacity: 0;
+  }
+}
+
+.animate-sakuga {
+  animation: sakuga-slash 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes rank-slam {
+  0% {
+    transform: scale(2.4) rotate(-14deg);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(0.92) rotate(3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-rank-slam {
+  animation: rank-slam 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes droplet-float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-droplet {
+  animation: droplet-float 2.6s ease-in-out infinite;
+}
+
+@keyframes white-flash-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-flash-out {
+  animation: white-flash-out 1.1s ease-out forwards;
+}
+
+/* --- Misión BITIES Chibi Animations --- */
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes jumpJoy {
+  0%, 100% {
+    transform: translateY(0px) scaleX(1) scaleY(1);
+  }
+  20% {
+    transform: translateY(3px) scaleX(1.08) scaleY(0.92);
+  }
+  55% {
+    transform: translateY(-22px) scaleX(0.94) scaleY(1.07);
+  }
+  80% {
+    transform: translateY(2px) scaleX(1.05) scaleY(0.95);
+  }
+}
+
+@keyframes bubbleRise {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.84);
+  }
+  14% {
+    opacity: 1;
+    transform: translateY(0px) scale(1.03);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(-135px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-180px) scale(0.92);
+  }
+}
+
+@keyframes alertPulse {
+  0%, 100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.92;
+  }
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.75);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes purpleFlash {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 3.2s ease-in-out infinite;
+}
+
+.animate-jump-joy {
+  animation: jumpJoy 0.85s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.animate-bubble-rise {
+  animation: bubbleRise 1.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-alert-pulse {
+  animation: alertPulse 1.1s ease-in-out infinite;
+}
+
+.animate-pop-in {
+  animation: popIn 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-purple-flash {
+  animation: purpleFlash 0.95s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-slow,
+  .animate-jump-joy,
+  .animate-alert-pulse,
+  .animate-cutin,
+  .animate-sakuga,
+  .animate-rank-slam,
+  .animate-droplet,
+  .animate-flash-out {
+    animation-duration: 0.01ms !important;
+  }
+}
