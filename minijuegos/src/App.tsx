@@ -5,6 +5,32 @@ import PerdidosApp from './perdidos/PerdidosApp';
 
 export type ActiveGame = 'hub' | 'bities' | 'los-perdidos';
 
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
+function trackGameSelection(game: ActiveGame) {
+  if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
+
+  window.gtag('event', 'page_view', {
+    page_title: document.title,
+    page_location: window.location.href,
+    page_path: window.location.pathname + window.location.search,
+  });
+
+  if (game !== 'hub') {
+    window.gtag('event', 'select_game', {
+      game_id: game,
+      game_name:
+        game === 'bities'
+          ? 'Misión BITIES: Rumbo al Estadio'
+          : 'Los Perdidos: Suiatsu',
+    });
+  }
+}
+
 function detectGameFromUrl(): ActiveGame {
   if (typeof window === 'undefined') return 'hub';
   const params = new URLSearchParams(window.location.search);
@@ -45,6 +71,7 @@ export default function App() {
         document.title = 'Los Perdidos: Suiatsu · La Casa de Zolve';
       }
       window.history.pushState({ game }, '', url.toString());
+      trackGameSelection(game);
     }
   }, []);
 
